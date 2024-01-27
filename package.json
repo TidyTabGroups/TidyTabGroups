@@ -1,7 +1,7 @@
 {
-  "name": "chrome-extension-typescript-starter",
+  "name": "tidy-tabs",
   "version": "1.0.0",
-  "description": "chrome-extension-typescript-starter",
+  "description": "tidy-tabs",
   "main": "index.js",
   "scripts": {
     "watch": "webpack --config webpack/webpack.dev.js --watch",
@@ -14,7 +14,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/chibat/chrome-extension-typescript-starter.git"
+    "url": "https://github.com/MoeBazziGIT/Tidy-Tabs.git"
   },
   "dependencies": {
     "react": "^18.2.0",

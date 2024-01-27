@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
 
-  "name": "Chrome Extension TypeScript Starter",
-  "description": "Chrome Extension, TypeScript, Visual Studio Code",
+  "name": "Tidy Tabs",
+  "description": "The easiest way to keep 'tabs' on your work, studies and life.",
   "version": "1.0",
 
   "options_ui": {
