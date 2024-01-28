@@ -1,6 +1,5 @@
-function polling() {
-  // console.log("polling");
-  setTimeout(polling, 1000 * 30);
-}
+import { DataModelManager } from "./model";
 
-polling();
+(async function main() {
+  const dataModel = await DataModelManager.initialize();
+})();

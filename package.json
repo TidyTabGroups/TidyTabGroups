@@ -17,8 +17,10 @@
     "url": "https://github.com/MoeBazziGIT/Tidy-Tabs.git"
   },
   "dependencies": {
+    "@types/uuid": "^9.0.8",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/chrome": "0.0.158",
