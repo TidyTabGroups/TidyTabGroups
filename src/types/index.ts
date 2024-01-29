@@ -49,4 +49,13 @@ export declare namespace TidyTabs {
   export interface DataModel {
     activeSpaces: Array<Space>;
   }
+
+  export type SpaceSyncDataType = "tab" | "tabGroup";
+
+  export interface SpaceSyncData<T extends SpaceSyncDataType> {
+    windowId: ChromeWindowId;
+    activeSpace: TidyTabs.Space;
+    type: T;
+    data: T extends "tab" ? ChromeTabWithId : ChromeTabGroupWithId;
+  }
 }
