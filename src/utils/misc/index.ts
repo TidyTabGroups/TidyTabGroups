@@ -37,3 +37,38 @@ export function tabGroupWasCollapsed(tabGroup: chrome.tabGroups.TabGroup, prevTa
 export function tabGroupWasExpanded(tabGroup: chrome.tabGroups.TabGroup, prevTabGroup: chrome.tabGroups.TabGroup) {
   return !tabGroup.collapsed && prevTabGroup.collapsed;
 }
+
+export function isTab(object: any): object is chrome.tabs.Tab {
+  const properties = [
+    "active",
+    "audible",
+    "autoDiscardable",
+    "discarded",
+    "groupId",
+    "height",
+    "highlighted",
+    "id",
+    "incognito",
+    "index",
+    "mutedInfo",
+    "pinned",
+    "selected",
+    "status",
+    "width",
+    "windowId",
+  ];
+
+  return object && properties.every((property) => property in object);
+}
+
+export function isTabGroup(object: any): object is chrome.tabGroups.TabGroup {
+  const properties = ["collapsed", "color", "id", "title", "windowId"];
+
+  return object && properties.every((property) => property in object);
+}
+
+export function isWindow(object: any): object is chrome.windows.Window {
+  const properties = ["alwaysOnTop", "focused", "height", "id", "incognito", "left", "state", "top", "type", "width"];
+
+  return object && properties.every((property) => property in object);
+}

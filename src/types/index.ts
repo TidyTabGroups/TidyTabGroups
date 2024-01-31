@@ -59,3 +59,28 @@ export declare namespace TidyTabs {
     data: T extends "tab" ? ChromeTabWithId : ChromeTabGroupWithId;
   }
 }
+
+export declare namespace ActiveSpaceForChromeObjectFinder {
+  export type FindType = "tab" | "tabGroup" | "window";
+
+  export type FindTabResultType = "activeTab" | "primaryTab" | "secondaryTab";
+  export type FindTabGroupResultType = "primaryTabGroup" | "secondaryTabGroup";
+  export type FindWindowResultType = "window";
+
+  export type FindResultType<FindType> = FindType extends "tab"
+    ? FindTabResultType
+    : FindType extends "tabGroup"
+    ? FindTabGroupResultType
+    : FindWindowResultType;
+
+  export type FindChromeObjectType<FindType> = FindType extends "tab"
+    ? ChromeTabWithId
+    : FindType extends "tabGroup"
+    ? ChromeTabGroupWithId
+    : ChromeWindowWithId;
+
+  export interface FindResult<FindType> {
+    activeSpace: TidyTabs.Space;
+    type: FindResultType<FindType>;
+  }
+}

@@ -1,4 +1,11 @@
-import { TidyTabs, ChromeTabGroupWithId, ChromeTabWithId } from "../../types/";
+import {
+  TidyTabs,
+  ChromeWindowId,
+  ChromeWindowWithId,
+  ChromeTabGroupWithId,
+  ChromeTabWithId,
+  ActiveSpaceForChromeObjectFinder,
+} from "../../types/";
 import { TidyTabsSpaceModel } from "../../model";
 import * as Utils from "../misc";
 import * as TidyTabsShapeValidator from "../TidyTabsShapeValidator";
@@ -123,6 +130,68 @@ export async function getExistingActiveSpaces() {
         DataModel::getExistingActiveSpaces::Could not get existing active spaces. 
         Error: ${error}
       `;
+    console.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+}
+
+export async function findActiveSpaceForChromeObject<T extends ActiveSpaceForChromeObjectFinder.FindType>(
+  windowId: ChromeWindowId,
+  chromeObject: ActiveSpaceForChromeObjectFinder.FindChromeObjectType<T>,
+  dataModel?: TidyTabs.DataModel
+): Promise<ActiveSpaceForChromeObjectFinder.FindResult<T> | undefined> {
+  try {
+    dataModel = await useOrGetDataModel(dataModel);
+    for (let space of dataModel.activeSpaces) {
+      const { activeData } = space;
+      if (!activeData) {
+        continue;
+      }
+
+      if (activeData.windowId !== windowId) {
+        continue;
+      }
+
+      let resultType:
+        | ActiveSpaceForChromeObjectFinder.FindResultType<ActiveSpaceForChromeObjectFinder.FindType>
+        | undefined;
+
+      if (Utils.isTab(chromeObject)) {
+        const tab = chromeObject as ChromeTabWithId;
+        const { activeTab } = activeData;
+        if (activeTab?.id === tab.id) {
+          resultType = "activeTab";
+        } else if (tab.groupId === activeData.primaryTabGroup.id) {
+          resultType = "primaryTab";
+        } else if (tab.groupId === activeData.secondaryTabGroup.id) {
+          resultType = "secondaryTab";
+        }
+      } else if (Utils.isTabGroup(chromeObject)) {
+        const tabGroup = chromeObject as ChromeTabGroupWithId;
+        const { primaryTabGroup, secondaryTabGroup } = activeData;
+        if (tabGroup.id === primaryTabGroup.id) {
+          resultType = "primaryTabGroup";
+        } else if (tabGroup.id === secondaryTabGroup.id) {
+          resultType = "secondaryTabGroup";
+        }
+      } else if (Utils.isWindow(chromeObject)) {
+        const window = chromeObject as ChromeWindowWithId;
+        if (window.id === activeData.windowId) {
+          resultType = "window";
+        }
+      } else {
+        throw new Error(`findActiveSpaceForChromeObject::chromeObject has invalid type`);
+      }
+
+      if (resultType) {
+        return {
+          activeSpace: space,
+          type: resultType,
+        } as ActiveSpaceForChromeObjectFinder.FindResult<ActiveSpaceForChromeObjectFinder.FindType>;
+      }
+    }
+  } catch (error) {
+    const errorMessage = `findActiveSpaceForChromeObject::Error: ${error}`;
     console.error(errorMessage);
     throw new Error(errorMessage);
   }

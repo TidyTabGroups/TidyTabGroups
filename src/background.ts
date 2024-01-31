@@ -11,34 +11,26 @@ async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   console.log(`onTabGroupsUpdated::tabGroup: ${tabGroup}`);
   const dataModel = await Utils.DataModel.useOrGetDataModel();
 
-  // find the active space that contains the tab group
-  let activeSpaceTabGroupType: "primary" | "secondary" | undefined;
-  const activeSpace = dataModel.activeSpaces.find((space) => {
-    const { activeData } = space;
-    if (!activeData) {
-      return false;
-    }
+  const activeSpaceFindResult = await Utils.DataModel.findActiveSpaceForChromeObject<"tabGroup">(
+    tabGroup.windowId,
+    tabGroup,
+    dataModel
+  );
 
-    if (activeData.windowId !== tabGroup.windowId) {
-      return false;
-    }
-
-    if (activeData.primaryTabGroup.id === tabGroup.id) {
-      activeSpaceTabGroupType = "primary";
-      return true;
-    } else if (activeData.secondaryTabGroup.id === tabGroup.id) {
-      activeSpaceTabGroupType = "secondary";
-      return true;
-    }
-
-    return false;
-  });
-
-  if (!activeSpace || !activeSpace.activeData) {
+  if (!activeSpaceFindResult) {
     return;
   }
 
+  const { activeSpace, type: activeSpaceTabGroupType } = activeSpaceFindResult;
   const { activeData } = activeSpace;
+
+  if (!activeData) {
+    // TODO: get rid of this once the activeData property on an "active" space is non optional
+    const errorMessage = `onTabGroupsUpdated::activeSpace ${activeSpace.id} has no activeData`;
+    console.error(errorMessage);
+    throw new Error(errorMessage);
+    return;
+  }
 
   /*
     1 if: the updated tab group is the secondary tab group:
@@ -46,10 +38,11 @@ async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
         1.1.1 if: the active tab is in the primary tab group:
           1.1.1.1 do: activate the active tab candidate in the secondary tab group
       1.2 if: the tab group was collapsed:
+        1.2.1 do: activate the active tab candidate in the primary tab group
   */
 
   // if #1
-  if (activeSpaceTabGroupType === "secondary") {
+  if (activeSpaceTabGroupType === "secondaryTabGroup") {
     // if #1.1
     if (Utils.Misc.tabGroupWasExpanded(tabGroup, activeData.secondaryTabGroup)) {
       const { activeTab, primaryTabGroup } = activeData;
