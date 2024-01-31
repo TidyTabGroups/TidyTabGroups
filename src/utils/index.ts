@@ -1,5 +1,5 @@
 import * as Misc from "./misc";
-import * as TidyTabsShapeValidator from "./TidyTabsShapeValidator";
 import * as DataModel from "./model";
+import * as Storage from "./storage";
 
-export { Misc, TidyTabsShapeValidator, DataModel };
+export { Misc, DataModel, Storage };

@@ -1,8 +1,30 @@
-import { ChromeWindowWithId, ChromeTabId, TabGroupCreationOptions, ChromeTabWithId, ChromeWindowId } from "../../types";
-import { TidyTabs, ChromeTabGroupWithId } from "../../types";
+import {
+  ChromeWindowWithId,
+  ChromeTabId,
+  TabGroupCreationOptions,
+  ChromeTabWithId,
+  ChromeTabGroupId,
+} from "../../types";
 
-export const SECONDARY_TAB_GROUP_TITLE = "      ←      ";
+const USER_OS_TYPE: "windows" | "macos" | "linux" = "windows";
+
+export const MISC_TAB_GROUP_TITLE_LEFT_MAC = "←";
+export const MISC_TAB_GROUP_TITLE_RIGHT_MAC = "TODO";
+export const MISC_TAB_GROUP_TITLE_LEFT_WINDOWS = "<";
+export const MISC_TAB_GROUP_TITLE_RIGHT_WINDOWS = ">";
+
+export const MISC_TAB_GROUP_TITLE_LEFT =
+  USER_OS_TYPE === "windows" ? MISC_TAB_GROUP_TITLE_LEFT_WINDOWS : MISC_TAB_GROUP_TITLE_LEFT_MAC;
+export const MISC_TAB_GROUP_TITLE_RIGHT =
+  USER_OS_TYPE === "windows" ? MISC_TAB_GROUP_TITLE_RIGHT_WINDOWS : MISC_TAB_GROUP_TITLE_RIGHT_MAC;
+
 export const MAX_PRIMARY_TABS = 1;
+
+export function isMiscTabGroupTitle(tabGroupTitle: String) {
+  return (
+    tabGroupTitle === MISC_TAB_GROUP_TITLE_LEFT || tabGroupTitle === MISC_TAB_GROUP_TITLE_RIGHT
+  );
+}
 
 export function getWindowsWithIds(windows: chrome.windows.Window[]) {
   // "Under some circumstances a Window may not be assigned an ID, for example when querying windows using the sessions API, in which case a session ID may be present."
@@ -13,13 +35,18 @@ export function getWindowsWithIds(windows: chrome.windows.Window[]) {
 
 export function getTabsWithIds(tabs: chrome.tabs.Tab[]) {
   // "Under some circumstances a Tab may not be assigned an ID, for example when querying foreign tabs using the sessions API, in which case a session ID may be present. Tab ID can also be set to chrome.tabs.TAB_ID_NONE for apps and devtools windows."
-  return tabs.filter((tab) => tab.id !== undefined && tab.id !== chrome.tabs.TAB_ID_NONE) as Array<ChromeTabWithId>;
+  return tabs.filter(
+    (tab) => tab.id !== undefined && tab.id !== chrome.tabs.TAB_ID_NONE
+  ) as Array<ChromeTabWithId>;
 }
 
 export async function createTabGroup(tabIds: [ChromeTabId], options?: TabGroupCreationOptions) {
   try {
     const { windowId, title, color } = options || {};
-    const tabGroupId = await chrome.tabs.group({ tabIds, createProperties: { windowId } });
+    const tabGroupId = await chrome.tabs.group({
+      tabIds,
+      createProperties: { windowId },
+    });
     if (title || color) {
       await chrome.tabGroups.update(tabGroupId, { title, color });
     }
@@ -30,11 +57,17 @@ export async function createTabGroup(tabIds: [ChromeTabId], options?: TabGroupCr
   }
 }
 
-export function tabGroupWasCollapsed(tabGroup: chrome.tabGroups.TabGroup, prevTabGroup: chrome.tabGroups.TabGroup) {
+export function tabGroupWasCollapsed(
+  tabGroup: chrome.tabGroups.TabGroup,
+  prevTabGroup: chrome.tabGroups.TabGroup
+) {
   return tabGroup.collapsed && !prevTabGroup.collapsed;
 }
 
-export function tabGroupWasExpanded(tabGroup: chrome.tabGroups.TabGroup, prevTabGroup: chrome.tabGroups.TabGroup) {
+export function tabGroupWasExpanded(
+  tabGroup: chrome.tabGroups.TabGroup,
+  prevTabGroup: chrome.tabGroups.TabGroup
+) {
   return !tabGroup.collapsed && prevTabGroup.collapsed;
 }
 
@@ -68,7 +101,18 @@ export function isTabGroup(object: any): object is chrome.tabGroups.TabGroup {
 }
 
 export function isWindow(object: any): object is chrome.windows.Window {
-  const properties = ["alwaysOnTop", "focused", "height", "id", "incognito", "left", "state", "top", "type", "width"];
+  const properties = [
+    "alwaysOnTop",
+    "focused",
+    "height",
+    "id",
+    "incognito",
+    "left",
+    "state",
+    "top",
+    "type",
+    "width",
+  ];
 
   return object && properties.every((property) => property in object);
 }
