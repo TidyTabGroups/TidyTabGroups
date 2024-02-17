@@ -1,157 +1,22 @@
-import { TidyTabs, ChromeTabGroupWithId, ChromeTabId, LocalStorage } from "../../types";
+import {
+  TidyTabs,
+  ChromeTabGroupWithId,
+  ChromeTabId,
+  LocalStorage,
+  ChromeWindowId,
+  ChromeWindowWithId,
+  ChromeTabWithId,
+  ChromeTabGroupId,
+} from "../../types";
 import * as Utils from "../../utils";
 
-export async function onStartUp() {
-  try {
-    const prevActiveWindows = await Utils.DataModel.ActiveWindow.getAll();
-    const windows = Utils.Misc.getWindowsWithIds(await chrome.windows.getAll());
-    const spaceAutoCollapseTimersToStart: { activeWindowId: string; spaceId: string }[] = [];
-    const matchedWindowsToPrevActiveWindows = await Utils.WindowMatcher.matchWindowsToActiveWindows(
-      windows,
-      prevActiveWindows
-    );
-
-    const newActiveWindows = matchedWindowsToPrevActiveWindows.map(
-      (matchedWindowToPrevActiveWindowInfo) => {
-        const { windowInfo, candidateMatchedWindowInfo } = matchedWindowToPrevActiveWindowInfo;
-        const {
-          activeWindow: prevActiveWindow,
-          matchedMiscTabGroupToSpace,
-          matchedNonMiscTabGroupsToSpaces,
-        } = candidateMatchedWindowInfo;
-
-        // group any non-grouped tabs in the window
-        // let nonGroupedTabsNewGroup: ChromeTabGroupWithId | undefined;
-        // const nonGroupedTabs = windowInfo.tabs.filter(
-        //   (tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE
-        // );
-        // if (nonGroupedTabs.length > 0) {
-        //   const tabGroupId = await chrome.tabs.group({
-        //     createProperties: {
-        //       windowId: windowInfo.window.id,
-        //     },
-        //     tabIds: nonGroupedTabs.map((tab) => tab.id),
-        //   });
-        //   nonGroupedTabsNewGroup = await chrome.tabGroups.get(tabGroupId);
-        // }
-
-        let newActiveWindowSpaces: TidyTabs.ActiveSpace[];
-        let newActiveWindowSelectedSpaceId: string | undefined;
-        let newActiveWindowPrimarySpaceId: string | undefined;
-        let newActiveWindowSelectedTabFocusType:
-          | TidyTabs.ActiveWindow["selectedSpaceFocusType"]
-          | undefined;
-        let newActiveWindowSelectedTabId: ChromeTabId | undefined;
-        let newActiveWindowMiscTabGroup: ChromeTabGroupWithId | undefined;
-
-        const selectedTab = windowInfo.tabs.find((tab) => tab.active)!;
-        newActiveWindowSelectedTabId = selectedTab.id;
-        const tabGroupIdForSelectedTab = selectedTab.groupId;
-
-        if (tabGroupIdForSelectedTab === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-          newActiveWindowSelectedTabFocusType = "nonSpaceTabFocus";
-        }
-
-        newActiveWindowSpaces = windowInfo.tabGroups.map((tabGroup) => {
-          const matchedSpaceId = matchedNonMiscTabGroupsToSpaces.find(
-            (matchedNonMiscTabGroupToSpaceInfo) =>
-              matchedNonMiscTabGroupToSpaceInfo.tabGroupId === tabGroup.id
-          )?.spaceId;
-
-          const isTabGroupForSelectedTab = tabGroupIdForSelectedTab === tabGroup.id;
-          const isTabGroupForPrimarySpace =
-            matchedSpaceId && matchedSpaceId === prevActiveWindow.primarySpaceId;
-          const isTabGroupForMiscSpace =
-            matchedMiscTabGroupToSpace && tabGroup.id === matchedMiscTabGroupToSpace.tabGroupId;
-
-          if (isTabGroupForSelectedTab) {
-            if (isTabGroupForPrimarySpace) {
-              newActiveWindowSelectedTabFocusType = "primaryFocus";
-            } else if (isTabGroupForMiscSpace) {
-              newActiveWindowSelectedTabFocusType = "secondaryFocus";
-            } else {
-              newActiveWindowSelectedTabFocusType = "peakFocus";
-            }
-          }
-
-          const tabsInGroup = windowInfo.tabs.filter((tab) => tab.groupId === tabGroup.id);
-          const newWindowActiveSpace = Utils.DataModel.ActiveWindowSpace.createFromExistingTabGroup(
-            tabGroup,
-            tabsInGroup
-          );
-
-          if (isTabGroupForSelectedTab) {
-            newActiveWindowSelectedSpaceId = newWindowActiveSpace.id;
-          }
-
-          if (isTabGroupForPrimarySpace) {
-            newActiveWindowPrimarySpaceId = newWindowActiveSpace.id;
-          }
-
-          if (isTabGroupForMiscSpace) {
-            newActiveWindowMiscTabGroup = tabGroup;
-          }
-
-          return newWindowActiveSpace;
-        });
-
-        if (
-          newActiveWindowSpaces.length === 0 ||
-          !newActiveWindowSelectedSpaceId ||
-          !newActiveWindowPrimarySpaceId ||
-          !newActiveWindowSelectedTabFocusType ||
-          !newActiveWindowSelectedTabId ||
-          !newActiveWindowMiscTabGroup ||
-          !newActiveWindowMiscTabGroup
-        ) {
-          const errorMessage = `initializeDataModel::Could not create active spaces for window ${windowInfo.window.id} from matched window ${prevActiveWindow.windowId}`;
-          console.error(errorMessage);
-          throw new Error(errorMessage);
-        }
-
-        const newActiveWindow = Utils.DataModel.ActiveWindow.create({
-          windowId: windowInfo.window.id,
-          spaces: newActiveWindowSpaces,
-          selectedSpaceId: newActiveWindowSelectedSpaceId,
-          primarySpaceId: newActiveWindowPrimarySpaceId,
-          selectedSpaceFocusType: newActiveWindowSelectedTabFocusType,
-          selectedTabId: newActiveWindowSelectedTabId,
-          miscTabGroup: newActiveWindowMiscTabGroup,
-        });
-
-        if (
-          newActiveWindowSelectedTabFocusType === "peakFocus" ||
-          newActiveWindowSelectedTabFocusType === "secondaryFocus"
-        ) {
-          spaceAutoCollapseTimersToStart.push({
-            activeWindowId: newActiveWindow.id,
-            spaceId: newActiveWindowSelectedSpaceId,
-          });
-        }
-
-        return newActiveWindow;
-      }
-    );
-
-    const newDataModel = {
-      ...Utils.Storage.LOCAL_STORAGE_DEFAULT_VALUES,
-      activeWindows: newActiveWindows,
-    } as LocalStorage;
-
-    await Utils.Storage.setItems(newDataModel);
-
-    spaceAutoCollapseTimersToStart.forEach(async (timerToStart) => {
-      await Utils.DataModel.SpaceAutoCollapseTimer.startAutoCollapseTimerForSpace(
-        timerToStart.activeWindowId,
-        timerToStart.spaceId
-      );
-    });
-  } catch (error) {
-    const errorMessage = new Error(
-      `DataModel::initialize:Could not intitialize data model: ${error}`
-    );
-    console.error(errorMessage);
-    throw error;
+export async function onActionClicked(tab: chrome.tabs.Tab) {
+  const { windowId } = tab;
+  const activeWindows = await Utils.DataModel.ActiveWindow.getAll();
+  if (!activeWindows.find((window) => window.windowId === windowId)) {
+    const newActiveWindow = await Utils.DataModel.ActiveWindow.activateWindow(windowId);
+    console.log(`onActionClicked::newActiveWindow: ${newActiveWindow}`);
+    await Utils.DataModel.ActiveWindow.set(newActiveWindow);
   }
 }
 
@@ -182,6 +47,21 @@ export async function onAlarm(alarm: chrome.alarms.Alarm) {
   }
 }
 
+export async function onInstalled(details: chrome.runtime.InstalledDetails) {
+  console.log(`onInstalled::Extension was installed because of: ${details.reason}`);
+  if (details.reason === "install") {
+    await Utils.Storage.initialize();
+    // TODO: open the onboarding page
+  } else if (details.reason === "update") {
+    await Utils.DataModel.ActiveWindow.reactivateWindowsForUpdate();
+  }
+}
+
+export async function onStartUp() {
+  console.log(`onStartUp::New browser session was started up`);
+  await Utils.DataModel.ActiveWindow.reactivateWindowsForStartup();
+}
+
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   console.log(`onTabGroupsUpdated::tabGroup: ${tabGroup}`);
   const activeWindows = await Utils.DataModel.ActiveWindow.getAll();
@@ -202,7 +82,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   */
 
   // if #1
-  if (activeWindow.miscTabGroup.id === tabGroup.id) {
+  if (activeWindow.miscTabGroup?.id === tabGroup.id) {
     // do #1.1
     await Utils.DataModel.ActiveWindow.update(activeWindow.id, {
       miscTabGroup: tabGroup,
@@ -211,12 +91,10 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
     // if #1.2
     if (Utils.Misc.tabGroupWasExpanded(tabGroup, activeWindow.miscTabGroup)) {
       // do #1.2.1
-      const tabsInMiscGroup = Utils.Misc.getTabsWithIds(
-        await chrome.tabs.query({
-          windowId: activeWindow.windowId,
-          groupId: tabGroup.id,
-        })
-      );
+      const tabsInMiscGroup = (await chrome.tabs.query({
+        windowId: activeWindow.windowId,
+        groupId: tabGroup.id,
+      })) as ChromeTabWithId[];
       const activeTabCandidate = tabsInMiscGroup[tabsInMiscGroup.length - 1];
       await chrome.tabs.update(activeTabCandidate.id, { active: true });
     }
@@ -231,12 +109,10 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
         console.error(errorMessage);
         throw new Error(errorMessage);
       }
-      const tabsInSelectedActiveSpaceTabGroup = Utils.Misc.getTabsWithIds(
-        await chrome.tabs.query({
-          windowId: activeWindow.windowId,
-          groupId: selectedActiveSpace.tabGroupInfo.id,
-        })
-      );
+      const tabsInSelectedActiveSpaceTabGroup = (await chrome.tabs.query({
+        windowId: activeWindow.windowId,
+        groupId: selectedActiveSpace.tabGroupInfo.id,
+      })) as ChromeTabWithId[];
       const activeTabCandidate = tabsInSelectedActiveSpaceTabGroup[0];
       await chrome.tabs.update(activeTabCandidate.id, { active: true });
     }
@@ -244,10 +120,11 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
     return;
   }
 
-  const activeSpaceFindResult = await Utils.DataModel.findActiveSpaceForChromeObject<"tabGroup">(
-    tabGroup.windowId,
-    tabGroup
-  );
+  const activeSpaceFindResult =
+    await Utils.DataModel.ActiveWindowSpace.findActiveSpaceForChromeObject<"tabGroup">(
+      tabGroup.windowId,
+      tabGroup
+    );
 
   if (!activeSpaceFindResult) {
     return;
@@ -255,7 +132,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
 
   const { activeSpace, type: activeSpaceTabGroupType } = activeSpaceFindResult;
 
-  await Utils.DataModel.syncActiveSpaceWithWindow({
+  await Utils.DataModel.ActiveWindowSpace.syncActiveSpaceWithWindow({
     activeWindow,
     activeSpace,
     type: "tabGroup",

@@ -46,6 +46,7 @@ export declare namespace TidyTabs {
       id: ChromeTabGroupId;
       title?: string;
       color?: chrome.tabGroups.ColorEnum;
+      collapsed: boolean;
     };
     tabs: ActiveTab[];
   }
@@ -65,8 +66,9 @@ export declare namespace TidyTabs {
     id?: string;
     windowId: ChromeWindowId;
     spaces: ActiveSpace[]; // in order of how they appear in the tab bar
-    selectedSpaceId: string;
-    primarySpaceId: string;
+    selectedSpaceId: string | undefined;
+    selectedTabId: string | undefined;
+    primarySpaceId: string | undefined;
     /*
       primaryFocus: the primary tab group is selected
       secondaryFocus: the secondary tab group is selected
@@ -74,8 +76,8 @@ export declare namespace TidyTabs {
       nonSpaceTabFocus: a tab that doesnt belong to any space is selected
      */
     selectedSpaceFocusType: "primaryFocus" | "secondaryFocus" | "peakFocus" | "nonSpaceTabFocus";
-    selectedTabId: ChromeTabId;
-    miscTabGroup: ChromeTabGroupWithId;
+    miscTabGroup: ChromeTabGroupWithId | undefined;
+    nonGroupedTabs: ActiveTab[];
   }
 
   export type ActiveWindow = BaseWindow & ActiveWindowCreateProperties;
@@ -128,31 +130,37 @@ export declare namespace ActiveSpaceForChromeObjectFinder {
 }
 
 export declare namespace ActiveWindowMatcher {
-  export interface CandidateWindowToActiveWindowMatchInfo {
-    windowId: ChromeWindowId;
-    activeWindow: TidyTabs.ActiveWindow;
-    matchedMiscTabGroupToSpace: TabGroupToActiveWindowSpaceMatchInfo | undefined;
-    matchedNonMiscTabGroupsToSpaces: TabGroupToActiveWindowSpaceMatchInfo[];
+  export interface BaseMatchedTabGroupToActiveWindowSpaceInfo {
+    tabGroupId: ChromeTabGroupId;
+    tabGroupColorsMatch: boolean;
+  }
+
+  export interface MatchedMiscTabGroupToActiveWindowSpaceInfo
+    extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
+    primarySpaceId: string;
+  }
+
+  export interface MatchedNonMiscTabGroupToActiveWindowSpaceInfo
+    extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
+    spaceId: string;
     matchedTabsCount: number;
   }
 
-  export interface WindowToActiveWindowMatchInfo {
-    windowInfo: MatchedWindowInfo;
-    candidateMatchedWindowInfo: CandidateWindowToActiveWindowMatchInfo;
+  export interface MatchedWindowToActiveWindowInfo {
+    windowId: ChromeWindowId;
+    activeWindow: TidyTabs.ActiveWindow;
+    matchedMiscTabGroupInfo: MatchedMiscTabGroupToActiveWindowSpaceInfo | undefined;
+    matchedNonMiscTabGroups: MatchedNonMiscTabGroupToActiveWindowSpaceInfo[];
+    matchedTabsCount: number;
   }
 
-  export interface MatchedWindowInfo {
+  export type MatchedWindowToActiveWindowResultInfo = WindowInfo & MatchedWindowToActiveWindowInfo;
+
+  export interface WindowInfo {
     window: ChromeWindowWithId;
     miscTabGroup: ChromeTabGroupWithId | undefined;
     nonMiscTabGroups: ChromeTabGroupWithId[];
     tabs: ChromeTabWithId[];
     tabGroups: ChromeTabGroupWithId[];
-  }
-
-  export interface TabGroupToActiveWindowSpaceMatchInfo {
-    tabGroupId: ChromeTabGroupId;
-    spaceId: string;
-    tabGroupColorsMatch: boolean;
-    matchedTabsCount: number;
   }
 }

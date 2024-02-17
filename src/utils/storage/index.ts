@@ -5,6 +5,10 @@ export const LOCAL_STORAGE_DEFAULT_VALUES: LocalStorage = {
   spaceAutoCollapseTimers: [],
 };
 
+export async function initialize() {
+  await setItems(LOCAL_STORAGE_DEFAULT_VALUES);
+}
+
 export async function getItems<T extends Partial<LocalStorage>>(
   keys?: string | string[] | { [key: string]: any } | null
 ) {

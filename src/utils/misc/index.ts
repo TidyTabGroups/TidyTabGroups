@@ -26,20 +26,6 @@ export function isMiscTabGroupTitle(tabGroupTitle: String) {
   );
 }
 
-export function getWindowsWithIds(windows: chrome.windows.Window[]) {
-  // "Under some circumstances a Window may not be assigned an ID, for example when querying windows using the sessions API, in which case a session ID may be present."
-  return windows.filter(
-    (window) => window.id !== undefined && window.id !== chrome.windows.WINDOW_ID_NONE
-  ) as Array<ChromeWindowWithId>;
-}
-
-export function getTabsWithIds(tabs: chrome.tabs.Tab[]) {
-  // "Under some circumstances a Tab may not be assigned an ID, for example when querying foreign tabs using the sessions API, in which case a session ID may be present. Tab ID can also be set to chrome.tabs.TAB_ID_NONE for apps and devtools windows."
-  return tabs.filter(
-    (tab) => tab.id !== undefined && tab.id !== chrome.tabs.TAB_ID_NONE
-  ) as Array<ChromeTabWithId>;
-}
-
 export async function createTabGroup(tabIds: [ChromeTabId], options?: TabGroupCreationOptions) {
   try {
     const { windowId, title, color } = options || {};
