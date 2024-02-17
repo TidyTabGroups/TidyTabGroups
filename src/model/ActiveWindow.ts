@@ -41,6 +41,11 @@ export namespace ActiveWindow {
     return result.activeWindows;
   }
 
+  export async function getByChromeWindowId(windowId: ChromeWindowId) {
+    const activeWindows = await getAll();
+    return activeWindows.find((window) => window.windowId === windowId);
+  }
+
   export async function set(activeWindow: DataModel.ActiveWindow) {
     const prevActiveWindows = await getAll();
     await setAll([...prevActiveWindows, activeWindow]);

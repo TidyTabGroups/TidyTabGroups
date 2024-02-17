@@ -55,9 +55,7 @@ export async function onStartUp() {
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   console.log(`onTabGroupsUpdated::tabGroup: ${tabGroup}`);
-  const activeWindows = await ActiveWindow.getAll();
-
-  const activeWindow = activeWindows.find((window) => window.windowId === tabGroup.windowId);
+  const activeWindow = await ActiveWindow.getByChromeWindowId(tabGroup.windowId);
 
   if (!activeWindow) {
     return;
