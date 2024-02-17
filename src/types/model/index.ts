@@ -61,7 +61,7 @@ export declare namespace DataModel {
       nonSpaceTabFocus: a tab that doesnt belong to any space is selected
      */
     selectedSpaceFocusType: "primaryFocus" | "secondaryFocus" | "peakFocus" | "nonSpaceTabFocus";
-    miscTabGroup: ChromeTabGroupWithId | null;
+    secondaryTabGroup: ChromeTabGroupWithId | null;
     nonGroupedTabs: ActiveTab[];
   }
 

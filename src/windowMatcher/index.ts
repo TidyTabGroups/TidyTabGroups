@@ -27,8 +27,8 @@ export async function matchWindowsToActiveWindows(
       // 1. Be a "normal" window
       // 2. contain at least one tab
       // When matched against a previous active window, it must:
-      // 3. if the active window has a primary space with more than one tab, then the misc tab group must exist.
-      // 4. If the active window has any spaces, they all must match to a (non-misc) tab group.
+      // 3. if the active window has a primary space with more than one tab, then the secondary tab group must exist.
+      // 4. If the active window has any spaces, they all must match to a (non-secondary) tab group.
       //    This is done by matching their titles. If more than one tab group match the title of a space, then the one that matches the color
       //    of the space's tab group color is chosen. If that isnt enough, the one with the most matched tabs to the space is chosen.
       // 5. If the active window has any non-grouped tabs, they all must match to a tab.
@@ -61,61 +61,61 @@ export async function matchWindowsToActiveWindows(
         const primarySpaceTabs = primarySpaceId
           ? spaces.find((space) => space.id === primarySpaceId)!.tabs
           : undefined;
-        let miscTabGroup: ChromeTabGroupWithId | undefined;
+        let secondaryTabGroup: ChromeTabGroupWithId | undefined;
         if (primarySpaceId && primarySpaceTabs!.length > 1) {
-          const miscTabGroupTitleToMatch =
+          const secondaryTabGroupTitleToMatch =
             selectedSpaceFocusType === "primaryFocus"
-              ? Misc.MISC_TAB_GROUP_TITLE_LEFT
-              : Misc.MISC_TAB_GROUP_TITLE_RIGHT;
-          const matchedMiscTabGroups = tabGroups.filter(
-            (tabGroup) => tabGroup.title === miscTabGroupTitleToMatch
+              ? Misc.SECONDARY_TAB_GROUP_TITLE_LEFT
+              : Misc.SECONDARY_TAB_GROUP_TITLE_RIGHT;
+          const matchedSecondaryTabGroups = tabGroups.filter(
+            (tabGroup) => tabGroup.title === secondaryTabGroupTitleToMatch
           );
 
-          let bestMatchedMiscTabGroup: ChromeTabGroupWithId | undefined;
-          if (matchedMiscTabGroups.length > 1) {
-            // find the best matching misc tab group
-            matchedMiscTabGroups.forEach((matchedMiscTabGroup) => {
-              const tabsInMatchedMiscTabGroup = tabs.filter(
-                (tab) => tab.groupId === matchedMiscTabGroup.id
+          let bestMatchedSecondaryTabGroup: ChromeTabGroupWithId | undefined;
+          if (matchedSecondaryTabGroups.length > 1) {
+            // find the best matching secondary tab group
+            matchedSecondaryTabGroups.forEach((matchedSecondaryTabGroup) => {
+              const tabsInMatchedSecondaryTabGroup = tabs.filter(
+                (tab) => tab.groupId === matchedSecondaryTabGroup.id
               );
             });
           } else {
-            bestMatchedMiscTabGroup = matchedMiscTabGroups[0];
+            bestMatchedSecondaryTabGroup = matchedSecondaryTabGroups[0];
           }
 
           // criteria #3
-          if (!bestMatchedMiscTabGroup) {
+          if (!bestMatchedSecondaryTabGroup) {
             console.warn(
-              `initializeDataModel::Window ${window.id} has no misc tab group when it must`
+              `initializeDataModel::Window ${window.id} has no secondary tab group when it must`
             );
             return;
           }
 
-          miscTabGroup = bestMatchedMiscTabGroup;
+          secondaryTabGroup = bestMatchedSecondaryTabGroup;
         }
 
-        const nonMiscTabGroups = miscTabGroup
-          ? tabGroups.filter((tabGroup) => tabGroup.id !== miscTabGroup!.id)
+        const nonSecondaryTabGroups = secondaryTabGroup
+          ? tabGroups.filter((tabGroup) => tabGroup.id !== secondaryTabGroup!.id)
           : tabGroups;
-        let matchedNonMiscTabGroupsToActiveWindowSpaces:
-          | ActiveWindowMatcher.MatchedNonMiscTabGroupToActiveWindowSpaceInfo[]
+        let matchedNonSecondaryTabGroupsToActiveWindowSpaces:
+          | ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[]
           | undefined;
 
         if (spaces.length > 0) {
-          const miscTabGroupTabs = miscTabGroup
-            ? tabs.filter((tab) => tab.groupId === miscTabGroup!.id)
+          const secondaryTabGroupTabs = secondaryTabGroup
+            ? tabs.filter((tab) => tab.groupId === secondaryTabGroup!.id)
             : [];
-          const nonMiscTabGroupsTabs = tabs.filter(
-            (tab) => !miscTabGroupTabs.find((miscTab) => miscTab.id === tab.id)
+          const nonSecondaryTabGroupsTabs = tabs.filter(
+            (tab) => !secondaryTabGroupTabs.find((secondaryTab) => secondaryTab.id === tab.id)
           );
 
-          const matchedNonMiscTabGroupsToActiveWindowSpaces = getMatchingTabGroups(
-            { id: window.id, tabGroups: nonMiscTabGroups, tabs: nonMiscTabGroupsTabs },
+          const matchedNonSecondaryTabGroupsToActiveWindowSpaces = getMatchingTabGroups(
+            { id: window.id, tabGroups: nonSecondaryTabGroups, tabs: nonSecondaryTabGroupsTabs },
             activeWindow
           );
 
           // criteria #4
-          if (matchedNonMiscTabGroupsToActiveWindowSpaces.length !== spaces.length) {
+          if (matchedNonSecondaryTabGroupsToActiveWindowSpaces.length !== spaces.length) {
             return;
           }
         }
@@ -135,16 +135,16 @@ export async function matchWindowsToActiveWindows(
         candidateMatchedWindowsToActiveWindowsMap[activeWindow.id].push({
           windowId: window.id,
           activeWindow,
-          matchedMiscTabGroupInfo: miscTabGroup && {
+          matchedSecondaryTabGroupInfo: secondaryTabGroup && {
             primarySpaceId: primarySpaceId!,
-            tabGroupId: miscTabGroup.id,
-            tabGroupColorsMatch: miscTabGroup.color === activeWindow.miscTabGroup!.color,
+            tabGroupId: secondaryTabGroup.id,
+            tabGroupColorsMatch: secondaryTabGroup.color === activeWindow.secondaryTabGroup!.color,
           },
-          matchedNonMiscTabGroups: matchedNonMiscTabGroupsToActiveWindowSpaces
-            ? matchedNonMiscTabGroupsToActiveWindowSpaces
+          matchedNonSecondaryTabGroups: matchedNonSecondaryTabGroupsToActiveWindowSpaces
+            ? matchedNonSecondaryTabGroupsToActiveWindowSpaces
             : [],
-          matchedTabsCount: matchedNonMiscTabGroupsToActiveWindowSpaces
-            ? matchedNonMiscTabGroupsToActiveWindowSpaces.reduce(
+          matchedTabsCount: matchedNonSecondaryTabGroupsToActiveWindowSpaces
+            ? matchedNonSecondaryTabGroupsToActiveWindowSpaces.reduce(
                 (acc, match) => acc + match.matchedTabsCount,
                 0
               ) + matchedNonGroupedTabs.length
@@ -155,8 +155,8 @@ export async function matchWindowsToActiveWindows(
         if (!matchedWindowsInfoMap[window.id]) {
           matchedWindowsInfoMap[window.id] = {
             window,
-            miscTabGroup,
-            nonMiscTabGroups,
+            secondaryTabGroup,
+            nonSecondaryTabGroups,
             tabs,
             tabGroups,
           };
@@ -206,7 +206,7 @@ export function getMatchingTabGroups(
 ) {
   // get the match candidates
   const candidateMatchedTabGroupsToSpacesMap: {
-    [spaceId: string]: ActiveWindowMatcher.MatchedNonMiscTabGroupToActiveWindowSpaceInfo[];
+    [spaceId: string]: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[];
   } = {};
 
   const { tabGroups, tabs } = windowInfo;
@@ -236,14 +236,14 @@ export function getMatchingTabGroups(
     }
   });
 
-  const matchedTabGroupsToSpaces: ActiveWindowMatcher.MatchedNonMiscTabGroupToActiveWindowSpaceInfo[] =
+  const matchedTabGroupsToSpaces: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[] =
     [];
   let remainingTabGroupsToMatchIds = Array.from(tabGroupsToMatchIds);
 
   // get the best matches for each space
   Object.keys(candidateMatchedTabGroupsToSpacesMap).forEach((spaceId) => {
     let bestMatchedTabGroupInfo:
-      | ActiveWindowMatcher.MatchedNonMiscTabGroupToActiveWindowSpaceInfo
+      | ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo
       | undefined;
     let bestMatchedTabsCount = 0;
 

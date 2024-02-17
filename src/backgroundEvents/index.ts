@@ -62,33 +62,33 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   }
 
   /*
-    1 if: the updated tab group is the misc tab group:
-      1.1 do: update the active window's misc tab group
+    1 if: the updated tab group is the secondary tab group:
+      1.1 do: update the active window's secondary tab group
       1.2 if: the tab group was expanded:
-        1.2.1 do: activate the active tab candidate in the misc tab group
+        1.2.1 do: activate the active tab candidate in the secondary tab group
       1.3 if: the tab group was collapsed:
         1.3.1 do: activate the active tab candidate in the primary tab group
   */
 
   // if #1
-  if (activeWindow.miscTabGroup?.id === tabGroup.id) {
+  if (activeWindow.secondaryTabGroup?.id === tabGroup.id) {
     // do #1.1
     await ActiveWindow.update(activeWindow.id, {
-      miscTabGroup: tabGroup,
+      secondaryTabGroup: tabGroup,
     });
 
     // if #1.2
-    if (Misc.tabGroupWasExpanded(tabGroup, activeWindow.miscTabGroup)) {
+    if (Misc.tabGroupWasExpanded(tabGroup, activeWindow.secondaryTabGroup)) {
       // do #1.2.1
-      const tabsInMiscGroup = (await chrome.tabs.query({
+      const tabsInSecondaryGroup = (await chrome.tabs.query({
         windowId: activeWindow.windowId,
         groupId: tabGroup.id,
       })) as ChromeTabWithId[];
-      const activeTabCandidate = tabsInMiscGroup[tabsInMiscGroup.length - 1];
+      const activeTabCandidate = tabsInSecondaryGroup[tabsInSecondaryGroup.length - 1];
       await chrome.tabs.update(activeTabCandidate.id, { active: true });
     }
     // if #1.3
-    else if (Misc.tabGroupWasCollapsed(tabGroup, activeWindow.miscTabGroup)) {
+    else if (Misc.tabGroupWasCollapsed(tabGroup, activeWindow.secondaryTabGroup)) {
       // do #1.3.1
       const selectedActiveSpace = activeWindow.spaces.find(
         (activeSpace) => activeSpace.id === activeWindow.selectedSpaceId

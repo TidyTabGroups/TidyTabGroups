@@ -78,7 +78,7 @@ export namespace ActiveWindow {
     windowId: ChromeWindowId,
     providedPrimarySpaceInfo?: {
       primaryTabGroupId: ChromeTabGroupId;
-      miscTabGroupId: ChromeTabGroupId | undefined;
+      secondaryTabGroupId: ChromeTabGroupId | undefined;
     }
   ) {
     const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
@@ -95,12 +95,12 @@ export namespace ActiveWindow {
     const selectedTab = tabs.find((tab) => tab.active)!;
     const tabGroupIdForSelectedTab = selectedTab.groupId;
 
-    // if provided, get the provided primary and misc tab group.
+    // if provided, get the provided primary and secondary tab group.
     const didProvidePrimarySpaceInfo = !!providedPrimarySpaceInfo;
-    const [didProvidePrimaryTabGroup, didProvideMiscTabGroup] = didProvidePrimarySpaceInfo
+    const [didProvidePrimaryTabGroup, didProvideSecondaryTabGroup] = didProvidePrimarySpaceInfo
       ? [
           providedPrimarySpaceInfo!.primaryTabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE,
-          providedPrimarySpaceInfo!.miscTabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE,
+          providedPrimarySpaceInfo!.secondaryTabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE,
         ]
       : [false, false];
     const providedPrimaryTabGroup = didProvidePrimaryTabGroup
@@ -113,13 +113,13 @@ export namespace ActiveWindow {
         } not found`
       );
     }
-    const providedMiscTabGroup = didProvideMiscTabGroup
-      ? tabGroups.find((tabGroup) => tabGroup.id === providedPrimarySpaceInfo!.miscTabGroupId)
+    const providedSecondaryTabGroup = didProvideSecondaryTabGroup
+      ? tabGroups.find((tabGroup) => tabGroup.id === providedPrimarySpaceInfo!.secondaryTabGroupId)
       : undefined;
-    if (didProvideMiscTabGroup && !providedMiscTabGroup) {
+    if (didProvideSecondaryTabGroup && !providedSecondaryTabGroup) {
       throw new Error(
-        `activateWindow::misc tab group with id ${
-          providedPrimarySpaceInfo!.miscTabGroupId
+        `activateWindow::secondary tab group with id ${
+          providedPrimarySpaceInfo!.secondaryTabGroupId
         } not found`
       );
     }
@@ -131,7 +131,7 @@ export namespace ActiveWindow {
     let newActiveWindowSelectedTabFocusType: DataModel.ActiveWindow["selectedSpaceFocusType"] =
       "nonSpaceTabFocus";
     let newActiveWindowSelectedTabId: DataModel.ActiveWindow["selectedTabId"] | undefined;
-    let newActiveWindowMiscTabGroup: DataModel.ActiveWindow["miscTabGroup"] = null;
+    let newActiveWindowSecondaryTabGroup: DataModel.ActiveWindow["secondaryTabGroup"] = null;
     let newActiveWindowNonGroupedTabs: DataModel.ActiveWindow["nonGroupedTabs"] = [];
 
     let selectedTabGroup: ChromeTabGroupWithId | undefined;
@@ -140,8 +140,8 @@ export namespace ActiveWindow {
       | { tabGroup: ChromeTabGroupWithId; tabsInGroup: ChromeTabWithId[] }
       | undefined;
 
-    const tabsInprovidedMiscTabGroup = didProvideMiscTabGroup
-      ? tabs.filter((tab) => tab.groupId === providedMiscTabGroup!.id)
+    const tabsInprovidedSecondaryTabGroup = didProvideSecondaryTabGroup
+      ? tabs.filter((tab) => tab.groupId === providedSecondaryTabGroup!.id)
       : undefined;
 
     tabGroups.forEach((tabGroup) => {
@@ -150,11 +150,11 @@ export namespace ActiveWindow {
         ? providedPrimaryTabGroup!.id === tabGroup.id
         : isTabGroupForSelectedTab;
       const isTabGroupSecondary =
-        didProvidePrimarySpaceInfo && tabGroup.id === providedMiscTabGroup!.id;
+        didProvidePrimarySpaceInfo && tabGroup.id === providedSecondaryTabGroup!.id;
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
       const tabsInSpace =
-        isTabGroupPrimary && providedMiscTabGroup
-          ? [...tabsInprovidedMiscTabGroup!, ...tabsInGroup]
+        isTabGroupPrimary && providedSecondaryTabGroup
+          ? [...tabsInprovidedSecondaryTabGroup!, ...tabsInGroup]
           : tabsInGroup;
       const newActiveWindowSpace = ActiveWindowSpace.createFromExistingTabGroup(
         tabGroup,
@@ -218,20 +218,20 @@ export namespace ActiveWindow {
       primarySpaceId: newActiveWindowPrimarySpaceId,
       selectedSpaceFocusType: newActiveWindowSelectedTabFocusType,
       selectedTabId: newActiveWindowSelectedTabId,
-      miscTabGroup: newActiveWindowMiscTabGroup,
+      secondaryTabGroup: newActiveWindowSecondaryTabGroup,
       nonGroupedTabs: newActiveWindowNonGroupedTabs,
     });
 
     // shape up the new active window, using the following steps:
-    // 1. create new misc tab group, or move any extra primary tabs to it
-    // 2. if exists, move the misc tab group to end position
+    // 1. create new secondary tab group, or move any extra primary tabs to it
+    // 2. if exists, move the secondary tab group to end position
     // 3. if exists, move the primary tab group to the end position
     // 4. collapse all tab groups that are not the selected or primary space tab group
     // 5. uncollapse selected tab group and primary tab group
     // 6. move all non grouped tabs to before all the tab groups
 
     // step 1
-    let miscTabGroup: ChromeTabGroupWithId | undefined;
+    let secondaryTabGroup: ChromeTabGroupWithId | undefined;
     if (primaryTabGroupInfo && primaryTabGroupInfo.tabsInGroup.length > 1) {
       const { tabGroup: primaryTabGroup, tabsInGroup: tabsInPrimaryTabGroup } =
         primaryTabGroupInfo!;
@@ -241,25 +241,25 @@ export namespace ActiveWindow {
         ? tabsInPrimaryTabGroup.filter((tab) => !tab.active)
         : tabsInPrimaryTabGroup.slice(0, tabsInPrimaryTabGroup.length - 1);
 
-      if (didProvideMiscTabGroup) {
-        miscTabGroup = providedMiscTabGroup!;
+      if (didProvideSecondaryTabGroup) {
+        secondaryTabGroup = providedSecondaryTabGroup!;
         await chrome.tabs.group({
-          tabIds: [...tabsInprovidedMiscTabGroup!, ...tabsInPrimaryTabGroupToMove].map(
+          tabIds: [...tabsInprovidedSecondaryTabGroup!, ...tabsInPrimaryTabGroupToMove].map(
             (tab) => tab.id
           ),
         });
       } else {
-        const miscTabGroupId = await chrome.tabs.group({
+        const secondaryTabGroupId = await chrome.tabs.group({
           tabIds: tabsInPrimaryTabGroupToMove.map((tab) => tab.id),
         });
-        miscTabGroup = await chrome.tabGroups.get(miscTabGroupId);
-        tabGroupsToCollapse.push(miscTabGroupId);
+        secondaryTabGroup = await chrome.tabGroups.get(secondaryTabGroupId);
+        tabGroupsToCollapse.push(secondaryTabGroupId);
       }
     }
 
     // step 2
-    if (miscTabGroup) {
-      await chrome.tabGroups.move(miscTabGroup.id, { index: -1 });
+    if (secondaryTabGroup) {
+      await chrome.tabGroups.move(secondaryTabGroup.id, { index: -1 });
     }
 
     // step 3
@@ -336,12 +336,12 @@ export namespace ActiveWindow {
           const {
             windowId,
             activeWindow: prevActiveWindow,
-            matchedMiscTabGroupInfo,
-            matchedNonMiscTabGroups,
+            matchedSecondaryTabGroupInfo,
+            matchedNonSecondaryTabGroups,
           } = matchedWindowToPrevActiveWindowInfo;
 
           const matchedPrimaryTabGroupInfo = prevActiveWindow.primarySpaceId
-            ? matchedNonMiscTabGroups.find(
+            ? matchedNonSecondaryTabGroups.find(
                 (matchedTabGroupInfo) =>
                   matchedTabGroupInfo.spaceId === prevActiveWindow.primarySpaceId
               )
@@ -354,7 +354,7 @@ export namespace ActiveWindow {
             primaryTabGroupId
               ? {
                   primaryTabGroupId,
-                  miscTabGroupId: matchedMiscTabGroupInfo?.tabGroupId,
+                  secondaryTabGroupId: matchedSecondaryTabGroupInfo?.tabGroupId,
                 }
               : undefined
           );
@@ -388,14 +388,17 @@ export namespace ActiveWindow {
           const primaryTabGroup = primarySpace
             ? tabGroups.find((tabGroup) => tabGroup.id === primarySpace.tabGroupInfo.id)
             : undefined;
-          const miscTabGroup =
-            primaryTabGroup && activeWindow.miscTabGroup
-              ? tabGroups.find((tabGroup) => tabGroup.id === activeWindow.miscTabGroup!.id)
+          const secondaryTabGroup =
+            primaryTabGroup && activeWindow.secondaryTabGroup
+              ? tabGroups.find((tabGroup) => tabGroup.id === activeWindow.secondaryTabGroup!.id)
               : undefined;
           const newActiveWindow = await ActiveWindow.activateWindow(
             window.id,
             primaryTabGroup
-              ? { primaryTabGroupId: primaryTabGroup.id, miscTabGroupId: miscTabGroup?.id }
+              ? {
+                  primaryTabGroupId: primaryTabGroup.id,
+                  secondaryTabGroupId: secondaryTabGroup?.id,
+                }
               : undefined
           );
           newActiveWindows.push(newActiveWindow);

@@ -49,12 +49,12 @@ export declare namespace ActiveWindowMatcher {
     tabGroupColorsMatch: boolean;
   }
 
-  export interface MatchedMiscTabGroupToActiveWindowSpaceInfo
+  export interface MatchedSecondaryTabGroupToActiveWindowSpaceInfo
     extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
     primarySpaceId: string;
   }
 
-  export interface MatchedNonMiscTabGroupToActiveWindowSpaceInfo
+  export interface MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo
     extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
     spaceId: string;
     matchedTabsCount: number;
@@ -63,8 +63,8 @@ export declare namespace ActiveWindowMatcher {
   export interface MatchedWindowToActiveWindowInfo {
     windowId: ChromeWindowId;
     activeWindow: DataModel.ActiveWindow;
-    matchedMiscTabGroupInfo: MatchedMiscTabGroupToActiveWindowSpaceInfo | undefined;
-    matchedNonMiscTabGroups: MatchedNonMiscTabGroupToActiveWindowSpaceInfo[];
+    matchedSecondaryTabGroupInfo: MatchedSecondaryTabGroupToActiveWindowSpaceInfo | undefined;
+    matchedNonSecondaryTabGroups: MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[];
     matchedTabsCount: number;
   }
 
@@ -72,8 +72,8 @@ export declare namespace ActiveWindowMatcher {
 
   export interface WindowInfo {
     window: ChromeWindowWithId;
-    miscTabGroup: ChromeTabGroupWithId | undefined;
-    nonMiscTabGroups: ChromeTabGroupWithId[];
+    secondaryTabGroup: ChromeTabGroupWithId | undefined;
+    nonSecondaryTabGroups: ChromeTabGroupWithId[];
     tabs: ChromeTabWithId[];
     tabGroups: ChromeTabGroupWithId[];
   }
