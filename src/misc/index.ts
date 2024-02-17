@@ -1,10 +1,4 @@
-import {
-  ChromeWindowWithId,
-  ChromeTabId,
-  TabGroupCreationOptions,
-  ChromeTabWithId,
-  ChromeTabGroupId,
-} from "../types";
+import { ChromeTabId, TabGroupCreationOptions } from "../types";
 
 const USER_OS_TYPE: "windows" | "macos" | "linux" = "windows";
 

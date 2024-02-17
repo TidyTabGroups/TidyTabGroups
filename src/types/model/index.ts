@@ -1,10 +1,4 @@
-import {
-  ChromeTabId,
-  ChromeWindowId,
-  ChromeTabGroupId,
-  ChromeTabGroupWithId,
-  ChromeTabWithId,
-} from "..";
+import { ChromeTabId, ChromeWindowId, ChromeTabGroupId, ChromeTabGroupWithId } from "..";
 
 export declare namespace DataModel {
   export interface TabCreateProperties {

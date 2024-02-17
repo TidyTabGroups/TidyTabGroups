@@ -1,12 +1,4 @@
-import {
-  DataModel,
-  ChromeTabGroupWithId,
-  ChromeTabId,
-  ChromeWindowId,
-  ChromeWindowWithId,
-  ChromeTabWithId,
-  ChromeTabGroupId,
-} from "../types";
+import { DataModel, ChromeTabWithId } from "../types";
 import { ActiveWindow, ActiveWindowSpace, SpaceAutoCollapseTimer } from "../model";
 import * as Storage from "../storage";
 import * as Misc from "../misc";
