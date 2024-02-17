@@ -145,7 +145,7 @@ export namespace ActiveWindow {
       const isTabGroupForPrimarySpace = didProvidePrimarySpaceInfo
         ? providedPrimaryTabGroup!.id === tabGroup.id
         : isTabGroupForSelectedTab;
-      const isTabGroupMisc = didProvidePrimarySpaceInfo && tabGroup.id === providedMiscTabGroup!.id;
+      const isTabGroupMisc = didProvideMiscTabGroup && tabGroup.id === providedMiscTabGroup!.id;
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
       const tabsInSpace =
         isTabGroupForPrimarySpace && providedMiscTabGroup
