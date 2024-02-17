@@ -1,5 +1,5 @@
 import { ActiveWindowTab, ActiveWindow } from ".";
-import { Misc } from "..";
+import * as Misc from "../misc";
 import {
   DataModel,
   ChromeTabGroupWithId,
@@ -8,7 +8,7 @@ import {
   ChromeWindowId,
   SpaceSyncData,
   SpaceSyncDataType,
-} from "../../types";
+} from "../types";
 import { v4 as uuidv4 } from "uuid";
 
 export namespace ActiveWindowSpace {

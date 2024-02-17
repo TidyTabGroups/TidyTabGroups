@@ -5,9 +5,9 @@ import {
   ChromeWindowId,
   ChromeWindowWithId,
   DataModel,
-} from "../../types";
-import * as Utils from "../../utils";
-import * as Storage from "../../utils/storage";
+} from "../types";
+import * as WindowMatcher from "../windowMatcher";
+import * as Storage from "../storage";
 import { v4 as uuidv4 } from "uuid";
 import { ActiveWindowSpace } from "./ActiveWindowSpace";
 import { ActiveWindowTab } from "./ActiveWindowTab";
@@ -321,8 +321,10 @@ export namespace ActiveWindow {
     try {
       const prevActiveWindows = await ActiveWindow.getAll();
       const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
-      const matchedWindowsToPrevActiveWindows =
-        await Utils.WindowMatcher.matchWindowsToActiveWindows(windows, prevActiveWindows);
+      const matchedWindowsToPrevActiveWindows = await WindowMatcher.matchWindowsToActiveWindows(
+        windows,
+        prevActiveWindows
+      );
 
       const newActiveWindows = await Promise.all(
         matchedWindowsToPrevActiveWindows.map(async (matchedWindowToPrevActiveWindowInfo) => {
@@ -354,7 +356,7 @@ export namespace ActiveWindow {
         })
       );
 
-      await Utils.DataModel.ActiveWindow.setAll(newActiveWindows);
+      await ActiveWindow.setAll(newActiveWindows);
     } catch (error) {
       const errorMessage = new Error(
         `DataModel::initialize:Could not intitialize data model: ${error}`
@@ -377,7 +379,7 @@ export namespace ActiveWindow {
             return;
           }
           const tabGroups = await chrome.tabGroups.query({ windowId: window.id });
-          const primarySpace = Utils.DataModel.ActiveWindow.getPrimarySpace(activeWindow);
+          const primarySpace = ActiveWindow.getPrimarySpace(activeWindow);
           const primaryTabGroup = primarySpace
             ? tabGroups.find((tabGroup) => tabGroup.id === primarySpace.tabGroupInfo.id)
             : undefined;
@@ -395,7 +397,7 @@ export namespace ActiveWindow {
         })
       );
 
-      await Utils.DataModel.ActiveWindow.setAll(newActiveWindows);
+      await ActiveWindow.setAll(newActiveWindows);
     } catch (error) {
       const errorMessage = new Error(
         `DataModel::initialize:Could not intitialize data model: ${error}`

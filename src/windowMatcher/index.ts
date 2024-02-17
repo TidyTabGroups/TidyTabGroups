@@ -7,8 +7,8 @@ import {
   ChromeTabId,
   ChromeTabWithId,
   ChromeWindowId,
-} from "../../types";
-import * as Utils from "../../utils";
+} from "../types";
+import * as Misc from "../misc";
 
 export async function matchWindowsToActiveWindows(
   windows: ChromeWindowWithId[],
@@ -65,8 +65,8 @@ export async function matchWindowsToActiveWindows(
         if (primarySpaceId && primarySpaceTabs!.length > 1) {
           const miscTabGroupTitleToMatch =
             selectedSpaceFocusType === "primaryFocus"
-              ? Utils.Misc.MISC_TAB_GROUP_TITLE_LEFT
-              : Utils.Misc.MISC_TAB_GROUP_TITLE_RIGHT;
+              ? Misc.MISC_TAB_GROUP_TITLE_LEFT
+              : Misc.MISC_TAB_GROUP_TITLE_RIGHT;
           const matchedMiscTabGroups = tabGroups.filter(
             (tabGroup) => tabGroup.title === miscTabGroupTitleToMatch
           );

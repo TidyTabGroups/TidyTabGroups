@@ -1,9 +1,8 @@
-import * as Utils from "./utils";
-
+import * as BackgroundEvents from "./backgroundEvents";
 (async function main() {
-  chrome.alarms.onAlarm.addListener(Utils.BackgroundEvents.onAlarm);
-  chrome.action.onClicked.addListener(Utils.BackgroundEvents.onActionClicked);
-  chrome.runtime.onInstalled.addListener(Utils.BackgroundEvents.onInstalled);
-  chrome.runtime.onStartup.addListener(Utils.BackgroundEvents.onStartUp);
-  chrome.tabGroups.onUpdated.addListener(Utils.BackgroundEvents.onTabGroupsUpdated);
+  chrome.alarms.onAlarm.addListener(BackgroundEvents.onAlarm);
+  chrome.action.onClicked.addListener(BackgroundEvents.onActionClicked);
+  chrome.runtime.onInstalled.addListener(BackgroundEvents.onInstalled);
+  chrome.runtime.onStartup.addListener(BackgroundEvents.onStartUp);
+  chrome.tabGroups.onUpdated.addListener(BackgroundEvents.onTabGroupsUpdated);
 })();

@@ -6,16 +6,18 @@ import {
   ChromeWindowWithId,
   ChromeTabWithId,
   ChromeTabGroupId,
-} from "../../types";
-import * as Utils from "../../utils";
+} from "../types";
+import { ActiveWindow, ActiveWindowSpace, SpaceAutoCollapseTimer } from "../model";
+import * as Storage from "../storage";
+import * as Misc from "../misc";
 
 export async function onActionClicked(tab: chrome.tabs.Tab) {
   const { windowId } = tab;
-  const activeWindows = await Utils.DataModel.ActiveWindow.getAll();
+  const activeWindows = await ActiveWindow.getAll();
   if (!activeWindows.find((window) => window.windowId === windowId)) {
-    const newActiveWindow = await Utils.DataModel.ActiveWindow.activateWindow(windowId);
+    const newActiveWindow = await ActiveWindow.activateWindow(windowId);
     console.log(`onActionClicked::newActiveWindow: ${newActiveWindow}`);
-    await Utils.DataModel.ActiveWindow.set(newActiveWindow);
+    await ActiveWindow.set(newActiveWindow);
   }
 }
 
@@ -28,9 +30,7 @@ export async function onAlarm(alarm: chrome.alarms.Alarm) {
       throw new Error(errorMessage);
     }
 
-    const autoCollapseTimer = await Utils.DataModel.SpaceAutoCollapseTimer.get(
-      spaceAutoCollapseAlarmId
-    );
+    const autoCollapseTimer = await SpaceAutoCollapseTimer.get(spaceAutoCollapseAlarmId);
 
     if (!autoCollapseTimer) {
       const errorMessage = `onAlarm: No autoCollapseTimer found`;
@@ -39,7 +39,7 @@ export async function onAlarm(alarm: chrome.alarms.Alarm) {
     }
 
     const { activeWindowId, spaceId } = autoCollapseTimer;
-    const space = await Utils.DataModel.ActiveWindowSpace.get(activeWindowId, spaceId);
+    const space = await ActiveWindowSpace.get(activeWindowId, spaceId);
 
     // TODO: if the space is not the primary space, make it the primary space
     await chrome.tabGroups.update(space.tabGroupInfo.id, { collapsed: true });
@@ -49,21 +49,21 @@ export async function onAlarm(alarm: chrome.alarms.Alarm) {
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   console.log(`onInstalled::Extension was installed because of: ${details.reason}`);
   if (details.reason === "install") {
-    await Utils.Storage.initialize();
+    await Storage.initialize();
     // TODO: open the onboarding page
   } else if (details.reason === "update") {
-    await Utils.DataModel.ActiveWindow.reactivateWindowsForUpdate();
+    await ActiveWindow.reactivateWindowsForUpdate();
   }
 }
 
 export async function onStartUp() {
   console.log(`onStartUp::New browser session was started up`);
-  await Utils.DataModel.ActiveWindow.reactivateWindowsForStartup();
+  await ActiveWindow.reactivateWindowsForStartup();
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   console.log(`onTabGroupsUpdated::tabGroup: ${tabGroup}`);
-  const activeWindows = await Utils.DataModel.ActiveWindow.getAll();
+  const activeWindows = await ActiveWindow.getAll();
 
   const activeWindow = activeWindows.find((window) => window.windowId === tabGroup.windowId);
 
@@ -83,12 +83,12 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   // if #1
   if (activeWindow.miscTabGroup?.id === tabGroup.id) {
     // do #1.1
-    await Utils.DataModel.ActiveWindow.update(activeWindow.id, {
+    await ActiveWindow.update(activeWindow.id, {
       miscTabGroup: tabGroup,
     });
 
     // if #1.2
-    if (Utils.Misc.tabGroupWasExpanded(tabGroup, activeWindow.miscTabGroup)) {
+    if (Misc.tabGroupWasExpanded(tabGroup, activeWindow.miscTabGroup)) {
       // do #1.2.1
       const tabsInMiscGroup = (await chrome.tabs.query({
         windowId: activeWindow.windowId,
@@ -98,7 +98,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       await chrome.tabs.update(activeTabCandidate.id, { active: true });
     }
     // if #1.3
-    else if (Utils.Misc.tabGroupWasCollapsed(tabGroup, activeWindow.miscTabGroup)) {
+    else if (Misc.tabGroupWasCollapsed(tabGroup, activeWindow.miscTabGroup)) {
       // do #1.3.1
       const selectedActiveSpace = activeWindow.spaces.find(
         (activeSpace) => activeSpace.id === activeWindow.selectedSpaceId
@@ -119,11 +119,10 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
     return;
   }
 
-  const activeSpaceFindResult =
-    await Utils.DataModel.ActiveWindowSpace.findActiveSpaceForChromeObject<"tabGroup">(
-      tabGroup.windowId,
-      tabGroup
-    );
+  const activeSpaceFindResult = await ActiveWindowSpace.findActiveSpaceForChromeObject<"tabGroup">(
+    tabGroup.windowId,
+    tabGroup
+  );
 
   if (!activeSpaceFindResult) {
     return;
@@ -131,7 +130,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
 
   const { activeSpace, type: activeSpaceTabGroupType } = activeSpaceFindResult;
 
-  await Utils.DataModel.ActiveWindowSpace.syncActiveSpaceWithWindow({
+  await ActiveWindowSpace.syncActiveSpaceWithWindow({
     activeWindow,
     activeSpace,
     type: "tabGroup",

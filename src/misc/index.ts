@@ -4,7 +4,7 @@ import {
   TabGroupCreationOptions,
   ChromeTabWithId,
   ChromeTabGroupId,
-} from "../../types";
+} from "../types";
 
 const USER_OS_TYPE: "windows" | "macos" | "linux" = "windows";
 

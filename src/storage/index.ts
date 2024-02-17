@@ -1,4 +1,4 @@
-import { DataModel } from "../../types";
+import { DataModel } from "../types";
 
 export const LOCAL_STORAGE_DEFAULT_VALUES: DataModel.Model = {
   activeWindows: [],
