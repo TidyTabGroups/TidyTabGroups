@@ -1,6 +1,6 @@
-import { LocalStorage } from "../../types";
+import { DataModel } from "../../types";
 
-export const LOCAL_STORAGE_DEFAULT_VALUES: LocalStorage = {
+export const LOCAL_STORAGE_DEFAULT_VALUES: DataModel.Model = {
   activeWindows: [],
   spaceAutoCollapseTimers: [],
 };
@@ -9,19 +9,19 @@ export async function initialize() {
   await setItems(LOCAL_STORAGE_DEFAULT_VALUES);
 }
 
-export async function getItems<T extends Partial<LocalStorage>>(
+export async function getItems<T extends Partial<DataModel.Model>>(
   keys?: string | string[] | { [key: string]: any } | null
 ) {
   return (await chrome.storage.local.get(keys)) as T;
 }
 
-export async function setItems<T extends Partial<LocalStorage>>(items: T) {
+export async function setItems<T extends Partial<DataModel.Model>>(items: T) {
   await chrome.storage.local.set(items);
 }
 
-export async function getGuaranteedItems<T extends Partial<LocalStorage>>(...keys: (keyof T)[]) {
+export async function getGuaranteedItems<T extends Partial<DataModel.Model>>(...keys: (keyof T)[]) {
   const result = (await chrome.storage.local.get(keys)) as T;
-  let defaultValues: Partial<LocalStorage> = {};
+  let defaultValues: Partial<DataModel.Model> = {};
 
   keys.forEach((key) => {
     if (result[key] === undefined) {
@@ -39,7 +39,7 @@ export async function getGuaranteedItems<T extends Partial<LocalStorage>>(...key
   return result;
 }
 
-export async function useOrGetItems<T extends Partial<LocalStorage>>(keys: Partial<T> = {}) {
+export async function useOrGetItems<T extends Partial<DataModel.Model>>(keys: Partial<T> = {}) {
   const missingValues: (keyof T)[] = [];
   for (const key in keys) {
     if (keys[key] === undefined) {
@@ -54,11 +54,11 @@ export async function useOrGetItems<T extends Partial<LocalStorage>>(keys: Parti
   return keys;
 }
 
-export async function useOrGetItem<T extends keyof LocalStorage>(
+export async function useOrGetItem<T extends keyof DataModel.Model>(
   key: T,
-  value: LocalStorage[T] | undefined
+  value: DataModel.Model[T] | undefined
 ) {
-  let result: LocalStorage[T] | undefined = value;
+  let result: DataModel.Model[T] | undefined = value;
   if (result === undefined) {
     result = (await getGuaranteedItems(key))[key];
   }

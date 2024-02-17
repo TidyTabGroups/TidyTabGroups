@@ -1,3 +1,6 @@
+import { DataModel } from "./model";
+export { DataModel };
+
 export type ChromeId = number;
 export type ChromeWindowId = ChromeId;
 export type ChromeTabGroupId = ChromeId;
@@ -13,95 +16,6 @@ export interface TabGroupCreationOptions {
   windowId?: ChromeWindowId;
   title?: string;
   color?: chrome.tabGroups.ColorEnum;
-}
-
-export declare namespace TidyTabs {
-  export interface TabCreateProperties {
-    id?: string;
-  }
-
-  export interface ActiveTabCreateProperties extends TabCreateProperties {
-    tabInfo: {
-      id: ChromeTabId;
-      url?: string;
-      title?: string;
-    };
-  }
-
-  export interface BaseTab {
-    id: string;
-  }
-
-  export type Tab = BaseTab & TabCreateProperties;
-  export type ActiveTab = BaseTab & ActiveTabCreateProperties;
-
-  export interface SpaceCreateProperties {
-    id?: string;
-    tabs: Tab[];
-  }
-
-  export interface ActiveSpaceCreateProperties extends SpaceCreateProperties {
-    windowId: ChromeWindowId;
-    tabGroupInfo: {
-      id: ChromeTabGroupId;
-      title?: string;
-      color?: chrome.tabGroups.ColorEnum;
-      collapsed: boolean;
-    };
-    tabs: ActiveTab[];
-  }
-
-  export interface BaseSpace {
-    id: string;
-  }
-
-  export type Space = BaseSpace & SpaceCreateProperties;
-  export type ActiveSpace = BaseSpace & ActiveSpaceCreateProperties;
-
-  export interface BaseWindow {
-    id: string;
-  }
-
-  export interface ActiveWindowCreateProperties {
-    id?: string;
-    windowId: ChromeWindowId;
-    spaces: ActiveSpace[]; // in order of how they appear in the tab bar
-    selectedSpaceId: string | undefined;
-    selectedTabId: string | undefined;
-    primarySpaceId: string | undefined;
-    /*
-      primaryFocus: the primary tab group is selected
-      secondaryFocus: the secondary tab group is selected
-      peakFocus: the selected space is being "peaked"
-      nonSpaceTabFocus: a tab that doesnt belong to any space is selected
-     */
-    selectedSpaceFocusType: "primaryFocus" | "secondaryFocus" | "peakFocus" | "nonSpaceTabFocus";
-    miscTabGroup: ChromeTabGroupWithId | undefined;
-    nonGroupedTabs: ActiveTab[];
-  }
-
-  export type ActiveWindow = BaseWindow & ActiveWindowCreateProperties;
-
-  export interface SpaceAutoCollapseTimer {
-    id: string;
-    activeWindowId: string;
-    spaceId: string;
-    time: number;
-  }
-
-  export type SpaceSyncDataType = "tab" | "tabGroup";
-
-  export interface SpaceSyncData<T extends SpaceSyncDataType> {
-    activeWindow: ActiveWindow;
-    activeSpace: ActiveSpace;
-    type: T;
-    data: T extends "tab" ? ChromeTabWithId : ChromeTabGroupWithId;
-  }
-}
-
-export interface LocalStorage {
-  activeWindows: TidyTabs.ActiveWindow[];
-  spaceAutoCollapseTimers: TidyTabs.SpaceAutoCollapseTimer[];
 }
 
 export declare namespace ActiveSpaceForChromeObjectFinder {
@@ -124,7 +38,7 @@ export declare namespace ActiveSpaceForChromeObjectFinder {
     : ChromeWindowWithId;
 
   export interface FindResult<FindType> {
-    activeSpace: TidyTabs.ActiveSpace;
+    activeSpace: DataModel.ActiveSpace;
     type: FindResultType<FindType>;
   }
 }
@@ -148,7 +62,7 @@ export declare namespace ActiveWindowMatcher {
 
   export interface MatchedWindowToActiveWindowInfo {
     windowId: ChromeWindowId;
-    activeWindow: TidyTabs.ActiveWindow;
+    activeWindow: DataModel.ActiveWindow;
     matchedMiscTabGroupInfo: MatchedMiscTabGroupToActiveWindowSpaceInfo | undefined;
     matchedNonMiscTabGroups: MatchedNonMiscTabGroupToActiveWindowSpaceInfo[];
     matchedTabsCount: number;
@@ -163,4 +77,13 @@ export declare namespace ActiveWindowMatcher {
     tabs: ChromeTabWithId[];
     tabGroups: ChromeTabGroupWithId[];
   }
+}
+
+export type SpaceSyncDataType = "tab" | "tabGroup";
+
+export interface SpaceSyncData<T extends SpaceSyncDataType> {
+  activeWindow: DataModel.ActiveWindow;
+  activeSpace: DataModel.ActiveSpace;
+  type: T;
+  data: T extends "tab" ? ChromeTabWithId : ChromeTabGroupWithId;
 }

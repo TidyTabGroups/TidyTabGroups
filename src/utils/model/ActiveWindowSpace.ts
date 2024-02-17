@@ -1,22 +1,24 @@
 import { ActiveWindowTab, ActiveWindow } from ".";
 import { Misc } from "..";
 import {
-  TidyTabs,
+  DataModel,
   ChromeTabGroupWithId,
   ChromeTabWithId,
   ActiveSpaceForChromeObjectFinder,
   ChromeWindowId,
+  SpaceSyncData,
+  SpaceSyncDataType,
 } from "../../types";
 import { v4 as uuidv4 } from "uuid";
 
 export namespace ActiveWindowSpace {
-  export function create(createProperties: TidyTabs.ActiveSpaceCreateProperties) {
+  export function create(createProperties: DataModel.ActiveSpaceCreateProperties) {
     // TODO: validate createProperties
     const id = createProperties.id || uuidv4();
     return {
       ...createProperties,
       id,
-    } as TidyTabs.ActiveSpace;
+    } as DataModel.ActiveSpace;
   }
 
   export function createFromExistingTabGroup(
@@ -52,7 +54,7 @@ export namespace ActiveWindowSpace {
   export async function update(
     id: string,
     activeWindowId: string,
-    updateProperties: Partial<TidyTabs.ActiveSpace>
+    updateProperties: Partial<DataModel.ActiveSpace>
   ) {
     try {
       const activeWindows = await ActiveWindow.getAll();
@@ -61,7 +63,7 @@ export namespace ActiveWindowSpace {
           continue;
         }
 
-        let updatedSpace: TidyTabs.ActiveSpace | undefined;
+        let updatedSpace: DataModel.ActiveSpace | undefined;
         const updatedSpaces = activeWindow.spaces.map((space) => {
           if (space.id === id) {
             updatedSpace = {
@@ -91,12 +93,12 @@ export namespace ActiveWindowSpace {
     }
   }
 
-  export async function syncActiveSpaceWithWindow<T extends TidyTabs.SpaceSyncDataType>(
-    syncData: TidyTabs.SpaceSyncData<T>
+  export async function syncActiveSpaceWithWindow<T extends SpaceSyncDataType>(
+    syncData: SpaceSyncData<T>
   ) {
     const { activeWindow, activeSpace: prevActiveSpace, type, data } = syncData;
 
-    let newActiveSpaceUpdateProps: Partial<TidyTabs.ActiveSpace> = {};
+    let newActiveSpaceUpdateProps: Partial<DataModel.ActiveSpace> = {};
 
     switch (type) {
       case "tab":

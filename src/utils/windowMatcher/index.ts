@@ -1,6 +1,6 @@
 import {
   ChromeWindowWithId,
-  TidyTabs,
+  DataModel,
   ActiveWindowMatcher,
   ChromeTabGroupWithId,
   ChromeTabGroupId,
@@ -12,7 +12,7 @@ import * as Utils from "../../utils";
 
 export async function matchWindowsToActiveWindows(
   windows: ChromeWindowWithId[],
-  activeWindows: TidyTabs.ActiveWindow[]
+  activeWindows: DataModel.ActiveWindow[]
 ) {
   const candidateMatchedWindowsToActiveWindowsMap: {
     [activeWindowId: string]: ActiveWindowMatcher.MatchedWindowToActiveWindowInfo[];
@@ -202,7 +202,7 @@ export function getMatchingTabGroups(
     tabGroups: ChromeTabGroupWithId[];
     tabs: ChromeTabWithId[];
   },
-  activeWindow: TidyTabs.ActiveWindow
+  activeWindow: DataModel.ActiveWindow
 ) {
   // get the match candidates
   const candidateMatchedTabGroupsToSpacesMap: {
@@ -272,7 +272,7 @@ export function getMatchingTabGroups(
   return matchedTabGroupsToSpaces;
 }
 
-export function getMatchingTabs(tabGroupTabs: ChromeTabWithId[], spaceTabs: TidyTabs.ActiveTab[]) {
+export function getMatchingTabs(tabGroupTabs: ChromeTabWithId[], spaceTabs: DataModel.ActiveTab[]) {
   interface MatchedTabGroupTabToSpaceTabInfo {
     tabGroupTabId: ChromeTabId;
     spaceTabId: string;

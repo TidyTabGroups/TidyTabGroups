@@ -1,8 +1,7 @@
 import {
-  TidyTabs,
+  DataModel,
   ChromeTabGroupWithId,
   ChromeTabId,
-  LocalStorage,
   ChromeWindowId,
   ChromeWindowWithId,
   ChromeTabWithId,
@@ -140,7 +139,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   });
 }
 
-function onSpaceNotInTidyTabsShape(space: TidyTabs.Space) {
+function onSpaceNotInTidyTabsShape(space: DataModel.Space) {
   // TODO: implement this
   console.log(`onSpaceNotInTidyTabsShape::space: ${space}`);
 }

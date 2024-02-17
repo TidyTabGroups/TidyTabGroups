@@ -1,4 +1,4 @@
-import { TidyTabs, LocalStorage } from "../../types";
+import { DataModel } from "../../types";
 import { v4 as uuidv4 } from "uuid";
 import * as Storage from "../storage";
 
@@ -13,7 +13,7 @@ export namespace SpaceAutoCollapseTimer {
       activeWindowId,
       spaceId,
       time: when,
-    } as TidyTabs.SpaceAutoCollapseTimer;
+    } as DataModel.SpaceAutoCollapseTimer;
   }
 
   export async function get(timerId: string) {
@@ -23,17 +23,17 @@ export namespace SpaceAutoCollapseTimer {
 
   export async function getAll() {
     const result = await Storage.getGuaranteedItems<{
-      spaceAutoCollapseTimers: LocalStorage["spaceAutoCollapseTimers"];
+      spaceAutoCollapseTimers: DataModel.Model["spaceAutoCollapseTimers"];
     }>("spaceAutoCollapseTimers");
     return result.spaceAutoCollapseTimers;
   }
 
-  export async function set(timer: TidyTabs.SpaceAutoCollapseTimer) {
+  export async function set(timer: DataModel.SpaceAutoCollapseTimer) {
     const prevSpaceAutoCollapseTimers = await getAll();
     await setAll([...prevSpaceAutoCollapseTimers, timer]);
   }
 
-  export async function setAll(timers: LocalStorage["spaceAutoCollapseTimers"]) {
+  export async function setAll(timers: DataModel.Model["spaceAutoCollapseTimers"]) {
     await Storage.setItems({ spaceAutoCollapseTimers: timers });
   }
 
