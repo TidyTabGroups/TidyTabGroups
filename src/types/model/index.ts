@@ -52,7 +52,7 @@ export declare namespace DataModel {
     windowId: ChromeWindowId;
     spaces: ActiveSpace[]; // in order of how they appear in the tab bar
     selectedSpaceId: string | null;
-    selectedTabId: string | null;
+    selectedTabId: string;
     primarySpaceId: string | null;
     /*
       primaryFocus: the primary tab group is selected
