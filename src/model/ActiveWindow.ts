@@ -259,12 +259,18 @@ export namespace ActiveWindow {
 
     // step 2
     if (secondaryTabGroup) {
-      await chrome.tabGroups.move(secondaryTabGroup.id, { index: -1 });
+      await chrome.tabGroups.move(secondaryTabGroup.id, {
+        windowId,
+        index: -1,
+      });
     }
 
     // step 3
     if (primaryTabGroupInfo) {
-      await chrome.tabGroups.move(primaryTabGroupInfo.tabGroup.id, { index: -1 });
+      await chrome.tabGroups.move(primaryTabGroupInfo.tabGroup.id, {
+        windowId,
+        index: -1,
+      });
     }
 
     // step 4
@@ -287,7 +293,7 @@ export namespace ActiveWindow {
     if (nonGroupedTabs.length > 0) {
       await chrome.tabs.move(
         nonGroupedTabs.map((tab) => tab.id),
-        { index: 0 }
+        { windowId, index: 0 }
       );
     }
 
