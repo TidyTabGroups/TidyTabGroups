@@ -9,7 +9,6 @@ export async function onActionClicked(tab: chrome.tabs.Tab) {
   if (!activeWindows.find((window) => window.windowId === windowId)) {
     const newActiveWindow = await ActiveWindow.activateWindow(windowId);
     console.log(`onActionClicked::newActiveWindow: ${newActiveWindow}`);
-    await ActiveWindow.set(newActiveWindow);
   }
 }
 

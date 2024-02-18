@@ -23,6 +23,12 @@ export namespace ActiveWindow {
     } as DataModel.ActiveWindow;
   }
 
+  export async function createAndSet(createProperties: DataModel.ActiveWindowCreateProperties) {
+    const newActiveWindow = create(createProperties);
+    await set(newActiveWindow);
+    return newActiveWindow;
+  }
+
   export async function get(activeWindowId: string) {
     const activeWindows = await getAll();
     const activeWindow = activeWindows.find((window) => window.id === activeWindowId);
@@ -211,7 +217,7 @@ export namespace ActiveWindow {
       throw new Error(`initializeDataModel::Error: No selected tab found`);
     }
 
-    newActiveWindow = ActiveWindow.create({
+    newActiveWindow = await ActiveWindow.createAndSet({
       windowId: window.id,
       spaces: newActiveWindowSpaces,
       selectedSpaceId: newActiveWindowSelectedSpaceId,
@@ -337,37 +343,33 @@ export namespace ActiveWindow {
         prevActiveWindows
       );
 
-      const newActiveWindows = await Promise.all(
-        matchedWindowsToPrevActiveWindows.map(async (matchedWindowToPrevActiveWindowInfo) => {
-          const {
-            windowId,
-            activeWindow: prevActiveWindow,
-            matchedSecondaryTabGroupInfo,
-            matchedNonSecondaryTabGroups,
-          } = matchedWindowToPrevActiveWindowInfo;
+      matchedWindowsToPrevActiveWindows.forEach(async (matchedWindowToPrevActiveWindowInfo) => {
+        const {
+          windowId,
+          activeWindow: prevActiveWindow,
+          matchedSecondaryTabGroupInfo,
+          matchedNonSecondaryTabGroups,
+        } = matchedWindowToPrevActiveWindowInfo;
 
-          const matchedPrimaryTabGroupInfo = prevActiveWindow.primarySpaceId
-            ? matchedNonSecondaryTabGroups.find(
-                (matchedTabGroupInfo) =>
-                  matchedTabGroupInfo.spaceId === prevActiveWindow.primarySpaceId
-              )
-            : undefined;
+        const matchedPrimaryTabGroupInfo = prevActiveWindow.primarySpaceId
+          ? matchedNonSecondaryTabGroups.find(
+              (matchedTabGroupInfo) =>
+                matchedTabGroupInfo.spaceId === prevActiveWindow.primarySpaceId
+            )
+          : undefined;
 
-          const primaryTabGroupId = matchedPrimaryTabGroupInfo?.tabGroupId;
+        const primaryTabGroupId = matchedPrimaryTabGroupInfo?.tabGroupId;
 
-          return ActiveWindow.activateWindow(
-            windowId,
-            primaryTabGroupId
-              ? {
-                  primaryTabGroupId,
-                  secondaryTabGroupId: matchedSecondaryTabGroupInfo?.tabGroupId,
-                }
-              : undefined
-          );
-        })
-      );
-
-      await ActiveWindow.setAll(newActiveWindows);
+        await ActiveWindow.activateWindow(
+          windowId,
+          primaryTabGroupId
+            ? {
+                primaryTabGroupId,
+                secondaryTabGroupId: matchedSecondaryTabGroupInfo?.tabGroupId,
+              }
+            : undefined
+        );
+      });
     } catch (error) {
       const errorMessage = new Error(
         `DataModel::initialize:Could not intitialize data model: ${error}`
@@ -381,37 +383,31 @@ export namespace ActiveWindow {
     try {
       const activeWindows = await ActiveWindow.getAll();
       const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
-      const newActiveWindows: DataModel.ActiveWindow[] = [];
 
-      await Promise.all(
-        activeWindows.map(async (activeWindow) => {
-          const window = windows.find((window) => window.id === activeWindow.windowId);
-          if (!window) {
-            return;
-          }
-          const tabGroups = await chrome.tabGroups.query({ windowId: window.id });
-          const primarySpace = ActiveWindow.getPrimarySpace(activeWindow);
-          const primaryTabGroup = primarySpace
-            ? tabGroups.find((tabGroup) => tabGroup.id === primarySpace.tabGroupInfo.id)
+      activeWindows.forEach(async (activeWindow) => {
+        const window = windows.find((window) => window.id === activeWindow.windowId);
+        if (!window) {
+          return;
+        }
+        const tabGroups = await chrome.tabGroups.query({ windowId: window.id });
+        const primarySpace = ActiveWindow.getPrimarySpace(activeWindow);
+        const primaryTabGroup = primarySpace
+          ? tabGroups.find((tabGroup) => tabGroup.id === primarySpace.tabGroupInfo.id)
+          : undefined;
+        const secondaryTabGroup =
+          primaryTabGroup && activeWindow.secondaryTabGroup
+            ? tabGroups.find((tabGroup) => tabGroup.id === activeWindow.secondaryTabGroup!.id)
             : undefined;
-          const secondaryTabGroup =
-            primaryTabGroup && activeWindow.secondaryTabGroup
-              ? tabGroups.find((tabGroup) => tabGroup.id === activeWindow.secondaryTabGroup!.id)
-              : undefined;
-          const newActiveWindow = await ActiveWindow.activateWindow(
-            window.id,
-            primaryTabGroup
-              ? {
-                  primaryTabGroupId: primaryTabGroup.id,
-                  secondaryTabGroupId: secondaryTabGroup?.id,
-                }
-              : undefined
-          );
-          newActiveWindows.push(newActiveWindow);
-        })
-      );
-
-      await ActiveWindow.setAll(newActiveWindows);
+        const newActiveWindow = await ActiveWindow.activateWindow(
+          window.id,
+          primaryTabGroup
+            ? {
+                primaryTabGroupId: primaryTabGroup.id,
+                secondaryTabGroupId: secondaryTabGroup?.id,
+              }
+            : undefined
+        );
+      });
     } catch (error) {
       const errorMessage = new Error(
         `DataModel::initialize:Could not intitialize data model: ${error}`
