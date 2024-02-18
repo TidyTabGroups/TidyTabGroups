@@ -28,10 +28,10 @@ export declare namespace DataModel {
   export interface ActiveSpaceCreateProperties extends SpaceCreateProperties {
     windowId: ChromeWindowId;
     tabGroupInfo: {
-      id: ChromeTabGroupId;
-      title?: string;
-      color?: chrome.tabGroups.ColorEnum;
-      collapsed: boolean;
+      id: chrome.tabGroups.TabGroup["id"];
+      title: chrome.tabGroups.TabGroup["title"];
+      color: chrome.tabGroups.TabGroup["color"];
+      collapsed: chrome.tabGroups.TabGroup["collapsed"];
     };
     tabs: ActiveTab[];
   }

@@ -132,8 +132,7 @@ export namespace ActiveWindowSpace {
         newActiveSpaceUpdateProps = {
           tabGroupInfo: {
             ...prevActiveSpace.tabGroupInfo,
-            title: tabGroup.title,
-            color: tabGroup.color,
+            ...tabGroup,
           },
         };
         break;
