@@ -74,11 +74,11 @@ export function initializeDatabase(name: string) {
     const schema = schemas[name];
 
     if (!schema) {
-      throw new Error(`initializeDatabase::Error: ${name} database scheme description not found`);
+      reject(new Error(`initializeDatabase::Error: ${name} database scheme description not found`));
     }
 
     if (pendingConnections[name] || connections["name"]) {
-      throw new Error(`initializeDatabase::Error: ${name} already has been initialized`);
+      reject(new Error(`initializeDatabase::Error: ${name} already has been initialized`));
     }
 
     console.log(`initializeDatabase::will initialize ${name} database`);
