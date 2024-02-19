@@ -43,17 +43,17 @@ export async function createTabGroup(tabIds: [ChromeTabId], options?: TabGroupCr
 }
 
 export function tabGroupWasCollapsed(
-  tabGroup: chrome.tabGroups.TabGroup,
-  prevTabGroup: chrome.tabGroups.TabGroup
+  tabGroupCollapsed: chrome.tabGroups.TabGroup["collapsed"],
+  prevTabGroupCollapsed: chrome.tabGroups.TabGroup["collapsed"]
 ) {
-  return tabGroup.collapsed && !prevTabGroup.collapsed;
+  return tabGroupCollapsed && !prevTabGroupCollapsed;
 }
 
 export function tabGroupWasExpanded(
-  tabGroup: chrome.tabGroups.TabGroup,
-  prevTabGroup: chrome.tabGroups.TabGroup
+  tabGroupCollapsed: chrome.tabGroups.TabGroup["collapsed"],
+  prevTabGroupCollapsed: chrome.tabGroups.TabGroup["collapsed"]
 ) {
-  return !tabGroup.collapsed && prevTabGroup.collapsed;
+  return !tabGroupCollapsed && prevTabGroupCollapsed;
 }
 
 export function isTab(object: any): object is chrome.tabs.Tab {
