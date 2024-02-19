@@ -101,6 +101,9 @@ export function initializeDatabase(name: string) {
       db.onerror = () => {
         console.error("Database error");
       };
+
+      pendingConnections[name].onSuccessListeners.forEach((listener) => listener(db!));
+      delete pendingConnections[name];
       connections[name] = {
         db,
         createdStores: pendingCreatedStores,
