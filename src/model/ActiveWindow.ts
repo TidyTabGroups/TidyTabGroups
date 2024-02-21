@@ -113,38 +113,27 @@ export namespace ActiveWindow {
       ? tabGroups.find((tabGroup) => tabGroup.id === providedPrimarySpaceInfo!.primaryTabGroupId)
       : undefined;
     if (didProvidePrimaryTabGroup && !providedPrimaryTabGroup) {
-      throw new Error(
-        `activateWindow::primary tab group with id ${
-          providedPrimarySpaceInfo!.primaryTabGroupId
-        } not found`
-      );
+      throw new Error(`activateWindow::primary tab group with id ${providedPrimarySpaceInfo!.primaryTabGroupId} not found`);
     }
     const providedSecondaryTabGroup = didProvideSecondaryTabGroup
       ? tabGroups.find((tabGroup) => tabGroup.id === providedPrimarySpaceInfo!.secondaryTabGroupId)
       : undefined;
     if (didProvideSecondaryTabGroup && !providedSecondaryTabGroup) {
-      throw new Error(
-        `activateWindow::secondary tab group with id ${
-          providedPrimarySpaceInfo!.secondaryTabGroupId
-        } not found`
-      );
+      throw new Error(`activateWindow::secondary tab group with id ${providedPrimarySpaceInfo!.secondaryTabGroupId} not found`);
     }
 
     let newActiveWindow: DataModel.ActiveWindow;
     let newActiveWindowSpaces: DataModel.ActiveWindow["spaces"] = [];
     let newActiveWindowSelectedSpaceId: DataModel.ActiveWindow["selectedSpaceId"] = null;
     let newActiveWindowPrimarySpaceId: DataModel.ActiveWindow["primarySpaceId"] = null;
-    let newActiveWindowSelectedTabFocusType: DataModel.ActiveWindow["selectedSpaceFocusType"] =
-      "nonSpaceTabFocus";
+    let newActiveWindowSelectedTabFocusType: DataModel.ActiveWindow["selectedSpaceFocusType"] = "nonSpaceTabFocus";
     let newActiveWindowSelectedTabId: DataModel.ActiveWindow["selectedTabId"] | undefined;
     let newActiveWindowSecondaryTabGroup: DataModel.ActiveWindow["secondaryTabGroup"] = null;
     let newActiveWindowNonGroupedTabs: DataModel.ActiveWindow["nonGroupedTabs"] = [];
 
     let selectedTabGroup: ChromeTabGroupWithId | undefined;
     let tabGroupsToCollapse: ChromeTabGroupId[] = [];
-    let primaryTabGroupInfo:
-      | { tabGroup: ChromeTabGroupWithId; tabsInGroup: ChromeTabWithId[] }
-      | undefined;
+    let primaryTabGroupInfo: { tabGroup: ChromeTabGroupWithId; tabsInGroup: ChromeTabWithId[] } | undefined;
 
     const tabsInprovidedSecondaryTabGroup = didProvideSecondaryTabGroup
       ? tabs.filter((tab) => tab.groupId === providedSecondaryTabGroup!.id)
@@ -152,20 +141,11 @@ export namespace ActiveWindow {
 
     tabGroups.forEach((tabGroup) => {
       const isTabGroupForSelectedTab = tabGroup.id === tabGroupIdForSelectedTab;
-      const isTabGroupPrimary = didProvidePrimarySpaceInfo
-        ? providedPrimaryTabGroup!.id === tabGroup.id
-        : isTabGroupForSelectedTab;
-      const isTabGroupSecondary =
-        didProvidePrimarySpaceInfo && tabGroup.id === providedSecondaryTabGroup!.id;
+      const isTabGroupPrimary = didProvidePrimarySpaceInfo ? providedPrimaryTabGroup!.id === tabGroup.id : isTabGroupForSelectedTab;
+      const isTabGroupSecondary = didProvidePrimarySpaceInfo && tabGroup.id === providedSecondaryTabGroup!.id;
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
-      const tabsInSpace =
-        isTabGroupPrimary && providedSecondaryTabGroup
-          ? [...tabsInprovidedSecondaryTabGroup!, ...tabsInGroup]
-          : tabsInGroup;
-      const newActiveWindowSpace = ActiveWindowSpace.createFromExistingTabGroup(
-        tabGroup,
-        tabsInSpace
-      );
+      const tabsInSpace = isTabGroupPrimary && providedSecondaryTabGroup ? [...tabsInprovidedSecondaryTabGroup!, ...tabsInGroup] : tabsInGroup;
+      const newActiveWindowSpace = ActiveWindowSpace.createFromExistingTabGroup(tabGroup, tabsInSpace);
       newActiveWindowSpaces.push(newActiveWindowSpace);
 
       if (isTabGroupForSelectedTab) {
@@ -180,9 +160,7 @@ export namespace ActiveWindow {
         }
 
         newActiveWindowSelectedSpaceId = newActiveWindowSpace.id;
-        const selectedActiveWindowTab = newActiveWindowSpace.tabs.find(
-          (tab) => tab.tabInfo.id === selectedTab.id
-        )!.id;
+        const selectedActiveWindowTab = newActiveWindowSpace.tabs.find((tab) => tab.tabInfo.id === selectedTab.id)!.id;
 
         if (!selectedActiveWindowTab) {
           const errorMessage = `initializeDataModel::Error: No active tab found with id: ${selectedTab.id}`;
@@ -239,10 +217,8 @@ export namespace ActiveWindow {
     // step 1
     let secondaryTabGroup: ChromeTabGroupWithId | undefined;
     if (primaryTabGroupInfo && primaryTabGroupInfo.tabsInGroup.length > 1) {
-      const { tabGroup: primaryTabGroup, tabsInGroup: tabsInPrimaryTabGroup } =
-        primaryTabGroupInfo!;
-      const isPrimaryTabGroupSelected =
-        selectedTabGroup && selectedTabGroup.id === primaryTabGroup.id;
+      const { tabGroup: primaryTabGroup, tabsInGroup: tabsInPrimaryTabGroup } = primaryTabGroupInfo!;
+      const isPrimaryTabGroupSelected = selectedTabGroup && selectedTabGroup.id === primaryTabGroup.id;
       const tabsInPrimaryTabGroupToMove = isPrimaryTabGroupSelected
         ? tabsInPrimaryTabGroup.filter((tab) => !tab.active)
         : tabsInPrimaryTabGroup.slice(0, tabsInPrimaryTabGroup.length - 1);
@@ -250,9 +226,7 @@ export namespace ActiveWindow {
       if (didProvideSecondaryTabGroup) {
         secondaryTabGroup = providedSecondaryTabGroup!;
         await chrome.tabs.group({
-          tabIds: [...tabsInprovidedSecondaryTabGroup!, ...tabsInPrimaryTabGroupToMove].map(
-            (tab) => tab.id
-          ),
+          tabIds: [...tabsInprovidedSecondaryTabGroup!, ...tabsInPrimaryTabGroupToMove].map((tab) => tab.id),
         });
       } else {
         const secondaryTabGroupId = await chrome.tabs.group({
@@ -281,11 +255,7 @@ export namespace ActiveWindow {
     }
 
     // step 4
-    await Promise.all(
-      tabGroupsToCollapse.map((tabGroupId) =>
-        chrome.tabGroups.update(tabGroupId, { collapsed: true })
-      )
-    );
+    await Promise.all(tabGroupsToCollapse.map((tabGroupId) => chrome.tabGroups.update(tabGroupId, { collapsed: true })));
 
     // step 5
     if (selectedTabGroup) {
@@ -326,10 +296,7 @@ export namespace ActiveWindow {
         // @ts-ignore
         newActiveWindowSelectedTabFocusType === "secondaryFocus")
     ) {
-      await SpaceAutoCollapseTimer.startAutoCollapseTimerForSpace(
-        newActiveWindow.id,
-        newActiveWindowSelectedSpaceId
-      );
+      await SpaceAutoCollapseTimer.startAutoCollapseTimerForSpace(newActiveWindow.id, newActiveWindowSelectedSpaceId);
     }
 
     return newActiveWindow;
@@ -339,10 +306,7 @@ export namespace ActiveWindow {
     try {
       const prevActiveWindows = await ActiveWindow.getAll();
       const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
-      const matchedWindowsToPrevActiveWindows = await WindowMatcher.matchWindowsToActiveWindows(
-        windows,
-        prevActiveWindows
-      );
+      const matchedWindowsToPrevActiveWindows = await WindowMatcher.matchWindowsToActiveWindows(windows, prevActiveWindows);
 
       matchedWindowsToPrevActiveWindows.forEach(async (matchedWindowToPrevActiveWindowInfo) => {
         const {
@@ -353,10 +317,7 @@ export namespace ActiveWindow {
         } = matchedWindowToPrevActiveWindowInfo;
 
         const matchedPrimaryTabGroupInfo = prevActiveWindow.primarySpaceId
-          ? matchedNonSecondaryTabGroups.find(
-              (matchedTabGroupInfo) =>
-                matchedTabGroupInfo.spaceId === prevActiveWindow.primarySpaceId
-            )
+          ? matchedNonSecondaryTabGroups.find((matchedTabGroupInfo) => matchedTabGroupInfo.spaceId === prevActiveWindow.primarySpaceId)
           : undefined;
 
         const primaryTabGroupId = matchedPrimaryTabGroupInfo?.tabGroupId;
@@ -372,9 +333,7 @@ export namespace ActiveWindow {
         );
       });
     } catch (error) {
-      const errorMessage = new Error(
-        `DataModel::initialize:Could not intitialize data model: ${error}`
-      );
+      const errorMessage = new Error(`DataModel::initialize:Could not intitialize data model: ${error}`);
       console.error(errorMessage);
       throw error;
     }
@@ -392,9 +351,7 @@ export namespace ActiveWindow {
         }
         const tabGroups = await chrome.tabGroups.query({ windowId: window.id });
         const primarySpace = ActiveWindow.getPrimarySpace(activeWindow);
-        const primaryTabGroup = primarySpace
-          ? tabGroups.find((tabGroup) => tabGroup.id === primarySpace.tabGroupInfo.id)
-          : undefined;
+        const primaryTabGroup = primarySpace ? tabGroups.find((tabGroup) => tabGroup.id === primarySpace.tabGroupInfo.id) : undefined;
         const secondaryTabGroup =
           primaryTabGroup && activeWindow.secondaryTabGroup
             ? tabGroups.find((tabGroup) => tabGroup.id === activeWindow.secondaryTabGroup!.id)
@@ -410,9 +367,7 @@ export namespace ActiveWindow {
         );
       });
     } catch (error) {
-      const errorMessage = new Error(
-        `DataModel::initialize:Could not intitialize data model: ${error}`
-      );
+      const errorMessage = new Error(`DataModel::initialize:Could not intitialize data model: ${error}`);
       console.error(errorMessage);
       throw error;
     }
