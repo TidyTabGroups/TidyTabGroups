@@ -10,7 +10,15 @@ interface StoreDescription {
   indexes: IndexDescription[];
 }
 
-let db: IDBDatabase | null;
+interface Connection {
+  db: IDBDatabase;
+  createdStores: string[];
+  onStoreCreatedListeners: ((storeName: string) => void)[];
+}
+
+import { DBSchema, IDBPDatabase, openDB, wrap } from "idb";
+import { DataModel } from "../types";
+
 const schemas: {
   [name: string]: {
     version: number;
@@ -30,9 +38,7 @@ const schemas: {
       {
         name: "activeSpaces",
         options: { keyPath: "id" },
-        indexes: [
-          { name: "activeWindowId", keyPath: "activeWindowId", options: { unique: false } },
-        ],
+        indexes: [{ name: "activeWindowId", keyPath: "activeWindowId", options: { unique: false } }],
       },
       {
         name: "activeTabs",
@@ -54,6 +60,10 @@ const schemas: {
   },
 };
 
+const connections: {
+  [name: string]: IDBDatabase;
+} = {};
+
 const pendingConnections: {
   [name: string]: {
     onSuccessListeners: ((db: IDBDatabase) => void)[];
@@ -61,90 +71,102 @@ const pendingConnections: {
   };
 } = {};
 
-const connections: {
-  [name: string]: {
-    db: IDBDatabase;
-    createdStores: string[];
-    onStoreCreatedListeners: ((storeName: string) => void)[];
-  };
-} = {};
-
-export function initializeDatabase(name: string) {
+export function initializeDatabaseConnection(name: string) {
   return new Promise<void>((resolve, reject) => {
     const schema = schemas[name];
 
     if (!schema) {
-      reject(new Error(`initializeDatabase::Error: ${name} database scheme description not found`));
+      reject(new Error(`initializeDatabaseConnection::Error: ${name} database scheme description not found`));
     }
 
-    if (pendingConnections[name] || connections["name"]) {
-      reject(new Error(`initializeDatabase::Error: ${name} already has been initialized`));
+    if (connections[name] || pendingConnections[name]) {
+      reject(new Error(`initializeDatabaseConnection::Error: ${name} already has been initialized`));
     }
 
-    console.log(`initializeDatabase::will initialize ${name} database`);
+    console.log(`initializeDatabaseConnection::will initialize ${name} database`);
 
     pendingConnections[name] = { onSuccessListeners: [], onErrorListeners: [] };
 
-    const pendingCreatedStores: string[] = [];
-
     const openRequest = indexedDB.open(name, schema.version);
     openRequest.addEventListener("error", (error) => {
-      console.error(`initializeDatabase::Error opening ${name} database`);
+      console.error(`initializeDatabaseConnection::Error opening ${name} database`);
       pendingConnections[name].onErrorListeners.forEach((listener) => listener());
       delete pendingConnections[name];
       reject();
     });
     openRequest.addEventListener("success", (event) => {
-      console.log(`initializeDatabase::Successfully opened ${name} database`);
+      console.log(`initializeDatabaseConnection::Successfully opened ${name} database`);
+      // FIXME: ts-ignore: "Property 'result' does not exist on type 'EventTarget'"
       // @ts-ignore
-      db = event.target.result as IDBDatabase;
+      const db = event.target.result as IDBDatabase;
       db.onerror = () => {
         console.error("Database error");
       };
 
-      pendingConnections[name].onSuccessListeners.forEach((listener) => listener(db!));
+      connections[name] = db;
+      pendingConnections[name].onSuccessListeners.forEach((listener) => listener(db));
       delete pendingConnections[name];
-      connections[name] = {
-        db,
-        createdStores: pendingCreatedStores,
-        onStoreCreatedListeners: [],
-      };
       resolve();
     });
 
     openRequest.addEventListener("upgradeneeded", (event) => {
-      console.log(`initializeDatabase::upgrade needed for ${name} database`);
+      console.log(`initializeDatabaseConnection::upgrade needed for ${name} database`);
+      // FIXME: ts-ignore: "Property 'result' does not exist on type 'EventTarget'"
       // @ts-ignore
-      db = event.target.result as IDBDatabase;
+      const db = event.target.result as IDBDatabase;
       schema.stores.forEach((storeDescription) => {
-        const { store, indexes } = createObjectStore(
-          db!,
-          storeDescription.name,
-          storeDescription.options,
-          storeDescription.indexes
-        );
-
-        store.transaction.addEventListener("complete", (event) => {
-          if (connections[name]) {
-            connections[name].createdStores.push(storeDescription.name);
-          } else {
-            pendingCreatedStores.push(storeDescription.name);
-          }
+        const store = db.createObjectStore(name, storeDescription.options);
+        storeDescription.indexes?.forEach(({ name, keyPath, options }) => {
+          return store.createIndex(name, keyPath, options);
         });
       });
     });
   });
 }
 
-function createObjectStore(
-  db: IDBDatabase,
-  name: string,
-  options?: IDBObjectStoreParameters,
-  indexesDescriptions?: IndexDescription[]
-) {
-  const store = db.createObjectStore(name, options);
-  const indexes = indexesDescriptions?.map(({ name, keyPath, options }) => {
-    return store.createIndex(name, keyPath, options);
+export function getDBConnection(name: string) {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    if (!schemas[name]) {
+      reject(new Error(`getDBConnection::Error: ${name} database scheme description not found`));
+    }
+
+    const connection = connections["name"];
+    if (connection) {
+      resolve(connection);
+    } else {
+      const pendingConnection = pendingConnections[name];
+      if (!pendingConnection) {
+        reject(new Error(`getDBConnection::${name} database not initialized`));
+      }
+
+      pendingConnection.onSuccessListeners.push(resolve);
+      pendingConnection.onErrorListeners.push(() => {
+        reject(new Error(`getDBConnection::${name} database connection was unable to initilize:`));
+      });
+    }
   });
-  return { store, indexes };
+}
+
+export async function getWrappedDBConnection<T extends DBSchema>(name: string) {
+  return wrap(await getDBConnection(name)) as IDBPDatabase<T>;
+}
+
+export async function createTransaction(
+  connectionName: string,
+  storeNames: string[],
+  mode?: IDBTransactionMode | undefined,
+  options?: IDBTransactionOptions | undefined
+) {
+  const db = await getDBConnection(connectionName);
+  return db.transaction(storeNames, mode, options);
+}
+
+export async function createObjectStoreTransaction(
+  connectionName: string,
+  storeName: string,
+  mode?: IDBTransactionMode | undefined,
+  options?: IDBTransactionOptions | undefined
+) {
+  const db = await getDBConnection(connectionName);
+  return db.transaction(storeName, mode, options);
 }

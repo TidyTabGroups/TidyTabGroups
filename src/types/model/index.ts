@@ -1,3 +1,4 @@
+import { DBSchema } from "idb";
 import { ChromeTabId, ChromeWindowId, ChromeTabGroupId, ChromeTabGroupWithId } from "..";
 
 export declare namespace DataModel {
@@ -76,6 +77,28 @@ export declare namespace DataModel {
 
   export interface Model {
     activeWindows: ActiveWindow[];
-    spaceAutoCollapseTimers: SpaceAutoCollapseTimer[];
+  }
+
+  export interface ModelDB extends DBSchema {
+    activeWindows: {
+      value: ActiveWindow;
+      key: string;
+      indexes: { window: "windowId" };
+    };
+    activeSpaces: {
+      value: ActiveSpace;
+      key: string;
+      indexes: { activeWindow: "activeWindowId" };
+    };
+    activeTabs: {
+      value: ActiveTab;
+      key: string;
+      indexes: { activeWindow: "activeWindowId"; activeSpace: "activeSpaceId" };
+    };
+    spaceAutoCollapseTimers: {
+      value: SpaceAutoCollapseTimer;
+      key: string;
+      indexes: { activeWindow: "activeWindowId"; activeSpace: "spaceId" };
+    };
   }
 }

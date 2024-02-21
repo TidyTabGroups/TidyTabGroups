@@ -7,5 +7,5 @@ import Database from "./database";
   chrome.runtime.onStartup.addListener(BackgroundEvents.onStartUp);
   chrome.tabGroups.onUpdated.addListener(BackgroundEvents.onTabGroupsUpdated);
 
-  Database.initializeDatabase("model");
+  Database.initializeDatabaseConnection("model");
 })();
