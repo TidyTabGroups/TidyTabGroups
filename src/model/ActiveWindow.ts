@@ -265,6 +265,7 @@ export namespace ActiveWindow {
 
     // step 2
     if (secondaryTabGroup) {
+      await ActiveWindow.update(newActiveWindow.id, { secondaryTabGroup });
       await chrome.tabGroups.move(secondaryTabGroup.id, {
         windowId,
         index: -1,
