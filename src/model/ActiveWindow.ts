@@ -32,6 +32,7 @@ export namespace ActiveWindow {
     activeWindowsStore.add(newActiveWindow);
     spaces.forEach((space) => activeSpacesStore.add(space));
     tabs.forEach((tab) => activeTabsStore.add(tab));
+    await transaction.done;
     return newActiveWindow;
   }
 
