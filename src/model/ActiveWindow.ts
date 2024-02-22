@@ -156,7 +156,7 @@ export namespace ActiveWindow {
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
       // const tabsInSpace = isTabGroupPrimary && providedSecondaryTabGroup ? [...tabsInprovidedSecondaryTabGroup!, ...tabsInGroup] : tabsInGroup;
 
-      const newActiveWindowSpace = ActiveWindowSpace.createFromExistingTabGroup(tabGroup);
+      const newActiveWindowSpace = ActiveWindowSpace.createFromExistingTabGroup(newActiveWindowId, tabGroup);
       newActiveWindowSpaces.push(newActiveWindowSpace);
 
       tabsInGroup.forEach((tab) => {

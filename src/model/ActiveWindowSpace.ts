@@ -16,17 +16,21 @@ import { v4 as uuidv4 } from "uuid";
 import Database from "../database";
 
 export namespace ActiveWindowSpace {
-  export function create(createProperties: DataModel.BaseActiveSpaceCreateProperties) {
+  export function create(createProperties: DataModel.ActiveSpaceCreateProperties): DataModel.ActiveSpace {
     // TODO: validate createProperties
     const id = createProperties.id || uuidv4();
     return {
       ...createProperties,
       id,
-    } as DataModel.ActiveSpace;
+    };
   }
 
-  export function createFromExistingTabGroup(tabGroup: ChromeTabGroupWithId) {
+  export function createFromExistingTabGroup(
+    activeWindowId: DataModel.ActiveSpaceCreateProperties["activeWindowId"],
+    tabGroup: ChromeTabGroupWithId
+  ) {
     return ActiveWindowSpace.create({
+      activeWindowId,
       tabGroupInfo: {
         id: tabGroup.id,
         title: tabGroup.title,
