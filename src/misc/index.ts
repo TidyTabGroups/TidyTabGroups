@@ -8,21 +8,14 @@ export const SECONDARY_TAB_GROUP_TITLE_LEFT_WINDOWS = "<";
 export const SECONDARY_TAB_GROUP_TITLE_RIGHT_WINDOWS = ">";
 
 export const SECONDARY_TAB_GROUP_TITLE_LEFT =
-  USER_OS_TYPE === "windows"
-    ? SECONDARY_TAB_GROUP_TITLE_LEFT_WINDOWS
-    : SECONDARY_TAB_GROUP_TITLE_LEFT_MAC;
+  USER_OS_TYPE === "windows" ? SECONDARY_TAB_GROUP_TITLE_LEFT_WINDOWS : SECONDARY_TAB_GROUP_TITLE_LEFT_MAC;
 export const SECONDARY_TAB_GROUP_TITLE_RIGHT =
-  USER_OS_TYPE === "windows"
-    ? SECONDARY_TAB_GROUP_TITLE_RIGHT_WINDOWS
-    : SECONDARY_TAB_GROUP_TITLE_RIGHT_MAC;
+  USER_OS_TYPE === "windows" ? SECONDARY_TAB_GROUP_TITLE_RIGHT_WINDOWS : SECONDARY_TAB_GROUP_TITLE_RIGHT_MAC;
 
 export const MAX_PRIMARY_TABS = 1;
 
 export function isMiscTabGroupTitle(tabGroupTitle: String) {
-  return (
-    tabGroupTitle === SECONDARY_TAB_GROUP_TITLE_LEFT ||
-    tabGroupTitle === SECONDARY_TAB_GROUP_TITLE_RIGHT
-  );
+  return tabGroupTitle === SECONDARY_TAB_GROUP_TITLE_LEFT || tabGroupTitle === SECONDARY_TAB_GROUP_TITLE_RIGHT;
 }
 
 export async function createTabGroup(tabIds: [ChromeTabId], options?: TabGroupCreationOptions) {
