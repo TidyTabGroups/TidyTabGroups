@@ -22,7 +22,6 @@ export async function onAlarm(alarm: chrome.alarms.Alarm) {
     }
 
     const autoCollapseTimer = await SpaceAutoCollapseTimer.get(spaceAutoCollapseAlarmId);
-
     if (!autoCollapseTimer) {
       const errorMessage = `onAlarm: No autoCollapseTimer found`;
       console.error(errorMessage);

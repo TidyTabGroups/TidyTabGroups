@@ -1,4 +1,4 @@
-import { ChromeTabId, TabGroupCreationOptions } from "../types";
+import { ChromeTabId, ChromeTabWithId, ChromeWindowId, TabGroupCreationOptions } from "../types";
 
 const USER_OS_TYPE: "windows" | "macos" | "linux" = "windows";
 
@@ -86,18 +86,27 @@ export function isTabGroup(object: any): object is chrome.tabGroups.TabGroup {
 }
 
 export function isWindow(object: any): object is chrome.windows.Window {
-  const properties = [
-    "alwaysOnTop",
-    "focused",
-    "height",
-    "id",
-    "incognito",
-    "left",
-    "state",
-    "top",
-    "type",
-    "width",
-  ];
+  const properties = ["alwaysOnTop", "focused", "height", "id", "incognito", "left", "state", "top", "type", "width"];
 
   return object && properties.every((property) => property in object);
+}
+
+// opens a dummy tab in windows that have a chrome://extensions/* tab open
+export async function openDummyTab() {
+  const chromeExtensionManagerTabs = await chrome.tabs.query({ url: "chrome://extensions/*" });
+
+  const windowIds: ChromeWindowId[] = [];
+  chromeExtensionManagerTabs.forEach((tab) => {
+    if (!windowIds.includes(tab.windowId)) {
+      windowIds.push(tab.windowId);
+    }
+  });
+
+  if (windowIds.length === 0) {
+    return;
+  }
+
+  windowIds.forEach(async (windowId) => {
+    chrome.tabs.create({ windowId, url: "dummy-page.html", active: false, pinned: true, index: 0 });
+  });
 }
