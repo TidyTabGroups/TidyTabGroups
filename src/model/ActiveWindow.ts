@@ -196,6 +196,7 @@ export namespace ActiveWindow {
 
     newActiveWindow = await ActiveWindow.createAndAdd(
       {
+        id: newActiveWindowId,
         windowId: window.id,
         selectedSpaceId: newActiveWindowSelectedSpaceId,
         primarySpaceId: newActiveWindowPrimarySpaceId,
