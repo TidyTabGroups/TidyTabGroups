@@ -1,6 +1,8 @@
 import { DataModel } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import * as Storage from "../storage";
+import { ActiveWindowSpace } from ".";
+import Database from "../database";
 
 export namespace SpaceAutoCollapseTimer {
   export function create(activeWindowId: string, spaceId: string) {
@@ -16,30 +18,33 @@ export namespace SpaceAutoCollapseTimer {
     } as DataModel.SpaceAutoCollapseTimer;
   }
 
-  export async function get(timerId: string) {
-    const spaceAutoCollapseTimers = await getAll();
-    return spaceAutoCollapseTimers.find((timer) => timer.id === timerId);
+  export async function get(id: string) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    const timer = await modelDB.get("spaceAutoCollapseTimers", id);
+    if (!timer) {
+      throw new Error(`SpaceAutoCollapseTimer::get::Could not find timer with id ${id}`);
+    }
+    return timer;
   }
 
   export async function getAll() {
-    const result = await Storage.getGuaranteedItems<{
-      spaceAutoCollapseTimers: DataModel.Model["spaceAutoCollapseTimers"];
-    }>("spaceAutoCollapseTimers");
-    return result.spaceAutoCollapseTimers;
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    return await modelDB.getAll("spaceAutoCollapseTimers");
   }
 
-  export async function set(timer: DataModel.SpaceAutoCollapseTimer) {
-    const prevSpaceAutoCollapseTimers = await getAll();
-    await setAll([...prevSpaceAutoCollapseTimers, timer]);
-  }
-
-  export async function setAll(timers: DataModel.Model["spaceAutoCollapseTimers"]) {
-    await Storage.setItems({ spaceAutoCollapseTimers: timers });
+  export async function add(timer: DataModel.SpaceAutoCollapseTimer) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    await modelDB.add("spaceAutoCollapseTimers", timer);
   }
 
   export async function startAutoCollapseTimerForSpace(activeWindowId: string, spaceId: string) {
     const timer = create(activeWindowId, spaceId);
-    await set(timer);
+    await add(timer);
+
     return timer;
+  }
+
+  export async function onAutoCollapseTimer(activeWindowId: string, spaceId: string) {
+    await ActiveWindowSpace.makePrimarySpace(activeWindowId, spaceId);
   }
 }

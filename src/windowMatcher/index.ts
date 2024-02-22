@@ -8,16 +8,21 @@ import {
   ChromeTabWithId,
   ChromeWindowId,
 } from "../types";
+import { ActiveWindowSpace } from "../model/ActiveWindowSpace";
 import * as Misc from "../misc";
+import Database from "../database";
+import { ActiveWindow } from "../model";
 
-export async function matchWindowsToActiveWindows(
-  windows: ChromeWindowWithId[],
-  activeWindows: DataModel.ActiveWindow[]
-) {
+export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[], activeWindows: DataModel.ActiveWindow[]) {
   const candidateMatchedWindowsToActiveWindowsMap: {
     [activeWindowId: string]: ActiveWindowMatcher.MatchedWindowToActiveWindowInfo[];
   } = {};
   const matchedWindowsInfoMap: { [windowId: string]: ActiveWindowMatcher.WindowInfo } = {};
+
+  // get the active spaces for each active window
+  const { activeSpacesByActiveWindowId, activeTabsByActiveSpaceId } = await ActiveWindow.getActiveSpacesAndTabs(
+    activeWindows.map((activeWindow) => activeWindow.id)
+  );
 
   // get the match candidates
   // Note: If more than one window matches the same previous active window, the one with the most matched spaces and tabs is chosen.
@@ -51,33 +56,22 @@ export async function matchWindowsToActiveWindows(
       });
 
       activeWindows.forEach((activeWindow) => {
-        const {
-          spaces,
-          primarySpaceId,
-          selectedSpaceFocusType,
-          nonGroupedTabs: activeWindowNonGroupedTabs,
-        } = activeWindow;
+        const { primarySpaceId, selectedSpaceFocusType, nonGroupedTabs: activeWindowNonGroupedTabs } = activeWindow;
+        const activeSpaces = activeSpacesByActiveWindowId[activeWindow.id];
+        const primarySpace = activeSpaces.find((activeSpace) => activeSpace.id === primarySpaceId);
 
-        const primarySpaceTabs = primarySpaceId
-          ? spaces.find((space) => space.id === primarySpaceId)!.tabs
-          : undefined;
+        const primarySpaceTabs = primarySpaceId ? activeTabsByActiveSpaceId[primarySpaceId] : undefined;
         let secondaryTabGroup: ChromeTabGroupWithId | undefined;
         if (primarySpaceId && primarySpaceTabs!.length > 1) {
           const secondaryTabGroupTitleToMatch =
-            selectedSpaceFocusType === "primaryFocus"
-              ? Misc.SECONDARY_TAB_GROUP_TITLE_LEFT
-              : Misc.SECONDARY_TAB_GROUP_TITLE_RIGHT;
-          const matchedSecondaryTabGroups = tabGroups.filter(
-            (tabGroup) => tabGroup.title === secondaryTabGroupTitleToMatch
-          );
+            selectedSpaceFocusType === "primaryFocus" ? Misc.SECONDARY_TAB_GROUP_TITLE_LEFT : Misc.SECONDARY_TAB_GROUP_TITLE_RIGHT;
+          const matchedSecondaryTabGroups = tabGroups.filter((tabGroup) => tabGroup.title === secondaryTabGroupTitleToMatch);
 
           let bestMatchedSecondaryTabGroup: ChromeTabGroupWithId | undefined;
           if (matchedSecondaryTabGroups.length > 1) {
             // find the best matching secondary tab group
             matchedSecondaryTabGroups.forEach((matchedSecondaryTabGroup) => {
-              const tabsInMatchedSecondaryTabGroup = tabs.filter(
-                (tab) => tab.groupId === matchedSecondaryTabGroup.id
-              );
+              const tabsInMatchedSecondaryTabGroup = tabs.filter((tab) => tab.groupId === matchedSecondaryTabGroup.id);
             });
           } else {
             bestMatchedSecondaryTabGroup = matchedSecondaryTabGroups[0];
@@ -85,44 +79,35 @@ export async function matchWindowsToActiveWindows(
 
           // criteria #3
           if (!bestMatchedSecondaryTabGroup) {
-            console.warn(
-              `initializeDataModel::Window ${window.id} has no secondary tab group when it must`
-            );
+            console.warn(`initializeDataModel::Window ${window.id} has no secondary tab group when it must`);
             return;
           }
 
           secondaryTabGroup = bestMatchedSecondaryTabGroup;
         }
 
-        const nonSecondaryTabGroups = secondaryTabGroup
-          ? tabGroups.filter((tabGroup) => tabGroup.id !== secondaryTabGroup!.id)
-          : tabGroups;
-        let matchedNonSecondaryTabGroupsToActiveWindowSpaces:
-          | ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[]
-          | undefined;
+        const nonSecondaryTabGroups = secondaryTabGroup ? tabGroups.filter((tabGroup) => tabGroup.id !== secondaryTabGroup!.id) : tabGroups;
+        let matchedNonSecondaryTabGroupsToActiveWindowSpaces: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[] | undefined;
 
-        if (spaces.length > 0) {
-          const secondaryTabGroupTabs = secondaryTabGroup
-            ? tabs.filter((tab) => tab.groupId === secondaryTabGroup!.id)
-            : [];
-          const nonSecondaryTabGroupsTabs = tabs.filter(
-            (tab) => !secondaryTabGroupTabs.find((secondaryTab) => secondaryTab.id === tab.id)
-          );
+        if (activeSpaces.length > 0) {
+          const secondaryTabGroupTabs = secondaryTabGroup ? tabs.filter((tab) => tab.groupId === secondaryTabGroup!.id) : [];
+          const nonSecondaryTabGroupsTabs = tabs.filter((tab) => !secondaryTabGroupTabs.find((secondaryTab) => secondaryTab.id === tab.id));
 
           const matchedNonSecondaryTabGroupsToActiveWindowSpaces = getMatchingTabGroups(
             { id: window.id, tabGroups: nonSecondaryTabGroups, tabs: nonSecondaryTabGroupsTabs },
-            activeWindow
+            {
+              activeWindow,
+              activeSpaces: activeSpaces.map((activeSpace) => ({ activeSpace, activeTabs: activeTabsByActiveSpaceId[activeSpace.id] })),
+            }
           );
 
           // criteria #4
-          if (matchedNonSecondaryTabGroupsToActiveWindowSpaces.length !== spaces.length) {
+          if (matchedNonSecondaryTabGroupsToActiveWindowSpaces.length !== activeSpaces.length) {
             return;
           }
         }
 
-        const nonGroupedTabs = tabs.filter(
-          (tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE
-        );
+        const nonGroupedTabs = tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE);
         const matchedNonGroupedTabs = getMatchingTabs(nonGroupedTabs, activeWindow.nonGroupedTabs);
         // criteria #5
         if (matchedNonGroupedTabs.length < activeWindowNonGroupedTabs.length) {
@@ -140,14 +125,9 @@ export async function matchWindowsToActiveWindows(
             tabGroupId: secondaryTabGroup.id,
             tabGroupColorsMatch: secondaryTabGroup.color === activeWindow.secondaryTabGroup!.color,
           },
-          matchedNonSecondaryTabGroups: matchedNonSecondaryTabGroupsToActiveWindowSpaces
-            ? matchedNonSecondaryTabGroupsToActiveWindowSpaces
-            : [],
+          matchedNonSecondaryTabGroups: matchedNonSecondaryTabGroupsToActiveWindowSpaces ? matchedNonSecondaryTabGroupsToActiveWindowSpaces : [],
           matchedTabsCount: matchedNonSecondaryTabGroupsToActiveWindowSpaces
-            ? matchedNonSecondaryTabGroupsToActiveWindowSpaces.reduce(
-                (acc, match) => acc + match.matchedTabsCount,
-                0
-              ) + matchedNonGroupedTabs.length
+            ? matchedNonSecondaryTabGroupsToActiveWindowSpaces.reduce((acc, match) => acc + match.matchedTabsCount, 0) + matchedNonGroupedTabs.length
             : matchedNonGroupedTabs.length,
         });
 
@@ -187,9 +167,7 @@ export async function matchWindowsToActiveWindows(
 
     if (bestMatchedWindow) {
       matchedWindowsToActiveWindows.push(bestMatchedWindow);
-      remainingWindowIdsToMatch = remainingWindowIdsToMatch.filter(
-        (windowId) => windowId !== bestMatchedWindow!.windowId
-      );
+      remainingWindowIdsToMatch = remainingWindowIdsToMatch.filter((windowId) => windowId !== bestMatchedWindow!.windowId);
     }
   }
 
@@ -202,7 +180,13 @@ export function getMatchingTabGroups(
     tabGroups: ChromeTabGroupWithId[];
     tabs: ChromeTabWithId[];
   },
-  activeWindow: DataModel.ActiveWindow
+  activeWindowInfo: {
+    activeWindow: DataModel.ActiveWindow;
+    activeSpaces: {
+      activeSpace: DataModel.ActiveSpace;
+      activeTabs: DataModel.ActiveTab[];
+    }[];
+  }
 ) {
   // get the match candidates
   const candidateMatchedTabGroupsToSpacesMap: {
@@ -213,38 +197,39 @@ export function getMatchingTabGroups(
   const tabsByTabGroupId: { [tabGroupId: ChromeTabGroupId]: ChromeTabWithId[] } = {};
   const tabGroupsToMatchIds = new Set<ChromeTabGroupId>();
 
-  activeWindow.spaces.forEach((space) => {
-    candidateMatchedTabGroupsToSpacesMap[space.id] = [];
+  const { activeSpaces } = activeWindowInfo;
+
+  activeSpaces.forEach((activeSpaceInfo) => {
+    const { activeSpace, activeTabs } = activeSpaceInfo;
+    candidateMatchedTabGroupsToSpacesMap[activeSpace.id] = [];
     for (let tabGroup of tabGroups) {
       if (!tabsByTabGroupId[tabGroup.id]) {
         tabsByTabGroupId[tabGroup.id] = tabs.filter((tab) => tab.groupId === tabGroup.id);
       }
 
-      if (tabGroup.title == space.tabGroupInfo.title) {
+      if (tabGroup.title == activeSpace.tabGroupInfo.title) {
         tabGroupsToMatchIds.add(tabGroup.id);
-        candidateMatchedTabGroupsToSpacesMap[space.id].push({
+        candidateMatchedTabGroupsToSpacesMap[activeSpace.id].push({
           tabGroupId: tabGroup.id,
-          spaceId: space.id,
-          tabGroupColorsMatch: tabGroup.color === space.tabGroupInfo.color,
-          matchedTabsCount: getMatchingTabs(tabsByTabGroupId[tabGroup.id], space.tabs).length,
+          activeSpaceId: activeSpace.id,
+          tabGroupColorsMatch: tabGroup.color === activeSpace.tabGroupInfo.color,
+          matchedTabsCount: getMatchingTabs(tabsByTabGroupId[tabGroup.id], activeSpaceInfo.activeTabs).length,
         });
       }
     }
 
-    if (candidateMatchedTabGroupsToSpacesMap[space.id].length === 0) {
+    // FIXME: is this return needed?
+    if (candidateMatchedTabGroupsToSpacesMap[activeSpace.id].length === 0) {
       return;
     }
   });
 
-  const matchedTabGroupsToSpaces: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[] =
-    [];
+  const matchedTabGroupsToSpaces: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[] = [];
   let remainingTabGroupsToMatchIds = Array.from(tabGroupsToMatchIds);
 
   // get the best matches for each space
   Object.keys(candidateMatchedTabGroupsToSpacesMap).forEach((spaceId) => {
-    let bestMatchedTabGroupInfo:
-      | ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo
-      | undefined;
+    let bestMatchedTabGroupInfo: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo | undefined;
     let bestMatchedTabsCount = 0;
 
     const candidateMatchedTabGroupsToSpaces = candidateMatchedTabGroupsToSpacesMap[spaceId];
@@ -263,9 +248,7 @@ export function getMatchingTabGroups(
       return;
     }
 
-    remainingTabGroupsToMatchIds = remainingTabGroupsToMatchIds.filter(
-      (tabGroupId) => tabGroupId !== bestMatchedTabGroupInfo!.tabGroupId
-    );
+    remainingTabGroupsToMatchIds = remainingTabGroupsToMatchIds.filter((tabGroupId) => tabGroupId !== bestMatchedTabGroupInfo!.tabGroupId);
     matchedTabGroupsToSpaces.push(bestMatchedTabGroupInfo);
   });
 
@@ -283,17 +266,12 @@ export function getMatchingTabs(tabGroupTabs: ChromeTabWithId[], spaceTabs: Data
 
   tabGroupTabs.forEach((tabGroupTab) => {
     for (let spaceTab of remainingSpaceTabsToMatch) {
-      if (
-        tabGroupTab.title === spaceTab.tabInfo.title &&
-        tabGroupTab.url === spaceTab.tabInfo.url
-      ) {
+      if (tabGroupTab.title === spaceTab.tabInfo.title && tabGroupTab.url === spaceTab.tabInfo.url) {
         matchedTabGroupTabsToSpaceTabs.push({
           tabGroupTabId: tabGroupTab.id,
           spaceTabId: spaceTab.id,
         });
-        remainingSpaceTabsToMatch = remainingSpaceTabsToMatch.filter(
-          (remaingSpaceTab) => remaingSpaceTab.id !== spaceTab.id
-        );
+        remainingSpaceTabsToMatch = remainingSpaceTabsToMatch.filter((remaingSpaceTab) => remaingSpaceTab.id !== spaceTab.id);
         break;
       }
     }

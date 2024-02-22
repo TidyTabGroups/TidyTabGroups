@@ -30,10 +30,7 @@ export async function onAlarm(alarm: chrome.alarms.Alarm) {
     }
 
     const { activeWindowId, spaceId } = autoCollapseTimer;
-    const space = await ActiveWindowSpace.get(activeWindowId, spaceId);
-
-    // TODO: if the space is not the primary space, make it the primary space
-    await chrome.tabGroups.update(space.tabGroupInfo.id, { collapsed: true });
+    SpaceAutoCollapseTimer.onAutoCollapseTimer(activeWindowId, spaceId);
   }
 }
 
@@ -54,80 +51,38 @@ export async function onStartUp() {
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   console.log(`onTabGroupsUpdated::tabGroup: ${tabGroup}`);
-  const activeWindow = await ActiveWindow.getByChromeWindowId(tabGroup.windowId);
+  const activeWindow = await ActiveWindow.getFromIndex("windowId", tabGroup.windowId);
 
   if (!activeWindow) {
     return;
   }
 
-  /*
-    1 if: the updated tab group is the secondary tab group:
-      1.1 do: update the active window's secondary tab group
-      1.2 if: the tab group was expanded:
-        1.2.1 do: activate the active tab candidate in the secondary tab group
-      1.3 if: the tab group was collapsed:
-        1.3.1 do: activate the active tab candidate in the primary tab group
-  */
-
-  // if #1
-  if (activeWindow.secondaryTabGroup?.id === tabGroup.id) {
-    // do #1.1
-    await ActiveWindow.update(activeWindow.id, {
-      secondaryTabGroup: tabGroup,
-    });
-
-    // if #1.2
-    if (Misc.tabGroupWasExpanded(tabGroup, activeWindow.secondaryTabGroup)) {
-      // do #1.2.1
-      const tabsInSecondaryGroup = (await chrome.tabs.query({
-        windowId: activeWindow.windowId,
-        groupId: tabGroup.id,
-      })) as ChromeTabWithId[];
-      const activeTabCandidate = tabsInSecondaryGroup[tabsInSecondaryGroup.length - 1];
-      await chrome.tabs.update(activeTabCandidate.id, { active: true });
-    }
-    // if #1.3
-    else if (Misc.tabGroupWasCollapsed(tabGroup, activeWindow.secondaryTabGroup)) {
-      // do #1.3.1
-      const selectedActiveSpace = activeWindow.spaces.find(
-        (activeSpace) => activeSpace.id === activeWindow.selectedSpaceId
-      );
-      if (!selectedActiveSpace) {
-        const errorMessage = `onTabGroupsUpdated::Error: No active space found with id: ${activeWindow.selectedSpaceId}`;
-        console.error(errorMessage);
-        throw new Error(errorMessage);
-      }
-      const tabsInSelectedActiveSpaceTabGroup = (await chrome.tabs.query({
-        windowId: activeWindow.windowId,
-        groupId: selectedActiveSpace.tabGroupInfo.id,
-      })) as ChromeTabWithId[];
-      const activeTabCandidate = tabsInSelectedActiveSpaceTabGroup[0];
-      await chrome.tabs.update(activeTabCandidate.id, { active: true });
-    }
-
+  const activeSpace = await ActiveWindowSpace.getFromIndex("tabGroupId", tabGroup.id);
+  if (!activeSpace) {
+    console.error(`onTabGroupsUpdated::Error: No active space found with tab group id: ${tabGroup.id}`);
+    onSpaceNotInTidyTabsShape();
     return;
   }
 
-  const activeSpaceFindResult = await ActiveWindowSpace.findActiveSpaceForChromeObject<"tabGroup">(
-    tabGroup.windowId,
-    tabGroup
-  );
+  const isForPrimarySpace = activeWindow.primarySpaceId === activeSpace.id;
+  const isSecondaryTabGroup = activeWindow.secondaryTabGroup?.id === tabGroup.id;
+  const isPrimaryTabGroup = isForPrimarySpace && !isSecondaryTabGroup;
 
-  if (!activeSpaceFindResult) {
-    return;
+  const wasCollapsed = Misc.tabGroupWasCollapsed(tabGroup.collapsed, activeSpace.tabGroupInfo.collapsed);
+  const wasExpanded = Misc.tabGroupWasExpanded(tabGroup.collapsed, activeSpace.tabGroupInfo.collapsed);
+
+  if (isPrimaryTabGroup) {
+  } else if (isSecondaryTabGroup) {
+  } else {
+    if (wasExpanded) {
+      await SpaceAutoCollapseTimer.startAutoCollapseTimerForSpace(activeWindow.id, activeSpace.id);
+    }
   }
 
-  const { activeSpace, type: activeSpaceTabGroupType } = activeSpaceFindResult;
-
-  await ActiveWindowSpace.syncActiveSpaceWithWindow({
-    activeWindow,
-    activeSpace,
-    type: "tabGroup",
-    data: tabGroup,
-  });
+  await ActiveWindowSpace.update(activeSpace.id, { ...activeSpace, tabGroupInfo: tabGroup });
 }
 
-function onSpaceNotInTidyTabsShape(space: DataModel.Space) {
+function onSpaceNotInTidyTabsShape() {
   // TODO: implement this
-  console.log(`onSpaceNotInTidyTabsShape::space: ${space}`);
+  console.log(`onSpaceNotInTidyTabsShape::`);
 }

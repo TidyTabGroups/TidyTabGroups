@@ -49,14 +49,12 @@ export declare namespace ActiveWindowMatcher {
     tabGroupColorsMatch: boolean;
   }
 
-  export interface MatchedSecondaryTabGroupToActiveWindowSpaceInfo
-    extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
+  export interface MatchedSecondaryTabGroupToActiveWindowSpaceInfo extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
     primarySpaceId: string;
   }
 
-  export interface MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo
-    extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
-    spaceId: string;
+  export interface MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
+    activeSpaceId: string;
     matchedTabsCount: number;
   }
 
@@ -82,8 +80,9 @@ export declare namespace ActiveWindowMatcher {
 export type SpaceSyncDataType = "tab" | "tabGroup";
 
 export interface SpaceSyncData<T extends SpaceSyncDataType> {
-  activeWindow: DataModel.ActiveWindow;
-  activeSpace: DataModel.ActiveSpace;
+  activeSpaceId: string;
   type: T;
   data: T extends "tab" ? ChromeTabWithId : ChromeTabGroupWithId;
 }
+
+export interface LocalStorageShape {}

@@ -1,17 +1,12 @@
-import {
-  ChromeTabGroupId,
-  ChromeTabGroupWithId,
-  ChromeTabWithId,
-  ChromeWindowId,
-  ChromeWindowWithId,
-  DataModel,
-} from "../types";
+import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId, DataModel } from "../types";
 import * as WindowMatcher from "../windowMatcher";
 import * as Storage from "../storage";
 import { v4 as uuidv4 } from "uuid";
 import { ActiveWindowSpace } from "./ActiveWindowSpace";
 import { ActiveWindowTab } from "./ActiveWindowTab";
 import { SpaceAutoCollapseTimer } from "./SpaceAutoCollapseTimer";
+import Database from "../database";
+import { IndexKey, IndexNames, StoreNames } from "idb";
 
 export namespace ActiveWindow {
   export function create(createProperties: DataModel.ActiveWindowCreateProperties) {
@@ -23,61 +18,64 @@ export namespace ActiveWindow {
     } as DataModel.ActiveWindow;
   }
 
-  export async function createAndSet(createProperties: DataModel.ActiveWindowCreateProperties) {
+  export async function createAndAdd(
+    createProperties: DataModel.ActiveWindowCreateProperties,
+    spaces: DataModel.ActiveSpace[],
+    tabs: DataModel.ActiveTab[]
+  ) {
     const newActiveWindow = create(createProperties);
-    await set(newActiveWindow);
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    const transaction = modelDB.transaction(["activeWindows", "activeSpaces", "activeTabs"], "readwrite");
+    const activeWindowsStore = transaction.objectStore("activeWindows");
+    const activeSpacesStore = transaction.objectStore("activeSpaces");
+    const activeTabsStore = transaction.objectStore("activeTabs");
+    activeWindowsStore.add(newActiveWindow);
+    spaces.forEach((space) => activeSpacesStore.add(space));
+    tabs.forEach((tab) => activeTabsStore.add(tab));
     return newActiveWindow;
   }
 
   export async function get(activeWindowId: string) {
-    const activeWindows = await getAll();
-    const activeWindow = activeWindows.find((window) => window.id === activeWindowId);
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    const activeWindow = await modelDB.get("activeWindows", activeWindowId);
     if (!activeWindow) {
-      const errorMessage = `ActiveWindow::get: No active window found with id: ${activeWindowId}`;
-      console.error(errorMessage);
-      throw new Error(errorMessage);
+      throw new Error(`ActiveWindow::get: No active window found with id: ${activeWindowId}`);
     }
     return activeWindow;
   }
 
+  export async function getFromIndex<IndexName extends IndexNames<DataModel.ModelDB, "activeWindows">>(
+    index: IndexName,
+    query: IndexKey<DataModel.ModelDB, "activeWindows", IndexName> | IDBKeyRange
+  ) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    return await modelDB.getFromIndex<"activeWindows", IndexName>("activeWindows", index, query);
+  }
+
   export async function getAll() {
-    const result = await Storage.getGuaranteedItems<{
-      activeWindows: DataModel.Model["activeWindows"];
-    }>("activeWindows");
-    return result.activeWindows;
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    return modelDB.getAll("activeWindows");
   }
 
-  export async function getByChromeWindowId(windowId: ChromeWindowId) {
-    const activeWindows = await getAll();
-    return activeWindows.find((window) => window.windowId === windowId);
+  export async function getAllFromIndex<IndexName extends IndexNames<DataModel.ModelDB, "activeWindows">>(index: IndexName) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    return modelDB.getAllFromIndex<"activeWindows", IndexName>("activeWindows", index);
   }
 
-  export async function set(activeWindow: DataModel.ActiveWindow) {
-    const prevActiveWindows = await getAll();
-    await setAll([...prevActiveWindows, activeWindow]);
+  export async function add(activeWindow: DataModel.ActiveWindow) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    await modelDB.add("activeWindows", activeWindow);
   }
 
-  export async function setAll(activeWindows: DataModel.Model["activeWindows"]) {
-    await Storage.setItems({ activeWindows });
+  export async function remove(id: string) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    await modelDB.delete("activeWindows", id);
   }
 
   export async function update(id: string, updateProperties: Partial<DataModel.ActiveWindow>) {
-    const activeWindows = await getAll();
-    const prevActiveWindow = activeWindows.find((window) => window.id === id);
-
-    if (!prevActiveWindow) {
-      const errorMessage = `ActiveWindow::update: No active window found with id: ${id}`;
-      console.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    const updatedWindow = { ...prevActiveWindow, ...updateProperties };
-
-    const updatedActiveWindows = activeWindows.map((window) =>
-      window.id === id ? updatedWindow : window
-    );
-
-    return await setAll(updatedActiveWindows);
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    const activeWindow = await get(id);
+    await modelDB.put("activeWindows", { ...activeWindow, ...updateProperties, id });
   }
 
   export async function activateWindow(
@@ -123,7 +121,8 @@ export namespace ActiveWindow {
     }
 
     let newActiveWindow: DataModel.ActiveWindow;
-    let newActiveWindowSpaces: DataModel.ActiveWindow["spaces"] = [];
+    let newActiveWindowSpaces: DataModel.ActiveSpace[] = [];
+    let newActiveWindowTabs: DataModel.ActiveTab[] = [];
     let newActiveWindowSelectedSpaceId: DataModel.ActiveWindow["selectedSpaceId"] = null;
     let newActiveWindowPrimarySpaceId: DataModel.ActiveWindow["primarySpaceId"] = null;
     let newActiveWindowSelectedTabFocusType: DataModel.ActiveWindow["selectedSpaceFocusType"] = "nonSpaceTabFocus";
@@ -144,9 +143,19 @@ export namespace ActiveWindow {
       const isTabGroupPrimary = didProvidePrimarySpaceInfo ? providedPrimaryTabGroup!.id === tabGroup.id : isTabGroupForSelectedTab;
       const isTabGroupSecondary = didProvidePrimarySpaceInfo && tabGroup.id === providedSecondaryTabGroup!.id;
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
-      const tabsInSpace = isTabGroupPrimary && providedSecondaryTabGroup ? [...tabsInprovidedSecondaryTabGroup!, ...tabsInGroup] : tabsInGroup;
-      const newActiveWindowSpace = ActiveWindowSpace.createFromExistingTabGroup(tabGroup, tabsInSpace);
+      // const tabsInSpace = isTabGroupPrimary && providedSecondaryTabGroup ? [...tabsInprovidedSecondaryTabGroup!, ...tabsInGroup] : tabsInGroup;
+
+      const newActiveWindowSpace = ActiveWindowSpace.createFromExistingTabGroup(tabGroup);
       newActiveWindowSpaces.push(newActiveWindowSpace);
+
+      tabsInGroup.forEach((tab) => {
+        const newActiveWindowTab = ActiveWindowTab.createFromExistingTab(tab);
+        newActiveWindowTabs.push(newActiveWindowTab);
+
+        if (selectedTab.id === tab.id) {
+          newActiveWindowSelectedTabId = newActiveWindowTab.id;
+        }
+      });
 
       if (isTabGroupForSelectedTab) {
         selectedTabGroup = tabGroup;
@@ -158,17 +167,6 @@ export namespace ActiveWindow {
         } else {
           newActiveWindowSelectedTabFocusType = "peakFocus";
         }
-
-        newActiveWindowSelectedSpaceId = newActiveWindowSpace.id;
-        const selectedActiveWindowTab = newActiveWindowSpace.tabs.find((tab) => tab.tabInfo.id === selectedTab.id)!.id;
-
-        if (!selectedActiveWindowTab) {
-          const errorMessage = `initializeDataModel::Error: No active tab found with id: ${selectedTab.id}`;
-          console.error(errorMessage);
-          throw new Error(errorMessage);
-        }
-
-        newActiveWindowSelectedTabId = selectedActiveWindowTab;
       }
 
       if (isTabGroupPrimary) {
@@ -195,16 +193,19 @@ export namespace ActiveWindow {
       throw new Error(`initializeDataModel::Error: No selected tab found`);
     }
 
-    newActiveWindow = await ActiveWindow.createAndSet({
-      windowId: window.id,
-      spaces: newActiveWindowSpaces,
-      selectedSpaceId: newActiveWindowSelectedSpaceId,
-      primarySpaceId: newActiveWindowPrimarySpaceId,
-      selectedSpaceFocusType: newActiveWindowSelectedTabFocusType,
-      selectedTabId: newActiveWindowSelectedTabId,
-      secondaryTabGroup: newActiveWindowSecondaryTabGroup,
-      nonGroupedTabs: newActiveWindowNonGroupedTabs,
-    });
+    newActiveWindow = await ActiveWindow.createAndAdd(
+      {
+        windowId: window.id,
+        selectedSpaceId: newActiveWindowSelectedSpaceId,
+        primarySpaceId: newActiveWindowPrimarySpaceId,
+        selectedSpaceFocusType: newActiveWindowSelectedTabFocusType,
+        selectedTabId: newActiveWindowSelectedTabId,
+        secondaryTabGroup: newActiveWindowSecondaryTabGroup,
+        nonGroupedTabs: newActiveWindowNonGroupedTabs,
+      },
+      newActiveWindowSpaces,
+      newActiveWindowTabs
+    );
 
     // shape up the new active window, using the following steps:
     // 1. create new secondary tab group, or move any extra primary tabs to it
@@ -317,7 +318,7 @@ export namespace ActiveWindow {
         } = matchedWindowToPrevActiveWindowInfo;
 
         const matchedPrimaryTabGroupInfo = prevActiveWindow.primarySpaceId
-          ? matchedNonSecondaryTabGroups.find((matchedTabGroupInfo) => matchedTabGroupInfo.spaceId === prevActiveWindow.primarySpaceId)
+          ? matchedNonSecondaryTabGroups.find((matchedTabGroupInfo) => matchedTabGroupInfo.activeSpaceId === prevActiveWindow.primarySpaceId)
           : undefined;
 
         const primaryTabGroupId = matchedPrimaryTabGroupInfo?.tabGroupId;
@@ -350,7 +351,7 @@ export namespace ActiveWindow {
           return;
         }
         const tabGroups = await chrome.tabGroups.query({ windowId: window.id });
-        const primarySpace = ActiveWindow.getPrimarySpace(activeWindow);
+        const primarySpace = await ActiveWindow.getPrimarySpace(activeWindow.id);
         const primaryTabGroup = primarySpace ? tabGroups.find((tabGroup) => tabGroup.id === primarySpace.tabGroupInfo.id) : undefined;
         const secondaryTabGroup =
           primaryTabGroup && activeWindow.secondaryTabGroup
@@ -373,10 +374,35 @@ export namespace ActiveWindow {
     }
   }
 
-  export function getPrimarySpace(activeWindow: DataModel.ActiveWindow) {
-    if (!activeWindow.primarySpaceId) {
-      return;
-    }
-    return activeWindow.spaces.find((space) => space.id === activeWindow.primarySpaceId!);
+  export async function getPrimarySpace(id: string) {
+    const activeWindow = await get(id);
+    return await ActiveWindowSpace.getFromIndex("activeWindowId", activeWindow.id);
+  }
+
+  export async function getActiveSpacesAndTabs(ids: string[]) {
+    const activeSpacesByActiveWindowId: { [activeWindowId: string]: DataModel.ActiveSpace[] } = {};
+    const activeTabsByActiveSpaceId: { [activeSpaceId: string]: DataModel.ActiveTab[] } = {};
+
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    const transaction = modelDB.transaction(["activeSpaces", "activeTabs"], "readonly");
+    const activeSpacesWindowIdIndex = transaction.objectStore("activeSpaces").index("activeWindowId");
+    const activeTabsSpaceIdIndex = transaction.objectStore("activeTabs").index("activeSpaceId");
+
+    await Promise.all(
+      ids.map(async (activeWindowId) => {
+        const activeSpaces = await activeSpacesWindowIdIndex.getAll(activeWindowId);
+        activeSpacesByActiveWindowId[activeWindowId] = activeSpaces;
+
+        await Promise.all(
+          activeSpaces.map(async (activeSpace) => {
+            const activeTabs = await activeTabsSpaceIdIndex.getAll(activeSpace.id);
+            activeTabsByActiveSpaceId[activeSpace.id] = activeTabs;
+          })
+        );
+      })
+    );
+    await transaction.done;
+
+    return { activeSpacesByActiveWindowId, activeTabsByActiveSpaceId };
   }
 }

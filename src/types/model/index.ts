@@ -2,11 +2,8 @@ import { DBSchema } from "idb";
 import { ChromeTabId, ChromeWindowId, ChromeTabGroupId, ChromeTabGroupWithId } from "..";
 
 export declare namespace DataModel {
-  export interface TabCreateProperties {
+  export interface BaseActiveTabCreateProperties {
     id?: string;
-  }
-
-  export interface ActiveTabCreateProperties extends TabCreateProperties {
     tabInfo: {
       id: ChromeTabId;
       url?: string;
@@ -14,44 +11,40 @@ export declare namespace DataModel {
     };
   }
 
-  export interface BaseTab {
+  export interface BaseActiveTab extends BaseActiveTabCreateProperties {
     id: string;
   }
 
-  export type Tab = BaseTab & TabCreateProperties;
-  export type ActiveTab = BaseTab & ActiveTabCreateProperties;
-
-  export interface SpaceCreateProperties {
-    id?: string;
-    tabs: Tab[];
+  export interface ActiveTabCreateProperties extends BaseActiveTabCreateProperties {
+    activeWindowId: string;
+    activeSpaceId: string;
   }
 
-  export interface ActiveSpaceCreateProperties extends SpaceCreateProperties {
-    windowId: ChromeWindowId;
+  export type ActiveTab = BaseActiveTab & ActiveTabCreateProperties;
+
+  export interface BaseActiveSpaceCreateProperties {
+    id?: string;
     tabGroupInfo: {
       id: chrome.tabGroups.TabGroup["id"];
-      title: chrome.tabGroups.TabGroup["title"];
+      title?: chrome.tabGroups.TabGroup["title"];
       color: chrome.tabGroups.TabGroup["color"];
       collapsed: chrome.tabGroups.TabGroup["collapsed"];
     };
-    tabs: ActiveTab[];
   }
 
-  export interface BaseSpace {
+  export interface BaseActiveSpace extends BaseActiveSpaceCreateProperties {
     id: string;
   }
 
-  export type Space = BaseSpace & SpaceCreateProperties;
-  export type ActiveSpace = BaseSpace & ActiveSpaceCreateProperties;
-
-  export interface BaseWindow {
-    id: string;
+  export interface ActiveSpaceCreateProperties extends BaseActiveSpaceCreateProperties {
+    activeWindowId: string;
   }
+
+  export type ActiveSpace = BaseActiveSpace & ActiveSpaceCreateProperties;
 
   export interface ActiveWindowCreateProperties {
     id?: string;
     windowId: ChromeWindowId;
-    spaces: ActiveSpace[]; // in order of how they appear in the tab bar
     selectedSpaceId: string | null;
     selectedTabId: string;
     primarySpaceId: string | null;
@@ -66,39 +59,40 @@ export declare namespace DataModel {
     nonGroupedTabs: ActiveTab[];
   }
 
-  export type ActiveWindow = BaseWindow & ActiveWindowCreateProperties;
+  export type ActiveWindow = { id: string } & ActiveWindowCreateProperties;
 
-  export interface SpaceAutoCollapseTimer {
-    id: string;
-    activeWindowId: string;
-    spaceId: string;
+  export interface BaseSpaceAutoCollapseTimerCreateProperties {
+    id?: string;
     time: number;
   }
 
-  export interface Model {
-    activeWindows: ActiveWindow[];
+  export interface SpaceAutoCollapseTimerCreateProperties extends BaseSpaceAutoCollapseTimerCreateProperties {
+    activeWindowId: string;
+    spaceId: string;
   }
+
+  export type SpaceAutoCollapseTimer = { id: string } & SpaceAutoCollapseTimerCreateProperties;
 
   export interface ModelDB extends DBSchema {
     activeWindows: {
       value: ActiveWindow;
       key: string;
-      indexes: { window: "windowId" };
+      indexes: { windowId: ActiveWindow["windowId"] };
     };
     activeSpaces: {
       value: ActiveSpace;
       key: string;
-      indexes: { activeWindow: "activeWindowId" };
+      indexes: { activeWindowId: ActiveSpace["activeWindowId"]; tabGroupId: ActiveSpace["tabGroupInfo"]["id"] };
     };
     activeTabs: {
       value: ActiveTab;
       key: string;
-      indexes: { activeWindow: "activeWindowId"; activeSpace: "activeSpaceId" };
+      indexes: { activeWindowId: ActiveWindow["id"]; activeSpaceId: ActiveSpace["id"]; tabId: ActiveTab["tabInfo"]["id"] };
     };
     spaceAutoCollapseTimers: {
       value: SpaceAutoCollapseTimer;
       key: string;
-      indexes: { activeWindow: "activeWindowId"; activeSpace: "spaceId" };
+      indexes: { activeWindowId: ActiveWindow["id"]; activeSpaceId: ActiveSpace["id"] };
     };
   }
 }

@@ -1,5 +1,7 @@
+import { IndexKey, IndexNames } from "idb";
 import { ActiveWindowTab, ActiveWindow } from ".";
 import * as Misc from "../misc";
+import * as Storage from "../storage";
 import {
   DataModel,
   ChromeTabGroupWithId,
@@ -8,11 +10,13 @@ import {
   ChromeWindowId,
   SpaceSyncData,
   SpaceSyncDataType,
+  ChromeTabId,
 } from "../types";
 import { v4 as uuidv4 } from "uuid";
+import Database from "../database";
 
 export namespace ActiveWindowSpace {
-  export function create(createProperties: DataModel.ActiveSpaceCreateProperties) {
+  export function create(createProperties: DataModel.BaseActiveSpaceCreateProperties) {
     // TODO: validate createProperties
     const id = createProperties.id || uuidv4();
     return {
@@ -21,191 +25,86 @@ export namespace ActiveWindowSpace {
     } as DataModel.ActiveSpace;
   }
 
-  export function createFromExistingTabGroup(
-    tabGroup: ChromeTabGroupWithId,
-    tabsInGroup: Array<ChromeTabWithId>
-  ) {
-    const activeTabs = tabsInGroup.map((tab) => ActiveWindowTab.createFromExistingTab(tab));
+  export function createFromExistingTabGroup(tabGroup: ChromeTabGroupWithId) {
     return ActiveWindowSpace.create({
-      windowId: tabGroup.windowId,
       tabGroupInfo: {
         id: tabGroup.id,
         title: tabGroup.title,
         color: tabGroup.color,
         collapsed: tabGroup.collapsed,
       },
-      tabs: activeTabs,
     });
   }
 
-  export async function get(activeWindowId: string, spaceId: string) {
+  export async function get(spaceId: string) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    const activeSpace = await modelDB.get("activeSpaces", spaceId);
+    if (!activeSpace) {
+      throw new Error(`TidyTabsSpaceModel::get::Could not find active space with id ${spaceId}`);
+    }
+    return activeSpace;
+  }
+
+  export async function getFromIndex<IndexName extends IndexNames<DataModel.ModelDB, "activeSpaces">>(
+    index: IndexName,
+    query: IndexKey<DataModel.ModelDB, "activeSpaces", IndexName> | IDBKeyRange
+  ) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    return await modelDB.getFromIndex<"activeSpaces", IndexName>("activeSpaces", index, query);
+  }
+
+  export async function getAllFromIndex<IndexName extends IndexNames<DataModel.ModelDB, "activeSpaces">>(
+    index: IndexName,
+    query: IndexKey<DataModel.ModelDB, "activeSpaces", IndexName> | IDBKeyRange
+  ) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    return await modelDB.getAllFromIndex<"activeSpaces", IndexName>("activeSpaces", index, query);
+  }
+
+  export async function update(id: string, updateProperties: Partial<DataModel.ActiveSpace>) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    const activeSpace = await get(id);
+    await modelDB.put("activeSpaces", { ...activeSpace, ...updateProperties });
+  }
+
+  export async function makePrimarySpace(activeWindowId: string, activeSpaceId: string) {
     const activeWindow = await ActiveWindow.get(activeWindowId);
-    const space = activeWindow.spaces.find((space) => space.id === spaceId);
+    const activeSpace = await ActiveWindowSpace.get(activeSpaceId);
+    const activeTabs = await ActiveWindowTab.getAllFromIndex("activeSpaceId", activeSpaceId);
 
-    if (!space) {
-      const errorMessage = `getSpace: No space found with id: ${spaceId}`;
-      console.error(errorMessage);
-      throw new Error(errorMessage);
+    if (!activeTabs) {
+      throw new Error(`makePrimarySpace::activeSpace ${activeSpaceId} has no tabs`);
     }
 
-    return space;
+    const { tabGroupInfo } = activeSpace;
+
+    // 1. if there is more than one tab in the group, create a secondary tab group
+    //  for every tab but the selected one and move it to the end
+    // 2. move primary tab group to end position
+
+    const nonSelectedTabs = activeTabs.filter((tab) => tab.id !== activeWindow.selectedTabId);
+    if (nonSelectedTabs.length > 0) {
+      const nonSelectedTabIds = nonSelectedTabs.map((tab) => tab.tabInfo.id);
+      // step 1
+      await createSecondaryTabGroup(activeWindow.id, nonSelectedTabIds);
+    }
+
+    // step 2
+    await chrome.tabGroups.move(tabGroupInfo.id, { windowId: activeWindow.windowId, index: -1 });
+
+    await ActiveWindow.update(activeWindowId, { primarySpaceId: activeSpaceId });
   }
 
-  export async function update(
-    id: string,
-    activeWindowId: string,
-    updateProperties: Partial<DataModel.ActiveSpace>
-  ) {
-    try {
-      const activeWindows = await ActiveWindow.getAll();
-      for (let activeWindow of activeWindows) {
-        if (activeWindow.id !== activeWindowId) {
-          continue;
-        }
-
-        let updatedSpace: DataModel.ActiveSpace | undefined;
-        const updatedSpaces = activeWindow.spaces.map((space) => {
-          if (space.id === id) {
-            updatedSpace = {
-              ...space,
-              ...updateProperties,
-            };
-            return updatedSpace;
-          }
-          return space;
-        });
-
-        if (!updatedSpace) {
-          const errorMessage = `TidyTabsSpaceModel::update::Could not find space with id ${id}`;
-          console.error(errorMessage);
-          throw new Error(errorMessage);
-        }
-
-        await ActiveWindow.update(activeWindowId, {
-          spaces: updatedSpaces,
-        });
-        return updatedSpace;
-      }
-    } catch (error) {
-      const errorMessage = `TidyTabsSpaceModel::update::Error: ${error}`;
-      console.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-  }
-
-  export async function syncActiveSpaceWithWindow<T extends SpaceSyncDataType>(
-    syncData: SpaceSyncData<T>
-  ) {
-    const { activeWindow, activeSpace: prevActiveSpace, type, data } = syncData;
-
-    let newActiveSpaceUpdateProps: Partial<DataModel.ActiveSpace> = {};
-
-    switch (type) {
-      case "tab":
-        const tab = data as ChromeTabWithId;
-        const prevActiveTab = prevActiveSpace.tabs.find(
-          (prevActiveTab) => prevActiveTab.tabInfo.id === tab.id
-        );
-        if (!prevActiveTab) {
-          const errorMessage = `syncActiveSpaceWithWindow::activeSpace ${prevActiveSpace.id} has no tab with id ${tab.id}`;
-          console.error(errorMessage);
-          throw new Error(errorMessage);
-        }
-
-        const newActiveTab = {
-          ...prevActiveTab,
-          tabUrl: tab.url,
-          tabTitle: tab.title,
-        };
-        const newActiveSpaceTabs = prevActiveSpace.tabs.map((prevActiveTab) =>
-          prevActiveTab.tabInfo.id === tab.id ? newActiveTab : prevActiveTab
-        );
-        newActiveSpaceUpdateProps = { tabs: newActiveSpaceTabs };
-        break;
-      case "tabGroup":
-        const tabGroup = data as ChromeTabGroupWithId;
-        if (tabGroup.id !== prevActiveSpace.tabGroupInfo.id) {
-          const errorMessage = `syncActiveSpaceWithWindow::activeSpace ${prevActiveSpace.id} has no tab group with id ${tabGroup.id}`;
-          console.error(errorMessage);
-          throw new Error(errorMessage);
-        }
-        newActiveSpaceUpdateProps = {
-          tabGroupInfo: {
-            ...prevActiveSpace.tabGroupInfo,
-            ...tabGroup,
-          },
-        };
-        break;
-      default:
-        const errorMessage = `syncActiveSpaceWithWindow::syncData has invalid type ${type}`;
-        console.error(errorMessage);
-        throw new Error(errorMessage);
-    }
-
-    try {
-      await ActiveWindowSpace.update(
-        prevActiveSpace.id,
-        activeWindow.id,
-        newActiveSpaceUpdateProps
-      );
-    } catch (error) {
-      const errorMessage = `syncActiveSpaceWithWindow::unable to sync active space ${prevActiveSpace.id} with window ${activeWindow.windowId}. Error: ${error}`;
-      console.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-  }
-
-  export async function findActiveSpaceForChromeObject<
-    T extends ActiveSpaceForChromeObjectFinder.FindType
-  >(
-    windowId: ChromeWindowId,
-    chromeObject: ActiveSpaceForChromeObjectFinder.FindChromeObjectType<T>
-  ): Promise<ActiveSpaceForChromeObjectFinder.FindResult<T> | undefined> {
-    try {
-      const activeWindows = await ActiveWindow.getAll();
-      activeWindows.forEach((activeWindow) => {
-        if (activeWindow.windowId !== windowId) {
-          return;
-        }
-
-        for (let activeSpace of activeWindow.spaces) {
-          let resultType:
-            | ActiveSpaceForChromeObjectFinder.FindResultType<ActiveSpaceForChromeObjectFinder.FindType>
-            | undefined;
-
-          if (Misc.isTab(chromeObject)) {
-            const tab = chromeObject as ChromeTabWithId;
-            const { tabs } = activeSpace;
-            const activeTab = tabs.find((t) => t.tabInfo.id === tab.id);
-            if (!activeTab) {
-              continue;
-            }
-          } else if (Misc.isTabGroup(chromeObject)) {
-            const tabGroup = chromeObject as ChromeTabGroupWithId;
-
-            if (tabGroup.id !== activeSpace.tabGroupInfo.id) {
-              continue;
-            }
-
-            resultType = "primaryTabGroup";
-          } else {
-            throw new Error(`findActiveSpaceForChromeObject::chromeObject has invalid type`);
-          }
-
-          if (resultType) {
-            return {
-              activeSpace,
-              type: resultType,
-            } as ActiveSpaceForChromeObjectFinder.FindResult<ActiveSpaceForChromeObjectFinder.FindType>;
-          }
-        }
-      });
-
-      return undefined;
-    } catch (error) {
-      const errorMessage = `findActiveSpaceForChromeObject::Error: ${error}`;
-      console.error(errorMessage);
-      throw new Error(errorMessage);
-    }
+  async function createSecondaryTabGroup(activeWindowId: string, tabIds: ChromeTabId[]) {
+    const secondaryTabGroupId = await chrome.tabs.group({ tabIds });
+    const secondaryTabGroup = await chrome.tabGroups.update(secondaryTabGroupId, {
+      collapsed: true,
+      title: Misc.SECONDARY_TAB_GROUP_TITLE_LEFT,
+    });
+    await chrome.tabGroups.move(secondaryTabGroup.id, {
+      windowId: secondaryTabGroup.windowId,
+      index: -1,
+    });
+    await ActiveWindow.update(activeWindowId, { secondaryTabGroup });
   }
 }
