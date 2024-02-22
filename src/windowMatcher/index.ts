@@ -20,7 +20,7 @@ export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[],
   const matchedWindowsInfoMap: { [windowId: string]: ActiveWindowMatcher.WindowInfo } = {};
 
   // get the active spaces for each active window
-  const { activeSpacesByActiveWindowId, activeTabsByActiveSpaceId } = await ActiveWindow.getActiveSpacesAndTabs(
+  const { activeSpacesByActiveWindowId, activeTabsByActiveSpaceId, activeNonGroupedActiveTabsByWindowId } = await ActiveWindow.getActiveSpacesAndTabs(
     activeWindows.map((activeWindow) => activeWindow.id)
   );
 
@@ -56,8 +56,9 @@ export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[],
       });
 
       activeWindows.forEach((activeWindow) => {
-        const { primarySpaceId, selectedSpaceFocusType, nonGroupedTabs: activeWindowNonGroupedTabs } = activeWindow;
+        const { primarySpaceId, selectedSpaceFocusType } = activeWindow;
         const activeSpaces = activeSpacesByActiveWindowId[activeWindow.id];
+        const nonGroupedActiveTabs = activeNonGroupedActiveTabsByWindowId[activeWindow.id];
         const primarySpace = activeSpaces.find((activeSpace) => activeSpace.id === primarySpaceId);
 
         const primarySpaceTabs = primarySpaceId ? activeTabsByActiveSpaceId[primarySpaceId] : undefined;
@@ -108,9 +109,9 @@ export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[],
         }
 
         const nonGroupedTabs = tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE);
-        const matchedNonGroupedTabs = getMatchingTabs(nonGroupedTabs, activeWindow.nonGroupedTabs);
+        const matchedNonGroupedTabs = getMatchingTabs(nonGroupedTabs, nonGroupedActiveTabs);
         // criteria #5
-        if (matchedNonGroupedTabs.length < activeWindowNonGroupedTabs.length) {
+        if (matchedNonGroupedTabs.length < nonGroupedActiveTabs.length) {
           return;
         }
 

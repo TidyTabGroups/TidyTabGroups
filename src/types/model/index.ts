@@ -17,7 +17,7 @@ export declare namespace DataModel {
 
   export interface ActiveTabCreateProperties extends BaseActiveTabCreateProperties {
     activeWindowId: string;
-    activeSpaceId: string;
+    activeSpaceId: string | null;
   }
 
   export type ActiveTab = BaseActiveTab & ActiveTabCreateProperties;
@@ -56,7 +56,6 @@ export declare namespace DataModel {
      */
     selectedSpaceFocusType: "primaryFocus" | "secondaryFocus" | "peakFocus" | "nonSpaceTabFocus";
     secondaryTabGroup: ChromeTabGroupWithId | null;
-    nonGroupedTabs: ActiveTab[];
   }
 
   export type ActiveWindow = { id: string } & ActiveWindowCreateProperties;

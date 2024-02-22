@@ -4,17 +4,23 @@ import { v4 as uuidv4 } from "uuid";
 import Database from "../database";
 
 export namespace ActiveWindowTab {
-  export function create(createProperties: DataModel.BaseActiveTabCreateProperties) {
+  export function create(createProperties: DataModel.ActiveTabCreateProperties): DataModel.ActiveTab {
     // TODO: validate createProperties
     const id = createProperties.id || uuidv4();
     return {
       ...createProperties,
       id,
-    } as DataModel.ActiveTab;
+    };
   }
 
-  export function createFromExistingTab(tab: ChromeTabWithId) {
+  export function createFromExistingTab(
+    activeWindowId: DataModel.ActiveTabCreateProperties["activeWindowId"],
+    activeSpaceId: DataModel.ActiveTabCreateProperties["activeSpaceId"],
+    tab: ChromeTabWithId
+  ) {
     return create({
+      activeWindowId,
+      activeSpaceId,
       tabInfo: {
         id: tab.id,
         url: tab.url,
