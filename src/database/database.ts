@@ -144,7 +144,7 @@ export function getDBConnection<T extends DBSchema>(name: keyof typeof schemas) 
       reject(new Error(`getDBConnection::Error: ${name} database scheme description not found`));
     }
 
-    const connection = connections["name"];
+    const connection = connections[name];
     if (connection) {
       resolve(connection as IDBPDatabase<T>);
     } else {
