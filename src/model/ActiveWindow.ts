@@ -1,4 +1,4 @@
-import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId, DataModel } from "../types";
+import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId, DataModel } from "../types";
 import * as WindowMatcher from "../windowMatcher";
 import * as Storage from "../storage";
 import { v4 as uuidv4 } from "uuid";
@@ -79,26 +79,22 @@ export namespace ActiveWindow {
     await modelDB.put("activeWindows", { ...activeWindow, ...updateProperties, id });
   }
 
-  export async function activateWindow(
+  export async function adjustAndExtractActiveWindowInfoForWindow(
     windowId: ChromeWindowId,
-    providedPrimarySpaceInfo?: {
-      primaryTabGroupId: ChromeTabGroupId;
-      secondaryTabGroupId: ChromeTabGroupId | undefined;
-    }
+    providedPrimarySpaceInfo?: { primaryTabGroupId: ChromeTabGroupId; secondaryTabGroupId: ChromeTabGroupId | undefined }
   ) {
     const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
     if (!window) {
-      throw new Error(`activateWindow::window with id ${window} not found`);
+      throw new Error(`adjustAndExtractActiveWindowInfoForWindow::window with id ${window} not found`);
     }
 
     if (window.type !== "normal") {
-      throw new Error(`activateWindow::window with id ${window} is not a normal window`);
+      throw new Error(`adjustAndExtractActiveWindowInfoForWindow::window with id ${window} is not a normal window`);
     }
 
     const tabGroups = await chrome.tabGroups.query({ windowId });
     const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
     const selectedTab = tabs.find((tab) => tab.active)!;
-    const tabGroupIdForSelectedTab = selectedTab.groupId;
 
     // if provided, get the provided primary and secondary tab group.
     const didProvidePrimarySpaceInfo = !!providedPrimarySpaceInfo;
@@ -112,168 +108,96 @@ export namespace ActiveWindow {
       ? tabGroups.find((tabGroup) => tabGroup.id === providedPrimarySpaceInfo!.primaryTabGroupId)
       : undefined;
     if (didProvidePrimaryTabGroup && !providedPrimaryTabGroup) {
-      throw new Error(`activateWindow::primary tab group with id ${providedPrimarySpaceInfo!.primaryTabGroupId} not found`);
+      throw new Error(
+        `adjustAndExtractActiveWindowInfoForWindow::primary tab group with id ${providedPrimarySpaceInfo!.primaryTabGroupId} not found`
+      );
     }
     const providedSecondaryTabGroup = didProvideSecondaryTabGroup
       ? tabGroups.find((tabGroup) => tabGroup.id === providedPrimarySpaceInfo!.secondaryTabGroupId)
       : undefined;
     if (didProvideSecondaryTabGroup && !providedSecondaryTabGroup) {
-      throw new Error(`activateWindow::secondary tab group with id ${providedPrimarySpaceInfo!.secondaryTabGroupId} not found`);
+      throw new Error(
+        `adjustAndExtractActiveWindowInfoForWindow::secondary tab group with id ${providedPrimarySpaceInfo!.secondaryTabGroupId} not found`
+      );
     }
-
-    const newActiveWindowId = uuidv4();
-    let newActiveWindow: DataModel.ActiveWindow;
-    let newActiveWindowSpaces: DataModel.ActiveSpace[] = [];
-    let newActiveWindowTabs: DataModel.ActiveTab[] = [];
-    let newActiveWindowSelectedSpaceId: DataModel.ActiveWindow["selectedSpaceId"] = null;
-    let newActiveWindowPrimarySpaceId: DataModel.ActiveWindow["primarySpaceId"] = null;
-    let newActiveWindowSelectedTabFocusType: DataModel.ActiveWindow["selectedSpaceFocusType"] = "nonSpaceTabFocus";
-    let newActiveWindowSelectedTabId: DataModel.ActiveWindow["selectedTabId"] | undefined;
-    let newActiveWindowSecondaryTabGroup: DataModel.ActiveWindow["secondaryTabGroup"] = null;
 
     let selectedTabGroup: ChromeTabGroupWithId | undefined;
-    let tabGroupsToCollapse: ChromeTabGroupId[] = [];
     let primaryTabGroupInfo: { tabGroup: ChromeTabGroupWithId; tabsInGroup: ChromeTabWithId[] } | undefined;
 
-    const tabsInprovidedSecondaryTabGroup = didProvideSecondaryTabGroup
-      ? tabs.filter((tab) => tab.groupId === providedSecondaryTabGroup!.id)
-      : undefined;
-
-    tabs.forEach((tab) => {
-      if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-        const newActiveWindowTab = ActiveWindowTab.createFromExistingTab(newActiveWindowId, null, tab);
-        newActiveWindowTabs.push(newActiveWindowTab);
-        if (selectedTab.id === tab.id) {
-          newActiveWindowSelectedTabId = newActiveWindowTab.id;
-        }
-      }
-    });
-
-    tabGroups.forEach((tabGroup) => {
-      const isTabGroupForSelectedTab = tabGroup.id === tabGroupIdForSelectedTab;
-      const isTabGroupPrimary = didProvidePrimarySpaceInfo ? providedPrimaryTabGroup!.id === tabGroup.id : isTabGroupForSelectedTab;
-      const isTabGroupSecondary = didProvidePrimarySpaceInfo && tabGroup.id === providedSecondaryTabGroup!.id;
-      const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
-      // const tabsInSpace = isTabGroupPrimary && providedSecondaryTabGroup ? [...tabsInprovidedSecondaryTabGroup!, ...tabsInGroup] : tabsInGroup;
-
-      const newActiveWindowSpace = ActiveWindowSpace.createFromExistingTabGroup(newActiveWindowId, tabGroup);
-      newActiveWindowSpaces.push(newActiveWindowSpace);
-
-      tabsInGroup.forEach((tab) => {
-        const newActiveWindowTab = ActiveWindowTab.createFromExistingTab(newActiveWindowId, newActiveWindowSpace.id, tab);
-        newActiveWindowTabs.push(newActiveWindowTab);
-
-        if (selectedTab.id === tab.id) {
-          newActiveWindowSelectedTabId = newActiveWindowTab.id;
-        }
-      });
-
-      if (isTabGroupForSelectedTab) {
-        selectedTabGroup = tabGroup;
-        newActiveWindowSelectedSpaceId = newActiveWindowSpace.id;
-        if (isTabGroupPrimary) {
-          newActiveWindowSelectedTabFocusType = "primaryFocus";
-        } else if (isTabGroupSecondary) {
-          newActiveWindowSelectedTabFocusType = "secondaryFocus";
-        } else {
-          newActiveWindowSelectedTabFocusType = "peakFocus";
-        }
-      }
-
-      if (isTabGroupPrimary) {
-        newActiveWindowPrimarySpaceId = newActiveWindowSpace.id;
-        primaryTabGroupInfo = { tabGroup, tabsInGroup };
-      }
-
-      if (!isTabGroupForSelectedTab && !isTabGroupPrimary) {
-        tabGroupsToCollapse.push(tabGroup.id);
-      }
-    });
-
-    if (!newActiveWindowSelectedTabId) {
-      throw new Error(`initializeDataModel::Error: No selected tab found`);
-    }
-
-    newActiveWindow = await ActiveWindow.createAndAdd(
-      {
-        id: newActiveWindowId,
-        windowId: window.id,
-        selectedSpaceId: newActiveWindowSelectedSpaceId,
-        primarySpaceId: newActiveWindowPrimarySpaceId,
-        selectedSpaceFocusType: newActiveWindowSelectedTabFocusType,
-        selectedTabId: newActiveWindowSelectedTabId,
-        secondaryTabGroup: newActiveWindowSecondaryTabGroup,
-      },
-      newActiveWindowSpaces,
-      newActiveWindowTabs
-    );
-
-    // shape up the new active window, using the following steps:
-    // 1. create new secondary tab group, or move any extra primary tabs to it
+    // adjust the "shape" ofthe new active window, using the following adjustments:
+    // 1. If a primary tab group exists and it has more than one tab, create new secondary tab group if not provided,
+    //   and/or move any extra primary tabs to it.
     // 2. if exists, move the secondary tab group to end position
     // 3. if exists, move the primary tab group to the end position
     // 4. collapse all tab groups that are not the selected or primary space tab group
-    // 5. uncollapse selected tab group and primary tab group
+    // 5. uncollapse primary tab group
     // 6. move all non grouped tabs to before all the tab groups
 
-    // step 1
-    let secondaryTabGroup: ChromeTabGroupWithId | undefined;
-    if (primaryTabGroupInfo && primaryTabGroupInfo.tabsInGroup.length > 1) {
-      const { tabGroup: primaryTabGroup, tabsInGroup: tabsInPrimaryTabGroup } = primaryTabGroupInfo!;
-      const isPrimaryTabGroupSelected = selectedTabGroup && selectedTabGroup.id === primaryTabGroup.id;
+    const { tabGroup: primaryTabGroup, tabsInGroup: tabsInPrimaryTabGroup } = primaryTabGroupInfo || {};
+
+    let ultimatePrimaryTabGroup: ChromeTabGroupWithId | undefined = primaryTabGroup;
+    let ultimateSecondaryTabGroup: ChromeTabGroupWithId | undefined;
+    let ultimateSelectedTab: ChromeTabWithId = selectedTab;
+
+    // adjustment 1
+    if (ultimatePrimaryTabGroup && tabsInPrimaryTabGroup!.length > 1) {
+      const isPrimaryTabGroupSelected = selectedTabGroup && selectedTabGroup.id === ultimatePrimaryTabGroup.id;
       const tabsInPrimaryTabGroupToMove = isPrimaryTabGroupSelected
-        ? tabsInPrimaryTabGroup.filter((tab) => !tab.active)
-        : tabsInPrimaryTabGroup.slice(0, tabsInPrimaryTabGroup.length - 1);
+        ? tabsInPrimaryTabGroup!.filter((tab) => !tab.active)
+        : tabsInPrimaryTabGroup!.slice(0, tabsInPrimaryTabGroup!.length - 1);
+      let ultimateSecondaryTabGroupId: ChromeTabGroupId;
 
       if (didProvideSecondaryTabGroup) {
-        secondaryTabGroup = providedSecondaryTabGroup!;
-        await chrome.tabs.group({
+        const tabsInprovidedSecondaryTabGroup = didProvideSecondaryTabGroup
+          ? tabs.filter((tab) => tab.groupId === providedSecondaryTabGroup!.id)
+          : undefined;
+        ultimateSecondaryTabGroupId = await chrome.tabs.group({
           tabIds: [...tabsInprovidedSecondaryTabGroup!, ...tabsInPrimaryTabGroupToMove].map((tab) => tab.id),
         });
+
+        if (ultimateSelectedTab.groupId === ultimatePrimaryTabGroup.id) {
+          ultimateSelectedTab = (await chrome.tabs.get(selectedTab.id)) as ChromeTabWithId;
+        }
       } else {
-        const secondaryTabGroupId = await chrome.tabs.group({
+        ultimateSecondaryTabGroupId = await chrome.tabs.group({
           tabIds: tabsInPrimaryTabGroupToMove.map((tab) => tab.id),
         });
-        secondaryTabGroup = await chrome.tabGroups.get(secondaryTabGroupId);
-        tabGroupsToCollapse.push(secondaryTabGroupId);
       }
-    }
 
-    // step 2
-    if (secondaryTabGroup) {
-      await ActiveWindow.update(newActiveWindow.id, { secondaryTabGroup });
-      await chrome.tabGroups.move(secondaryTabGroup.id, {
+      // adjustment 2
+      ultimateSecondaryTabGroup = await chrome.tabGroups.move(ultimateSecondaryTabGroupId, {
+        windowId,
+        index: -1,
+      });
+
+      // adjustment 3
+      ultimatePrimaryTabGroup = await chrome.tabGroups.move(ultimatePrimaryTabGroup.id, {
         windowId,
         index: -1,
       });
     }
 
-    // step 3
-    if (primaryTabGroupInfo) {
-      await chrome.tabGroups.move(primaryTabGroupInfo.tabGroup.id, {
-        windowId,
-        index: -1,
-      });
+    // adjustment 4
+    await Promise.all(
+      tabGroups.map(async (tabGroup) => {
+        if (tabGroup.id !== selectedTab.groupId && tabGroup.id !== ultimatePrimaryTabGroup?.id) {
+          const updatedTabGroup = await chrome.tabGroups.update(tabGroup.id, { collapsed: true });
+          if (updatedTabGroup.id === ultimateSecondaryTabGroup?.id) {
+            ultimateSecondaryTabGroup = updatedTabGroup;
+          }
+        }
+      })
+    );
+
+    // adjustment 5
+    if (ultimatePrimaryTabGroup) {
+      ultimatePrimaryTabGroup = await chrome.tabGroups.update(ultimatePrimaryTabGroup.id, { collapsed: false });
     }
 
-    // step 4
-    await Promise.all(tabGroupsToCollapse.map((tabGroupId) => chrome.tabGroups.update(tabGroupId, { collapsed: true })));
-
-    // step 5
-    if (selectedTabGroup) {
-      await chrome.tabGroups.update(selectedTabGroup.id, { collapsed: false });
-    }
-    if (primaryTabGroupInfo) {
-      await chrome.tabGroups.update(primaryTabGroupInfo.tabGroup.id, { collapsed: false });
-    }
-
-    // step 6
-    const nonGroupedTabs = tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE);
-    if (nonGroupedTabs.length > 0) {
-      await chrome.tabs.move(
-        nonGroupedTabs.map((tab) => tab.id),
-        { windowId, index: 0 }
-      );
+    // adjustment 6
+    const nonGroupedTabIds = tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE).map((tab) => tab.id);
+    if (nonGroupedTabIds.length > 0) {
+      await chrome.tabs.move(nonGroupedTabIds, { windowId, index: 0 });
     }
 
     // group any non-grouped tabs in the window
@@ -291,13 +215,117 @@ export namespace ActiveWindow {
     //   nonGroupedTabsNewGroup = await chrome.tabGroups.get(tabGroupId);
     // }
 
-    if (
-      newActiveWindowSelectedSpaceId &&
-      // @ts-ignore
-      (newActiveWindowSelectedTabFocusType === "peakFocus" ||
-        // @ts-ignore
-        newActiveWindowSelectedTabFocusType === "secondaryFocus")
-    ) {
+    return {
+      primaryTabGroupId: ultimatePrimaryTabGroup?.id,
+      secondaryTabGroupId: ultimateSecondaryTabGroup?.id,
+    };
+  }
+
+  export async function activateWindow(
+    windowId: ChromeWindowId,
+    providedPrimarySpaceInfo?: {
+      primaryTabGroupId: ChromeTabGroupId;
+      secondaryTabGroupId: ChromeTabGroupId | undefined;
+    }
+  ) {
+    const { primaryTabGroupId, secondaryTabGroupId } = await adjustAndExtractActiveWindowInfoForWindow(windowId, providedPrimarySpaceInfo);
+    const tabGroups = await chrome.tabGroups.query({ windowId });
+    const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
+
+    const newActiveWindowId = uuidv4();
+    let newActiveWindowSpaces: DataModel.ActiveSpace[] = [];
+    let newActiveWindowTabs: DataModel.ActiveTab[] = [];
+    let newActiveWindowSelectedSpaceId: DataModel.ActiveWindow["selectedSpaceId"] = null;
+    let newActiveWindowPrimarySpaceId: DataModel.ActiveWindow["primarySpaceId"] = null;
+    let newActiveWindowSelectedTabFocusType: DataModel.ActiveWindow["selectedSpaceFocusType"];
+    let newActiveWindowSelectedTabId: DataModel.ActiveWindow["selectedTabId"] | undefined;
+    let newActiveWindowSecondaryTabGroup: DataModel.ActiveWindow["secondaryTabGroup"] = null;
+
+    const tabsInSecondaryGroup = secondaryTabGroupId ? tabs.filter((tab) => tab.groupId === secondaryTabGroupId) : [];
+    const selectedTab = tabs.find((tab) => tab.active)!;
+
+    if (selectedTab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      newActiveWindowSelectedTabFocusType = "nonSpaceTabFocus";
+    } else if (selectedTab.groupId === primaryTabGroupId) {
+      newActiveWindowSelectedTabFocusType = "primaryFocus";
+    } else if (selectedTab.groupId === secondaryTabGroupId) {
+      newActiveWindowSelectedTabFocusType = "secondaryFocus";
+    } else {
+      newActiveWindowSelectedTabFocusType = "peakFocus";
+    }
+
+    tabs.forEach((tab) => {
+      if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+        const newActiveWindowTab = ActiveWindowTab.createFromExistingTab(newActiveWindowId, null, tab);
+        newActiveWindowTabs.push(newActiveWindowTab);
+        if (selectedTab.id === tab.id) {
+          newActiveWindowSelectedTabId = newActiveWindowTab.id;
+        }
+      }
+    });
+
+    tabGroups.forEach((tabGroup) => {
+      const isPrimaryTabGroup = primaryTabGroupId && tabGroup.id === primaryTabGroupId;
+      const isSecondaryTabGroup = tabGroup.id === secondaryTabGroupId;
+
+      if (isSecondaryTabGroup) {
+        newActiveWindowSecondaryTabGroup = tabGroup;
+        return;
+      }
+
+      const newActiveWindowSpaceId = uuidv4();
+      const newActiveWindowSpace = ActiveWindowSpace.create({
+        id: newActiveWindowSpaceId,
+        activeWindowId: newActiveWindowId,
+        tabGroupInfo: {
+          id: tabGroup.id,
+          title: tabGroup.title,
+          color: tabGroup.color,
+          collapsed: tabGroup.collapsed,
+        },
+      });
+      newActiveWindowSpaces.push(newActiveWindowSpace);
+
+      if (isPrimaryTabGroup) {
+        newActiveWindowPrimarySpaceId = newActiveWindowSpace.id;
+      }
+
+      const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
+      const tabsForSpace = isPrimaryTabGroup ? [...tabsInGroup, ...tabsInSecondaryGroup] : tabsInGroup;
+      tabsForSpace.forEach((tab) => {
+        const newActiveWindowTab = ActiveWindowTab.createFromExistingTab(newActiveWindowId, newActiveWindowSpaceId, tab);
+        newActiveWindowTabs.push(newActiveWindowTab);
+
+        if (selectedTab.id === tab.id) {
+          newActiveWindowSelectedTabId = newActiveWindowTab.id;
+        }
+      });
+    });
+
+    // FIXME: get rid of this type assertion when we have figured out a better way to handle it
+    if (!newActiveWindowSelectedTabId) {
+      throw new Error(`activateWindow::Error: No selected tab found`);
+    }
+
+    const newActiveWindow = await ActiveWindow.createAndAdd(
+      {
+        id: newActiveWindowId,
+        windowId,
+        selectedSpaceId: newActiveWindowSelectedSpaceId,
+        primarySpaceId: newActiveWindowPrimarySpaceId,
+        selectedSpaceFocusType: newActiveWindowSelectedTabFocusType,
+        selectedTabId: newActiveWindowSelectedTabId,
+        secondaryTabGroup: newActiveWindowSecondaryTabGroup,
+      },
+      newActiveWindowSpaces,
+      newActiveWindowTabs
+    );
+
+    if (newActiveWindowSelectedTabFocusType === "peakFocus" || newActiveWindowSelectedTabFocusType === "secondaryFocus") {
+      // FIXME: get rid of this type assertion when we have figured out a better way to handle it
+      if (!newActiveWindowSelectedSpaceId) {
+        throw new Error(`activateWindow::Error: No selected space found`);
+      }
       await SpaceAutoCollapseTimer.startAutoCollapseTimerForSpace(newActiveWindow.id, newActiveWindowSelectedSpaceId);
     }
 
