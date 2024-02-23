@@ -404,8 +404,7 @@ export namespace ActiveWindow {
   }
 
   export async function getPrimarySpace(id: string) {
-    const activeWindow = await get(id);
-    return await ActiveWindowSpace.getFromIndex("activeWindowId", activeWindow.id);
+    return await ActiveWindowSpace.getFromIndex("activeWindowId", id);
   }
 
   export async function getActiveSpacesAndTabs(ids: string[]) {
