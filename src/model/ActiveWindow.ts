@@ -73,6 +73,33 @@ export namespace ActiveWindow {
     await modelDB.delete("activeWindows", id);
   }
 
+  export async function removeAllCascading(activeWindowIds: string[]) {
+    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
+    const transaction = modelDB.transaction(["activeWindows", "activeSpaces", "activeTabs", "spaceAutoCollapseTimers"], "readwrite");
+    const activeWindowsStore = transaction.objectStore("activeWindows");
+    const activeSpacesStore = transaction.objectStore("activeSpaces");
+    const activeTabsStore = transaction.objectStore("activeTabs");
+    const spaceAutoCollapseTimerStore = transaction.objectStore("spaceAutoCollapseTimers");
+
+    await Promise.all(
+      activeWindowIds.map(async (activeWindowId) => {
+        await activeWindowsStore.delete(activeWindowId);
+        const activeWindowIndexForActiveSpaces = activeSpacesStore.index("activeWindowId");
+        const activeSpaceIds = await activeWindowIndexForActiveSpaces.getAllKeys(activeWindowId);
+        await Promise.all(activeSpaceIds.map((activeSpaceId) => activeSpacesStore.delete(activeSpaceId)));
+
+        const activeWindowIndexForActiveTabs = activeTabsStore.index("activeWindowId");
+        const activeTabIds = await activeWindowIndexForActiveTabs.getAllKeys(activeWindowId);
+        await Promise.all(activeTabIds.map((activeTabId) => activeTabsStore.delete(activeTabId)));
+
+        const activeWindowIndexForSpaceAutoCollapseTimers = spaceAutoCollapseTimerStore.index("activeWindowId");
+        const spaceAutoCollapseTimerIds = await activeWindowIndexForSpaceAutoCollapseTimers.getAllKeys(activeWindowId);
+        await Promise.all(spaceAutoCollapseTimerIds.map((spaceAutoCollapseTimerId) => spaceAutoCollapseTimerStore.delete(spaceAutoCollapseTimerId)));
+      })
+    );
+    await transaction.done;
+  }
+
   export async function update(id: string, updateProperties: Partial<DataModel.ActiveWindow>) {
     const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
     const activeWindow = await get(id);
@@ -338,30 +365,34 @@ export namespace ActiveWindow {
       const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
       const matchedWindowsToPrevActiveWindows = await WindowMatcher.matchWindowsToActiveWindows(windows, prevActiveWindows);
 
-      matchedWindowsToPrevActiveWindows.forEach(async (matchedWindowToPrevActiveWindowInfo) => {
-        const {
-          windowId,
-          activeWindow: prevActiveWindow,
-          matchedSecondaryTabGroupInfo,
-          matchedNonSecondaryTabGroups,
-        } = matchedWindowToPrevActiveWindowInfo;
+      await Promise.all(
+        matchedWindowsToPrevActiveWindows.map(async (matchedWindowToPrevActiveWindowInfo) => {
+          const {
+            windowId,
+            activeWindow: prevActiveWindow,
+            matchedSecondaryTabGroupInfo,
+            matchedNonSecondaryTabGroups,
+          } = matchedWindowToPrevActiveWindowInfo;
 
-        const matchedPrimaryTabGroupInfo = prevActiveWindow.primarySpaceId
-          ? matchedNonSecondaryTabGroups.find((matchedTabGroupInfo) => matchedTabGroupInfo.activeSpaceId === prevActiveWindow.primarySpaceId)
-          : undefined;
+          const matchedPrimaryTabGroupInfo = prevActiveWindow.primarySpaceId
+            ? matchedNonSecondaryTabGroups.find((matchedTabGroupInfo) => matchedTabGroupInfo.activeSpaceId === prevActiveWindow.primarySpaceId)
+            : undefined;
 
-        const primaryTabGroupId = matchedPrimaryTabGroupInfo?.tabGroupId;
+          const primaryTabGroupId = matchedPrimaryTabGroupInfo?.tabGroupId;
 
-        await ActiveWindow.activateWindow(
-          windowId,
-          primaryTabGroupId
-            ? {
-                primaryTabGroupId,
-                secondaryTabGroupId: matchedSecondaryTabGroupInfo?.tabGroupId,
-              }
-            : undefined
-        );
-      });
+          await ActiveWindow.activateWindow(
+            windowId,
+            primaryTabGroupId
+              ? {
+                  primaryTabGroupId,
+                  secondaryTabGroupId: matchedSecondaryTabGroupInfo?.tabGroupId,
+                }
+              : undefined
+          );
+        })
+      );
+      // remove the previous active windows
+      await removeAllCascading(prevActiveWindows.map((prevActiveWindow) => prevActiveWindow.id));
     } catch (error) {
       const errorMessage = new Error(`DataModel::initialize:Could not intitialize data model: ${error}`);
       console.error(errorMessage);
@@ -374,28 +405,33 @@ export namespace ActiveWindow {
       const activeWindows = await ActiveWindow.getAll();
       const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
 
-      activeWindows.forEach(async (activeWindow) => {
-        const window = windows.find((window) => window.id === activeWindow.windowId);
-        if (!window) {
-          return;
-        }
-        const tabGroups = await chrome.tabGroups.query({ windowId: window.id });
-        const primarySpace = await ActiveWindow.getPrimarySpace(activeWindow.id);
-        const primaryTabGroup = primarySpace ? tabGroups.find((tabGroup) => tabGroup.id === primarySpace.tabGroupInfo.id) : undefined;
-        const secondaryTabGroup =
-          primaryTabGroup && activeWindow.secondaryTabGroup
-            ? tabGroups.find((tabGroup) => tabGroup.id === activeWindow.secondaryTabGroup!.id)
-            : undefined;
-        const newActiveWindow = await ActiveWindow.activateWindow(
-          window.id,
-          primaryTabGroup
-            ? {
-                primaryTabGroupId: primaryTabGroup.id,
-                secondaryTabGroupId: secondaryTabGroup?.id,
-              }
-            : undefined
-        );
-      });
+      await Promise.all(
+        activeWindows.map(async (activeWindow) => {
+          const window = windows.find((window) => window.id === activeWindow.windowId);
+          if (!window) {
+            return;
+          }
+          const tabGroups = await chrome.tabGroups.query({ windowId: window.id });
+          const primarySpace = await ActiveWindow.getPrimarySpace(activeWindow.id);
+          const primaryTabGroup = primarySpace ? tabGroups.find((tabGroup) => tabGroup.id === primarySpace.tabGroupInfo.id) : undefined;
+          const secondaryTabGroup =
+            primaryTabGroup && activeWindow.secondaryTabGroup
+              ? tabGroups.find((tabGroup) => tabGroup.id === activeWindow.secondaryTabGroup!.id)
+              : undefined;
+          const newActiveWindow = await ActiveWindow.activateWindow(
+            window.id,
+            primaryTabGroup
+              ? {
+                  primaryTabGroupId: primaryTabGroup.id,
+                  secondaryTabGroupId: secondaryTabGroup?.id,
+                }
+              : undefined
+          );
+        })
+      );
+
+      // remove the previous active windows
+      await removeAllCascading(activeWindows.map((activeWindow) => activeWindow.id));
     } catch (error) {
       const errorMessage = new Error(`DataModel::initialize:Could not intitialize data model: ${error}`);
       console.error(errorMessage);
