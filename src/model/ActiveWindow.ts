@@ -450,23 +450,28 @@ export namespace ActiveWindow {
 
     const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
     const transaction = modelDB.transaction(["activeSpaces", "activeTabs"], "readonly");
-    const activeSpacesWindowIdIndex = transaction.objectStore("activeSpaces").index("activeWindowId");
-    const activeTabsSpaceIdIndex = transaction.objectStore("activeTabs").index("activeSpaceId");
+
+    const activeSpacesStore = transaction.objectStore("activeSpaces");
+    const activeTabsStore = transaction.objectStore("activeTabs");
+
+    const activeWindowIdIndexForActiveSpaces = activeSpacesStore.index("activeWindowId");
+    const activeWindowIdIndexForActiveTabs = activeTabsStore.index("activeWindowId");
+    const activeSpaceIdIndexForActiveTabs = activeTabsStore.index("activeSpaceId");
 
     await Promise.all(
       ids.map(async (activeWindowId) => {
-        // FIXME: use proper indexedDB indexing to filter out non grouped tabs instead of using Array.filter
-        const nonGroupedTabs = (await ActiveWindowTab.getAllFromIndex("activeWindowId", activeWindowId)).filter(
+        // FIXME: use proper indexedDB querying to get the non-grouped tabs instead of using Array.filter
+        const nonGroupedTabs = (await activeWindowIdIndexForActiveTabs.getAll(activeWindowId)).filter(
           (activeTab) => activeTab.activeSpaceId === null
         );
         activeNonGroupedActiveTabsByWindowId[activeWindowId] = nonGroupedTabs;
 
-        const activeSpaces = await activeSpacesWindowIdIndex.getAll(activeWindowId);
+        const activeSpaces = await activeWindowIdIndexForActiveSpaces.getAll(activeWindowId);
         activeSpacesByActiveWindowId[activeWindowId] = activeSpaces;
 
         await Promise.all(
           activeSpaces.map(async (activeSpace) => {
-            const activeTabs = await activeTabsSpaceIdIndex.getAll(activeSpace.id);
+            const activeTabs = await activeSpaceIdIndexForActiveTabs.getAll(activeSpace.id);
             activeTabsByActiveSpaceId[activeSpace.id] = activeTabs;
           })
         );
