@@ -67,6 +67,10 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
 
   if (wasExpanded) {
     await SpaceAutoCollapseTimer.startAutoCollapseTimerForSpace(activeWindow.id, activeSpace.id);
+    // activate the last tab in the space
+    const tabs = (await chrome.tabs.query({ groupId: tabGroup.id })) as ChromeTabWithId[];
+    const lastTab = tabs[tabs.length - 1];
+    await chrome.tabs.update(lastTab.id, { active: true });
   }
 
   await ActiveWindowSpace.update(activeSpace.id, { tabGroupInfo: tabGroup });
