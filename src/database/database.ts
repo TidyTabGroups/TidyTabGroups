@@ -48,6 +48,11 @@ const schemas = {
             keyPath: "activeWindowId",
             options: { unique: false },
           },
+          {
+            name: "tabGroupId" as keyof DataModel.ModelDB["activeWindows"]["indexes"],
+            keyPath: "tabGroupInfo.id",
+            options: { unique: true },
+          },
         ],
       },
       {
@@ -56,6 +61,7 @@ const schemas = {
         indexes: [
           { name: "activeWindowId", keyPath: "activeWindowId", options: { unique: false } },
           { name: "activeSpaceId", keyPath: "activeSpaceId", options: { unique: false } },
+          { name: "tabId", keyPath: "tabInfo.id", options: { unique: true } },
         ],
       },
       {
