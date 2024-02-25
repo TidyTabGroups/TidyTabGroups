@@ -62,10 +62,6 @@ export namespace ActiveWindowSpace {
 
   export async function makePrimarySpace(activeWindowId: string, activeSpaceId: string) {
     const activeSpace = await ActiveWindowSpace.get(activeSpaceId);
-    const activeTabs = await ActiveWindowTab.getAllFromIndex("activeSpaceId", activeSpaceId);
-    if (!activeTabs) {
-      throw new Error(`makePrimarySpace::activeSpace ${activeSpaceId} has no tabs`);
-    }
     const { tabGroupInfo } = activeSpace;
     await chrome.tabGroups.move(tabGroupInfo.id, { index: -1 });
     await ActiveWindow.update(activeWindowId, { primarySpaceId: activeSpaceId });
