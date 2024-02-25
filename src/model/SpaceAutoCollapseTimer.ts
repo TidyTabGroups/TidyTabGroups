@@ -51,6 +51,23 @@ export namespace SpaceAutoCollapseTimer {
     }
   }
 
+  export async function remove(
+    id: string,
+    _transaction?: IDBPTransaction<DataModel.ModelDB, ["spaceAutoCollapseTimers", ...StoreNames<DataModel.ModelDB>[]], "readwrite">
+  ) {
+    const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction(
+      "model",
+      _transaction,
+      ["spaceAutoCollapseTimers"],
+      "readwrite"
+    );
+
+    await transaction.objectStore("spaceAutoCollapseTimers").delete(id);
+    if (!didProvideTransaction) {
+      await transaction.done;
+    }
+  }
+
   export async function startAutoCollapseTimerForSpace(
     activeWindowId: string,
     spaceId: string,
@@ -62,7 +79,9 @@ export namespace SpaceAutoCollapseTimer {
     return timer;
   }
 
-  export async function onAutoCollapseTimer(activeWindowId: string, spaceId: string) {
-    await ActiveWindowSpace.makePrimarySpace(activeWindowId, spaceId);
+  export async function onAutoCollapseTimer(id: string) {
+    const autoCollapseTimer = await get(id);
+    await ActiveWindowSpace.makePrimarySpace(autoCollapseTimer.activeWindowId, autoCollapseTimer.spaceId);
+    await remove(id);
   }
 }

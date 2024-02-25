@@ -13,6 +13,7 @@ export async function onActionClicked(tab: chrome.tabs.Tab) {
 }
 
 export async function onAlarm(alarm: chrome.alarms.Alarm) {
+  console.log(`onAlarm::alarm:`, alarm.name);
   if (alarm.name.startsWith("spaceAutoCollapseTimer")) {
     const spaceAutoCollapseAlarmId = alarm.name.split(":")[1];
     if (!spaceAutoCollapseAlarmId) {
@@ -28,8 +29,7 @@ export async function onAlarm(alarm: chrome.alarms.Alarm) {
       throw new Error(errorMessage);
     }
 
-    const { activeWindowId, spaceId } = autoCollapseTimer;
-    SpaceAutoCollapseTimer.onAutoCollapseTimer(activeWindowId, spaceId);
+    SpaceAutoCollapseTimer.onAutoCollapseTimer(autoCollapseTimer.id);
   }
 }
 
