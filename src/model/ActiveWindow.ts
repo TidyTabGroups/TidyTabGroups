@@ -316,8 +316,7 @@ export namespace ActiveWindow {
     >("model", ["activeWindows", "activeSpaces", "activeTabs", "spaceAutoCollapseTimers"], "readwrite");
     await removeAllCascading(await getAllKeys(transaction), transaction);
 
-    // TODO: only get all "normal" windows. activateWindow will throw an error otherwise
-    const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
+    const windows = (await chrome.windows.getAll()).filter((window) => window.type === "normal") as ChromeWindowWithId[];
     const newActiveWindows = await Promise.all(windows.map((window) => activateWindow(window.id)));
     await transaction.done;
     return newActiveWindows;
