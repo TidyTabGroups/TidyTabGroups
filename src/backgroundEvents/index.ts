@@ -69,7 +69,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
     await SpaceAutoCollapseTimer.startAutoCollapseTimerForSpace(activeWindow.id, activeSpace.id);
   }
 
-  await ActiveWindowSpace.update(activeSpace.id, { ...activeSpace, tabGroupInfo: tabGroup });
+  await ActiveWindowSpace.update(activeSpace.id, { tabGroupInfo: tabGroup });
 }
 
 function onSpaceNotInTidyTabsShape() {
