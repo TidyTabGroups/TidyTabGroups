@@ -36,8 +36,6 @@ export async function onAlarm(alarm: chrome.alarms.Alarm) {
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   console.log(`onInstalled::Extension was installed because of: ${details.reason}`);
   if (details.reason === "install") {
-    // TODO: remove this
-    await Storage.initialize();
     // TODO: open the onboarding page
   }
 
