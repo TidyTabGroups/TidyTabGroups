@@ -31,7 +31,13 @@ const schemas = {
         options: {
           keyPath: "id",
         },
-        indexes: [],
+        indexes: [
+          {
+            name: "windowId" as keyof DataModel.ModelDB["activeWindows"]["indexes"],
+            keyPath: "windowId",
+            options: { unique: true },
+          },
+        ],
       },
       {
         name: "activeSpaces",
