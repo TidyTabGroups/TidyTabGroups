@@ -201,9 +201,10 @@ export namespace ActiveWindow {
 
     // adjustment 2
     if (nonGroupedTabs.length > 0) {
+      const pinnedTabs = nonGroupedTabs.filter((tab) => tab.pinned);
       await chrome.tabs.move(
         nonGroupedTabs.map((tab) => tab.id),
-        { windowId, index: 0 }
+        { windowId, index: pinnedTabs.length }
       );
       tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
       const newTabsInfo = getTabsInfo(tabs);
