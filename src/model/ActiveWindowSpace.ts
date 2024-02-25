@@ -1,17 +1,6 @@
 import { IndexKey, IndexNames } from "idb";
 import { ActiveWindowTab, ActiveWindow } from ".";
-import * as Misc from "../misc";
-import * as Storage from "../storage";
-import {
-  DataModel,
-  ChromeTabGroupWithId,
-  ChromeTabWithId,
-  ActiveSpaceForChromeObjectFinder,
-  ChromeWindowId,
-  SpaceSyncData,
-  SpaceSyncDataType,
-  ChromeTabId,
-} from "../types";
+import { DataModel, ChromeTabGroupWithId } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import Database from "../database";
 
@@ -75,40 +64,11 @@ export namespace ActiveWindowSpace {
     const activeWindow = await ActiveWindow.get(activeWindowId);
     const activeSpace = await ActiveWindowSpace.get(activeSpaceId);
     const activeTabs = await ActiveWindowTab.getAllFromIndex("activeSpaceId", activeSpaceId);
-
     if (!activeTabs) {
       throw new Error(`makePrimarySpace::activeSpace ${activeSpaceId} has no tabs`);
     }
-
     const { tabGroupInfo } = activeSpace;
-
-    // 1. if there is more than one tab in the group, create a secondary tab group
-    //  for every tab but the selected one and move it to the end
-    // 2. move primary tab group to end position
-
-    const nonSelectedTabs = activeTabs.filter((tab) => tab.id !== activeWindow.selectedTabId);
-    if (nonSelectedTabs.length > 0) {
-      const nonSelectedTabIds = nonSelectedTabs.map((tab) => tab.tabInfo.id);
-      // step 1
-      await createSecondaryTabGroup(activeWindow.id, nonSelectedTabIds);
-    }
-
-    // step 2
     await chrome.tabGroups.move(tabGroupInfo.id, { windowId: activeWindow.windowId, index: -1 });
-
     await ActiveWindow.update(activeWindowId, { primarySpaceId: activeSpaceId });
-  }
-
-  async function createSecondaryTabGroup(activeWindowId: string, tabIds: ChromeTabId[]) {
-    const secondaryTabGroupId = await chrome.tabs.group({ tabIds });
-    const secondaryTabGroup = await chrome.tabGroups.update(secondaryTabGroupId, {
-      collapsed: true,
-      title: Misc.SECONDARY_TAB_GROUP_TITLE_LEFT,
-    });
-    await chrome.tabGroups.move(secondaryTabGroup.id, {
-      windowId: secondaryTabGroup.windowId,
-      index: -1,
-    });
-    await ActiveWindow.update(activeWindowId, { secondaryTabGroup });
   }
 }

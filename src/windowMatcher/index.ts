@@ -8,9 +8,6 @@ import {
   ChromeTabWithId,
   ChromeWindowId,
 } from "../types";
-import { ActiveWindowSpace } from "../model/ActiveWindowSpace";
-import * as Misc from "../misc";
-import Database from "../database";
 import { ActiveWindow } from "../model";
 
 export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[], activeWindows: DataModel.ActiveWindow[]) {
@@ -32,11 +29,8 @@ export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[],
       // 1. Be a "normal" window
       // 2. contain at least one tab
       // When matched against a previous active window, it must:
-      // 3. if the active window has a primary space with more than one tab, then the secondary tab group must exist.
-      // 4. If the active window has any spaces, they all must match to a (non-secondary) tab group.
-      //    This is done by matching their titles. If more than one tab group match the title of a space, then the one that matches the color
-      //    of the space's tab group color is chosen. If that isnt enough, the one with the most matched tabs to the space is chosen.
-      // 5. If the active window has any non-grouped tabs, they all must match to a tab.
+      // 3. if the active window has any spaces, they all must match to a tab group in the window
+      // 4. If the active window has any non-grouped tabs, they all must match to a tab in the window
 
       // criteria #1
       if (window.type !== "normal") {
@@ -59,43 +53,12 @@ export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[],
         const { primarySpaceId, selectedSpaceFocusType } = activeWindow;
         const activeSpaces = activeSpacesByActiveWindowId[activeWindow.id];
         const nonGroupedActiveTabs = activeNonGroupedActiveTabsByWindowId[activeWindow.id];
-        const primarySpace = activeSpaces.find((activeSpace) => activeSpace.id === primarySpaceId);
-
-        const primarySpaceTabs = primarySpaceId ? activeTabsByActiveSpaceId[primarySpaceId] : undefined;
-        let secondaryTabGroup: ChromeTabGroupWithId | undefined;
-        if (primarySpaceId && primarySpaceTabs!.length > 1) {
-          const secondaryTabGroupTitleToMatch =
-            selectedSpaceFocusType === "primaryFocus" ? Misc.SECONDARY_TAB_GROUP_TITLE_LEFT : Misc.SECONDARY_TAB_GROUP_TITLE_RIGHT;
-          const matchedSecondaryTabGroups = tabGroups.filter((tabGroup) => tabGroup.title === secondaryTabGroupTitleToMatch);
-
-          let bestMatchedSecondaryTabGroup: ChromeTabGroupWithId | undefined;
-          if (matchedSecondaryTabGroups.length > 1) {
-            // find the best matching secondary tab group
-            matchedSecondaryTabGroups.forEach((matchedSecondaryTabGroup) => {
-              const tabsInMatchedSecondaryTabGroup = tabs.filter((tab) => tab.groupId === matchedSecondaryTabGroup.id);
-            });
-          } else {
-            bestMatchedSecondaryTabGroup = matchedSecondaryTabGroups[0];
-          }
-
-          // criteria #3
-          if (!bestMatchedSecondaryTabGroup) {
-            console.warn(`initializeDataModel::Window ${window.id} has no secondary tab group when it must`);
-            return;
-          }
-
-          secondaryTabGroup = bestMatchedSecondaryTabGroup;
-        }
-
-        const nonSecondaryTabGroups = secondaryTabGroup ? tabGroups.filter((tabGroup) => tabGroup.id !== secondaryTabGroup!.id) : tabGroups;
-        let matchedNonSecondaryTabGroupsToActiveWindowSpaces: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[] | undefined;
+        let matchedTabGroupsToActiveWindowSpaces: ActiveWindowMatcher.MatchedTabGroupToActiveWindowSpaceInfo[] | undefined;
 
         if (activeSpaces.length > 0) {
-          const secondaryTabGroupTabs = secondaryTabGroup ? tabs.filter((tab) => tab.groupId === secondaryTabGroup!.id) : [];
-          const nonSecondaryTabGroupsTabs = tabs.filter((tab) => !secondaryTabGroupTabs.find((secondaryTab) => secondaryTab.id === tab.id));
-
-          const matchedNonSecondaryTabGroupsToActiveWindowSpaces = getMatchingTabGroups(
-            { id: window.id, tabGroups: nonSecondaryTabGroups, tabs: nonSecondaryTabGroupsTabs },
+          const groupedTabs = tabs.filter((tab) => tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE);
+          const matchedTabGroupsToActiveWindowSpaces = getMatchingTabGroups(
+            { id: window.id, tabGroups: tabGroups, tabs: groupedTabs },
             {
               activeWindow,
               activeSpaces: activeSpaces.map((activeSpace) => ({ activeSpace, activeTabs: activeTabsByActiveSpaceId[activeSpace.id] })),
@@ -103,7 +66,7 @@ export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[],
           );
 
           // criteria #4
-          if (matchedNonSecondaryTabGroupsToActiveWindowSpaces.length !== activeSpaces.length) {
+          if (matchedTabGroupsToActiveWindowSpaces.length !== activeSpaces.length) {
             return;
           }
         }
@@ -121,14 +84,9 @@ export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[],
         candidateMatchedWindowsToActiveWindowsMap[activeWindow.id].push({
           windowId: window.id,
           activeWindow,
-          matchedSecondaryTabGroupInfo: secondaryTabGroup && {
-            primarySpaceId: primarySpaceId!,
-            tabGroupId: secondaryTabGroup.id,
-            tabGroupColorsMatch: secondaryTabGroup.color === activeWindow.secondaryTabGroup!.color,
-          },
-          matchedNonSecondaryTabGroups: matchedNonSecondaryTabGroupsToActiveWindowSpaces ? matchedNonSecondaryTabGroupsToActiveWindowSpaces : [],
-          matchedTabsCount: matchedNonSecondaryTabGroupsToActiveWindowSpaces
-            ? matchedNonSecondaryTabGroupsToActiveWindowSpaces.reduce((acc, match) => acc + match.matchedTabsCount, 0) + matchedNonGroupedTabs.length
+          matchedTabGroups: matchedTabGroupsToActiveWindowSpaces ? matchedTabGroupsToActiveWindowSpaces : [],
+          matchedTabsCount: matchedTabGroupsToActiveWindowSpaces
+            ? matchedTabGroupsToActiveWindowSpaces.reduce((acc, match) => acc + match.matchedTabsCount, 0) + matchedNonGroupedTabs.length
             : matchedNonGroupedTabs.length,
         });
 
@@ -136,8 +94,6 @@ export async function matchWindowsToActiveWindows(windows: ChromeWindowWithId[],
         if (!matchedWindowsInfoMap[window.id]) {
           matchedWindowsInfoMap[window.id] = {
             window,
-            secondaryTabGroup,
-            nonSecondaryTabGroups,
             tabs,
             tabGroups,
           };
@@ -191,7 +147,7 @@ export function getMatchingTabGroups(
 ) {
   // get the match candidates
   const candidateMatchedTabGroupsToSpacesMap: {
-    [spaceId: string]: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[];
+    [spaceId: string]: ActiveWindowMatcher.MatchedTabGroupToActiveWindowSpaceInfo[];
   } = {};
 
   const { tabGroups, tabs } = windowInfo;
@@ -225,12 +181,12 @@ export function getMatchingTabGroups(
     }
   });
 
-  const matchedTabGroupsToSpaces: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[] = [];
+  const matchedTabGroupsToSpaces: ActiveWindowMatcher.MatchedTabGroupToActiveWindowSpaceInfo[] = [];
   let remainingTabGroupsToMatchIds = Array.from(tabGroupsToMatchIds);
 
   // get the best matches for each space
   Object.keys(candidateMatchedTabGroupsToSpacesMap).forEach((spaceId) => {
-    let bestMatchedTabGroupInfo: ActiveWindowMatcher.MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo | undefined;
+    let bestMatchedTabGroupInfo: ActiveWindowMatcher.MatchedTabGroupToActiveWindowSpaceInfo | undefined;
     let bestMatchedTabsCount = 0;
 
     const candidateMatchedTabGroupsToSpaces = candidateMatchedTabGroupsToSpacesMap[spaceId];

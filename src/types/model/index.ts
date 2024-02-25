@@ -50,12 +50,10 @@ export declare namespace DataModel {
     primarySpaceId: string | null;
     /*
       primaryFocus: the primary tab group is selected
-      secondaryFocus: the secondary tab group is selected
       peakFocus: the selected space is being "peaked"
       nonSpaceTabFocus: a tab that doesnt belong to any space is selected
      */
-    selectedSpaceFocusType: "primaryFocus" | "secondaryFocus" | "peakFocus" | "nonSpaceTabFocus";
-    secondaryTabGroup: ChromeTabGroupWithId | null;
+    selectedSpaceFocusType: "primaryFocus" | "peakFocus" | "nonSpaceTabFocus";
   }
 
   export type ActiveWindow = { id: string } & ActiveWindowCreateProperties;

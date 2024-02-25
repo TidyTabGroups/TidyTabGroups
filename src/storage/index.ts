@@ -1,6 +1,7 @@
 import { LocalStorageShape } from "../types";
 
 export const LOCAL_STORAGE_DEFAULT_VALUES: LocalStorageShape = {
+  // TODO: remove these
   activeWindows: [],
   spaceAutoCollapseTimers: [],
 };

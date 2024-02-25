@@ -5,7 +5,6 @@ import { openDummyTab } from "./misc";
   chrome.alarms.onAlarm.addListener(BackgroundEvents.onAlarm);
   chrome.action.onClicked.addListener(BackgroundEvents.onActionClicked);
   chrome.runtime.onInstalled.addListener(BackgroundEvents.onInstalled);
-  chrome.runtime.onStartup.addListener(BackgroundEvents.onStartUp);
   chrome.tabGroups.onUpdated.addListener(BackgroundEvents.onTabGroupsUpdated);
 
   Database.initializeDatabaseConnection("model");

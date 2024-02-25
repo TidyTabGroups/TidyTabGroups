@@ -18,42 +18,10 @@ export interface TabGroupCreationOptions {
   color?: chrome.tabGroups.ColorEnum;
 }
 
-export declare namespace ActiveSpaceForChromeObjectFinder {
-  export type FindType = "tab" | "tabGroup" | "window";
-
-  export type FindTabResultType = "activeTab" | "primaryTab" | "secondaryTab";
-  export type FindTabGroupResultType = "primaryTabGroup" | "secondaryTabGroup";
-  export type FindWindowResultType = "window";
-
-  export type FindResultType<FindType> = FindType extends "tab"
-    ? FindTabResultType
-    : FindType extends "tabGroup"
-    ? FindTabGroupResultType
-    : FindWindowResultType;
-
-  export type FindChromeObjectType<FindType> = FindType extends "tab"
-    ? ChromeTabWithId
-    : FindType extends "tabGroup"
-    ? ChromeTabGroupWithId
-    : ChromeWindowWithId;
-
-  export interface FindResult<FindType> {
-    activeSpace: DataModel.ActiveSpace;
-    type: FindResultType<FindType>;
-  }
-}
-
 export declare namespace ActiveWindowMatcher {
-  export interface BaseMatchedTabGroupToActiveWindowSpaceInfo {
+  export interface MatchedTabGroupToActiveWindowSpaceInfo {
     tabGroupId: ChromeTabGroupId;
     tabGroupColorsMatch: boolean;
-  }
-
-  export interface MatchedSecondaryTabGroupToActiveWindowSpaceInfo extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
-    primarySpaceId: string;
-  }
-
-  export interface MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo extends BaseMatchedTabGroupToActiveWindowSpaceInfo {
     activeSpaceId: string;
     matchedTabsCount: number;
   }
@@ -61,8 +29,7 @@ export declare namespace ActiveWindowMatcher {
   export interface MatchedWindowToActiveWindowInfo {
     windowId: ChromeWindowId;
     activeWindow: DataModel.ActiveWindow;
-    matchedSecondaryTabGroupInfo: MatchedSecondaryTabGroupToActiveWindowSpaceInfo | undefined;
-    matchedNonSecondaryTabGroups: MatchedNonSecondaryTabGroupToActiveWindowSpaceInfo[];
+    matchedTabGroups: MatchedTabGroupToActiveWindowSpaceInfo[];
     matchedTabsCount: number;
   }
 
@@ -70,8 +37,6 @@ export declare namespace ActiveWindowMatcher {
 
   export interface WindowInfo {
     window: ChromeWindowWithId;
-    secondaryTabGroup: ChromeTabGroupWithId | undefined;
-    nonSecondaryTabGroups: ChromeTabGroupWithId[];
     tabs: ChromeTabWithId[];
     tabGroups: ChromeTabGroupWithId[];
   }

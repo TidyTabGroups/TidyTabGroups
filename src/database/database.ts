@@ -19,7 +19,7 @@ interface Connection<T extends DBSchema> {
   onStoreCreatedListeners: ((storeName: StoreNames<T>) => void)[];
 }
 
-import { DBSchema, IDBPDatabase, IndexNames, StoreNames, openDB, unwrap, wrap } from "idb";
+import { DBSchema, IDBPDatabase, IDBPTransaction, IndexNames, StoreNames, openDB, unwrap, wrap } from "idb";
 import { DataModel } from "../types";
 
 const schemas = {
@@ -167,12 +167,30 @@ export function getDBConnection<T extends DBSchema>(name: keyof typeof schemas) 
   });
 }
 
-export async function createTransaction<T extends DBSchema>(
+export async function createTransaction<DBTypes extends DBSchema, TxStores extends ArrayLike<StoreNames<DBTypes>>, Mode extends IDBTransactionMode>(
   connectionName: keyof typeof schemas,
-  storeNames: StoreNames<T>[],
-  mode?: IDBTransactionMode | undefined,
+  storeNames: TxStores,
+  mode: Mode,
   options?: IDBTransactionOptions | undefined
 ) {
-  const db = await getDBConnection<T>(connectionName);
-  return db.transaction(storeNames, mode, options);
+  const db = await getDBConnection<DBTypes>(connectionName);
+  return db.transaction<TxStores, Mode>(storeNames, mode, options);
+}
+
+export async function useOrCreateTransaction<
+  DBTypes extends DBSchema,
+  TxStores extends ArrayLike<StoreNames<DBTypes>>,
+  Mode extends IDBTransactionMode
+>(
+  connectionName: keyof typeof schemas,
+  transaction: IDBPTransaction<DBTypes, TxStores, Mode> | undefined,
+  storeNames: TxStores,
+  mode: Mode
+): Promise<[IDBPTransaction<DBTypes, TxStores, Mode>, boolean]> {
+  if (transaction) {
+    return [transaction, true];
+  }
+
+  const newTransaction = await createTransaction<DBTypes, TxStores, Mode>(connectionName, storeNames, mode);
+  return [newTransaction, false];
 }

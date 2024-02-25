@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import * as Storage from "../storage";
 import { ActiveWindowSpace } from ".";
 import Database from "../database";
+import { IDBPTransaction, StoreNames } from "idb";
 
 export namespace SpaceAutoCollapseTimer {
   export function create(activeWindowId: string, spaceId: string) {
@@ -32,14 +33,31 @@ export namespace SpaceAutoCollapseTimer {
     return await modelDB.getAll("spaceAutoCollapseTimers");
   }
 
-  export async function add(timer: DataModel.SpaceAutoCollapseTimer) {
-    const modelDB = await Database.getDBConnection<DataModel.ModelDB>("model");
-    await modelDB.add("spaceAutoCollapseTimers", timer);
+  export async function add(
+    timer: DataModel.SpaceAutoCollapseTimer,
+    _transaction?: IDBPTransaction<DataModel.ModelDB, ["spaceAutoCollapseTimers", ...StoreNames<DataModel.ModelDB>[]], "readwrite">
+  ) {
+    const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction(
+      "model",
+      _transaction,
+      ["spaceAutoCollapseTimers"],
+      "readwrite"
+    );
+
+    await transaction.objectStore("spaceAutoCollapseTimers").add(timer);
+
+    if (!didProvideTransaction) {
+      await transaction.done;
+    }
   }
 
-  export async function startAutoCollapseTimerForSpace(activeWindowId: string, spaceId: string) {
+  export async function startAutoCollapseTimerForSpace(
+    activeWindowId: string,
+    spaceId: string,
+    _transaction?: IDBPTransaction<DataModel.ModelDB, ["spaceAutoCollapseTimers", ...StoreNames<DataModel.ModelDB>[]], "readwrite">
+  ) {
     const timer = create(activeWindowId, spaceId);
-    await add(timer);
+    await add(timer, _transaction);
 
     return timer;
   }

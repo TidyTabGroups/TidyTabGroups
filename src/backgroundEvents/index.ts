@@ -36,16 +36,13 @@ export async function onAlarm(alarm: chrome.alarms.Alarm) {
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   console.log(`onInstalled::Extension was installed because of: ${details.reason}`);
   if (details.reason === "install") {
+    // TODO: remove this
     await Storage.initialize();
     // TODO: open the onboarding page
-  } else if (details.reason === "update") {
-    await ActiveWindow.reactivateWindowsForUpdate();
   }
-}
 
-export async function onStartUp() {
-  console.log(`onStartUp::New browser session was started up`);
-  await ActiveWindow.reactivateWindowsForStartup();
+  const newActiveWindows = await ActiveWindow.reactivateAllWindows();
+  console.log(`onInstalled::reactivated all windows:`, newActiveWindows);
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
@@ -63,19 +60,13 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
     return;
   }
 
-  const isForPrimarySpace = activeWindow.primarySpaceId === activeSpace.id;
-  const isSecondaryTabGroup = activeWindow.secondaryTabGroup?.id === tabGroup.id;
-  const isPrimaryTabGroup = isForPrimarySpace && !isSecondaryTabGroup;
+  const isPrimaryTabGroup = activeWindow.primarySpaceId === activeSpace.id;
 
   const wasCollapsed = Misc.tabGroupWasCollapsed(tabGroup.collapsed, activeSpace.tabGroupInfo.collapsed);
   const wasExpanded = Misc.tabGroupWasExpanded(tabGroup.collapsed, activeSpace.tabGroupInfo.collapsed);
 
-  if (isPrimaryTabGroup) {
-  } else if (isSecondaryTabGroup) {
-  } else {
-    if (wasExpanded) {
-      await SpaceAutoCollapseTimer.startAutoCollapseTimerForSpace(activeWindow.id, activeSpace.id);
-    }
+  if (wasExpanded) {
+    await SpaceAutoCollapseTimer.startAutoCollapseTimerForSpace(activeWindow.id, activeSpace.id);
   }
 
   await ActiveWindowSpace.update(activeSpace.id, { ...activeSpace, tabGroupInfo: tabGroup });
