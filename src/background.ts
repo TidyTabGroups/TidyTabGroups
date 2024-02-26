@@ -8,6 +8,4 @@ import { openDummyTab } from "./misc";
   chrome.tabGroups.onUpdated.addListener(BackgroundEvents.onTabGroupsUpdated);
 
   Database.initializeDatabaseConnection("model");
-
-  openDummyTab();
 })();

@@ -41,6 +41,8 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
 
   const newActiveWindows = await ActiveWindow.reactivateAllWindows();
   console.log(`onInstalled::reactivated all windows:`, newActiveWindows);
+
+  Misc.openDummyTab();
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
