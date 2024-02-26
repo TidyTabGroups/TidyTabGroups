@@ -72,20 +72,15 @@ export function isWindow(object: any): object is chrome.windows.Window {
 
 // opens a dummy tab in windows that have a chrome://extensions/* tab open
 export async function openDummyTab() {
-  const chromeExtensionManagerTabs = await chrome.tabs.query({ url: "chrome://extensions/*" });
+  const lastFocusedWindow = await chrome.windows.getLastFocused();
+  const [activeTab] = await chrome.tabs.query({ windowId: lastFocusedWindow.id, active: true });
 
-  const windowIds: ChromeWindowId[] = [];
-  chromeExtensionManagerTabs.forEach((tab) => {
-    if (!windowIds.includes(tab.windowId)) {
-      windowIds.push(tab.windowId);
-    }
-  });
-
-  if (windowIds.length === 0) {
+  if (!activeTab || !activeTab.url) {
     return;
   }
 
-  windowIds.forEach(async (windowId) => {
-    chrome.tabs.create({ windowId, url: "dummy-page.html", active: false, pinned: true, index: 0 });
-  });
+  const activeTabUrl = new URL(activeTab.url);
+  if (activeTabUrl.origin === "chrome://extensions") {
+    chrome.tabs.create({ windowId: lastFocusedWindow.id, url: "dummy-page.html", active: false, index: activeTab.index + 1 });
+  }
 }
