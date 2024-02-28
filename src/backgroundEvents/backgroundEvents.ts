@@ -34,7 +34,39 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   console.log(`onInstalled::reactivated all windows:`, newActiveWindows);
   await chrome.storage.local.set({ hasActivated: true });
 
+  // inject the content script into all tabs
+  const tabs = (await chrome.tabs.query({})) as ChromeTabWithId[];
+  for (const tab of tabs) {
+    chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["js/content_script.js"] });
+  }
+
   Misc.openDummyTab();
+}
+
+export async function onMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
+  if (!message || !message.type || !message.data) {
+    console.warn("onMessage::message is not valid:", message);
+    return;
+  }
+
+  console.log(`onMessage::message:`, message);
+
+  if (message.type === "primaryTabGroupTrigger") {
+    const { tab } = sender;
+    if (!tab || !tab.id) {
+      console.warn("onMessage::primaryTabGroupTrigger::sender.tab is not valid:", sender.tab);
+      return;
+    }
+    const { triggerType } = message.data;
+    console.log(`onMessage::primaryTabGroupTrigger::triggerType:`, triggerType);
+
+    if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      console.warn(`onMessage::primaryTabGroupTrigger::tab is not in a tab group`);
+      return;
+    }
+
+    await ActiveWindow.setPrimaryTabGroup(tab.id, tab.groupId);
+  }
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
@@ -62,13 +94,27 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
     // activate the last tab in the tab group
     const tabs = (await chrome.tabs.query({ groupId: tabGroup.id })) as ChromeTabWithId[];
     const lastTab = tabs[tabs.length - 1];
+    let shouldSetPrimaryTabGroupNow = false;
+    await new Promise<void>((resolve) => {
+      chrome.tabs.sendMessage(lastTab.id, { type: "enableAutoCollapseTrigger" }, () => {
+        if (chrome.runtime.lastError?.message === "Could not establish connection. Receiving end does not exist.") {
+          console.warn(`onTabGroupsUpdated::onTabGroupsUpdated::chrome.tabs.sendMessage::Receiving end does not exist for tab:`, lastTab);
+          // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
+          //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
+          shouldSetPrimaryTabGroupNow = true;
+        }
+        resolve();
+      });
+    });
     await Misc.activateTabAndWait(lastTab.id);
 
     const primaryTabGroup = await ActiveWindow.getPrimaryTabGroup(tabGroup.windowId);
     if (primaryTabGroup !== null && primaryTabGroup.id !== tabGroup.id) {
       await Misc.updateTabGroupAndWait(primaryTabGroup.id, { collapsed: true });
-      await chrome.tabGroups.move(tabGroup.id, { index: -1 });
-    } else if (wasCollapsed) {
+    }
+
+    if (shouldSetPrimaryTabGroupNow) {
+      await ActiveWindow.setPrimaryTabGroup(lastTab.id, lastTab.groupId);
     }
   }
 

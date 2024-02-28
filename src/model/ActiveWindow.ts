@@ -1,7 +1,7 @@
 import { IDBPTransaction, StoreNames } from "idb";
 import Database from "../database";
 import Types from "../types";
-import { ChromeWindowWithId, ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId } from "../types/types";
+import { ChromeWindowWithId, ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabGroupId, ChromeTabId } from "../types/types";
 import * as ActiveTabGroup from "./ActiveTabGroup";
 import Misc from "../misc";
 
@@ -175,4 +175,9 @@ export async function activateWindow(windowId: ChromeWindowId) {
 export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
   const tabGroupsOrdered = await Misc.getTabGroupsOrdered(windowId);
   return tabGroupsOrdered.length > 0 ? tabGroupsOrdered[tabGroupsOrdered.length - 1] : null;
+}
+
+export async function setPrimaryTabGroup(tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
+  await chrome.tabGroups.move(tabGroupId, { index: -1 });
+  await chrome.tabs.move(tabId, { index: -1 });
 }
