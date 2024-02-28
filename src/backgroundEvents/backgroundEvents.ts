@@ -43,7 +43,6 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
     return;
   }
 
-  // console.log(`onTabGroupsUpdated::tabGroup: `, tabGroup.title);
   const activeTabGroup = await ActiveTabGroup.get(tabGroup.id);
   if (!activeTabGroup) {
     Misc.onWindowError(tabGroup.windowId);
