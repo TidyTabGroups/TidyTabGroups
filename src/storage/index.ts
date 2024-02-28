@@ -1,4 +1,4 @@
-import { LocalStorageShape } from "../types";
+import { LocalStorageShape } from "../types/types";
 
 export const LOCAL_STORAGE_DEFAULT_VALUES: LocalStorageShape = {
   // TODO: remove these

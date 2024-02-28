@@ -1,6 +1,5 @@
-import { ActiveWindow } from "./ActiveWindow";
-import { ActiveWindowSpace } from "./ActiveWindowSpace";
-import { ActiveWindowTab } from "./ActiveWindowTab";
-import { SpaceAutoCollapseTimer } from "./SpaceAutoCollapseTimer";
+import * as ActiveWindow from "./ActiveWindow";
+import * as ActiveTabGroup from "./ActiveTabGroup";
+import * as ActiveTabGroupAutoCollapseTimer from "./ActiveTabGroupAutoCollapseTimer";
 
-export { ActiveWindow, ActiveWindowSpace, ActiveWindowTab, SpaceAutoCollapseTimer };
+export { ActiveWindow, ActiveTabGroup, ActiveTabGroupAutoCollapseTimer };

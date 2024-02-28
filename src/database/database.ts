@@ -1,6 +1,3 @@
-type IDBPStoreName<T extends DBSchema> = keyof T;
-type IDBPIndexName<T extends DBSchema> = keyof T["indexes"];
-
 interface StoreDescription<DBTypes extends DBSchema, StoreName extends StoreNames<DBTypes>> {
   name: StoreName;
   options?: IDBObjectStoreParameters;
@@ -20,7 +17,7 @@ interface Connection<T extends DBSchema> {
 }
 
 import { DBSchema, IDBPDatabase, IDBPTransaction, IndexNames, StoreNames, openDB, unwrap, wrap } from "idb";
-import { DataModel } from "../types";
+import { ModelDataBase } from "../types/types";
 
 const schemas = {
   model: {
@@ -29,50 +26,24 @@ const schemas = {
       {
         name: "activeWindows",
         options: {
+          keyPath: "windowId",
+        },
+      },
+      {
+        name: "activeTabGroups",
+        options: {
           keyPath: "id",
         },
-        indexes: [
-          {
-            name: "windowId" as keyof DataModel.ModelDB["activeWindows"]["indexes"],
-            keyPath: "windowId",
-            options: { unique: true },
-          },
-        ],
       },
       {
-        name: "activeSpaces",
+        name: "activeTabGroupAutoCollapseTimers",
         options: { keyPath: "id" },
         indexes: [
-          {
-            name: "activeWindowId" as keyof DataModel.ModelDB["activeSpaces"]["indexes"],
-            keyPath: "activeWindowId",
-            options: { unique: false },
-          },
-          {
-            name: "tabGroupId" as keyof DataModel.ModelDB["activeWindows"]["indexes"],
-            keyPath: "tabGroupInfo.id",
-            options: { unique: true },
-          },
+          { name: "windowId", keyPath: "windowId", options: { unique: true } },
+          { name: "tabGroupId", keyPath: "tabGroupId", options: { unique: true } },
         ],
       },
-      {
-        name: "activeTabs",
-        options: { keyPath: "id" },
-        indexes: [
-          { name: "activeWindowId", keyPath: "activeWindowId", options: { unique: false } },
-          { name: "activeSpaceId", keyPath: "activeSpaceId", options: { unique: false } },
-          { name: "tabId", keyPath: "tabInfo.id", options: { unique: true } },
-        ],
-      },
-      {
-        name: "spaceAutoCollapseTimers",
-        options: { keyPath: "id" },
-        indexes: [
-          { name: "activeWindowId", keyPath: "activeWindowId", options: { unique: false } },
-          { name: "activeSpaceId", keyPath: "activeSpaceId", options: { unique: true } },
-        ],
-      },
-    ] as StoreDescription<DataModel.ModelDB, StoreNames<DataModel.ModelDB>>[],
+    ] as StoreDescription<ModelDataBase, StoreNames<ModelDataBase>>[],
   },
 };
 
@@ -142,6 +113,7 @@ export function initializeDatabaseConnection<T extends DBSchema>(name: keyof typ
       connections[name] = db;
       pendingConnections[name].onSuccessListeners.forEach((listener) => listener(db));
       delete pendingConnections[name];
+      resolve();
     } catch (error) {
       pendingConnections[name].onErrorListeners.forEach((listener) => listener());
       delete pendingConnections[name];
