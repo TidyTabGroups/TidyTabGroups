@@ -185,7 +185,7 @@ export async function setPrimaryTabAndTabGroup(windowId: ChromeWindowId, tabId: 
     await Misc.moveTabGroupAndWait(tabGroupId, { index: -1 });
   }
 
-  const tabsInGroup = tabs.filter((tab) => tab.groupId === tab.groupId);
+  const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroupId);
   const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
   if (tabId !== lastTabInGroup.id) {
     await Misc.moveTabAndWait(tabId, { index: -1 });
