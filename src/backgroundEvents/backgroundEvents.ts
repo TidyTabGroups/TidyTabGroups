@@ -79,10 +79,17 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
 
 export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   const tab = (await chrome.tabs.get(activeInfo.tabId)) as ChromeTabWithId;
+  console.log(`onTabActivated::`, tab.title);
   if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+    const nonCollapsedTabGroups = (await chrome.tabGroups.query({ windowId: tab.windowId, collapsed: false })) as ChromeTabGroupWithId[];
+    await Promise.all(
+      nonCollapsedTabGroups.map(async (tabGroup) => {
+        await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
+      })
+    );
     return;
   }
-  console.log(`onTabActivated::`, tab.title);
+
   let triggerWasEnabled = await ActiveWindow.enablePrimaryTabTriggerForTab(tab.id);
   // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
   //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
