@@ -67,11 +67,7 @@ export async function update(
 }
 
 export async function reactivateAllWindows() {
-  const allObjectStores: Array<"activeWindows" | "activeTabGroups" | "activeTabGroupAutoCollapseTimers"> = [
-    "activeWindows",
-    "activeTabGroups",
-    "activeTabGroupAutoCollapseTimers",
-  ];
+  const allObjectStores: Array<"activeWindows" | "activeTabGroups"> = ["activeWindows", "activeTabGroups"];
   const transaction = await Database.createTransaction<Types.ModelDataBase, typeof allObjectStores, "readwrite">(
     "model",
     allObjectStores,
@@ -157,11 +153,11 @@ export async function activateWindow(windowId: ChromeWindowId) {
     await chrome.tabGroups.move(selectedTab.groupId, { index: -1 });
   }
 
-  const transaction = await Database.createTransaction<
-    Types.ModelDataBase,
-    ["activeWindows", "activeTabGroups", "activeTabGroupAutoCollapseTimers"],
+  const transaction = await Database.createTransaction<Types.ModelDataBase, ["activeWindows", "activeTabGroups"], "readwrite">(
+    "model",
+    ["activeWindows", "activeTabGroups"],
     "readwrite"
-  >("model", ["activeWindows", "activeTabGroups", "activeTabGroupAutoCollapseTimers"], "readwrite");
+  );
   await add({ windowId }, transaction);
   await Promise.all(
     tabGroups.map((tabGroup) => {

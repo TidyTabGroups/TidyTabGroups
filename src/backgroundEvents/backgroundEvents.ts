@@ -1,27 +1,6 @@
-import { ActiveWindow, ActiveTabGroup, ActiveTabGroupAutoCollapseTimer } from "../model";
+import { ActiveWindow } from "../model";
 import Misc from "../misc";
 import { ChromeTabGroupWithId, ChromeTabWithId } from "../types/types";
-
-export async function onAlarm(alarm: chrome.alarms.Alarm) {
-  console.log(`onAlarm::alarm:`, alarm.name);
-  debugger;
-  if (alarm.name.startsWith(Misc.ACTIVE_TAB_GROUP_AUTO_COLLAPSE_TIMER_BASE_NAME)) {
-    const activeTabGroupIdString = alarm.name.split(":")[1];
-    if (!activeTabGroupIdString) {
-      throw new Error(`onAlarm: No tab group id found in alarm name`);
-    }
-
-    const activeTabGroupId = parseInt(activeTabGroupIdString);
-    const autoCollapseTimer = await ActiveTabGroupAutoCollapseTimer.getFromIndex("tabGroupId", activeTabGroupId);
-    if (!autoCollapseTimer) {
-      throw new Error(`onAlarm: No autoCollapseTimer found`);
-    }
-
-    await ActiveTabGroup.makePrimaryTabGroup(autoCollapseTimer.tabGroupId);
-
-    await ActiveTabGroupAutoCollapseTimer.remove(autoCollapseTimer.id);
-  }
-}
 
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   console.log(`onInstalled::Extension was installed because of: ${details.reason}`);

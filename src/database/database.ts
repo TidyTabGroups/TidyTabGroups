@@ -35,14 +35,6 @@ const schemas = {
           keyPath: "id",
         },
       },
-      {
-        name: "activeTabGroupAutoCollapseTimers",
-        options: { keyPath: "id" },
-        indexes: [
-          { name: "windowId", keyPath: "windowId", options: { unique: true } },
-          { name: "tabGroupId", keyPath: "tabGroupId", options: { unique: true } },
-        ],
-      },
     ] as StoreDescription<ModelDataBase, StoreNames<ModelDataBase>>[],
   },
 };

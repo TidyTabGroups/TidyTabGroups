@@ -1,8 +1,5 @@
 import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../types/types";
 
-export const ACTIVE_TAB_GROUP_AUTO_COLLAPSE_TIMER_DURATION = 2500;
-export const ACTIVE_TAB_GROUP_AUTO_COLLAPSE_TIMER_BASE_NAME = "activeTabGroupAutoCollapseTimer";
-
 export function onWindowError(windowId: ChromeWindowId) {
   // TODO: re-activate the window
 }

@@ -9,11 +9,6 @@ export interface ModelDataBase extends DBSchema {
     value: ActiveTabGroup;
     key: ChromeTabGroupId;
   };
-  activeTabGroupAutoCollapseTimers: {
-    value: ActiveTabGroupAutoCollapseTimer;
-    key: string;
-    indexes: { windowId: ActiveTabGroupAutoCollapseTimer["windowId"]; tabGroupId: ActiveTabGroupAutoCollapseTimer["tabGroupId"] };
-  };
 }
 
 export interface ActiveWindow {
@@ -21,12 +16,6 @@ export interface ActiveWindow {
 }
 
 export type ActiveTabGroup = chrome.tabGroups.TabGroup;
-
-export interface ActiveTabGroupAutoCollapseTimer {
-  id: string;
-  tabGroupId: ChromeTabGroupId;
-  windowId: ChromeWindowId;
-}
 
 export type ChromeId = number;
 export type ChromeWindowId = ChromeId;
