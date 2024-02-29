@@ -64,26 +64,3 @@ export async function update(
     await transaction.done;
   }
 }
-
-export async function makePrimaryTabGroup(id: ChromeTabGroupId) {
-  const tabGroup = await chrome.tabGroups.get(id);
-  if (!tabGroup) {
-    throw new Error(`ActiveTabGroup::makePrimaryTabGroup::tabGroup with id ${id} not found`);
-  }
-
-  const transaction = await Database.createTransaction<Types.ModelDataBase, ["activeWindows", "activeTabGroups"], "readwrite">(
-    "model",
-    ["activeWindows", "activeTabGroups"],
-    "readwrite"
-  );
-
-  const activeTabGroupKey = await transaction.objectStore("activeTabGroups").getKey(id);
-  if (!activeTabGroupKey) {
-    throw new Error(`ActiveTabGroup::makePrimaryTabGroup::activeTabGroup with id ${id} not found`);
-  }
-
-  const prevPrimaryTabGroup = await ActiveWindow.getPrimaryTabGroup(tabGroup.windowId);
-  if (!prevPrimaryTabGroup || prevPrimaryTabGroup.id !== id) {
-    await chrome.tabGroups.move(tabGroup.id, { index: -1 });
-  }
-}
