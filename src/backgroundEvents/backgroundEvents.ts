@@ -17,7 +17,7 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
     chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["js/content_script.js"] });
   }
 
-  Misc.openDummyTab();
+  // Misc.openDummyTab();
 }
 
 export async function onMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
