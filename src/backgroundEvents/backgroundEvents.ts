@@ -42,7 +42,7 @@ export async function onMessage(message: any, sender: chrome.runtime.MessageSend
       return;
     }
 
-    await ActiveWindow.setPrimaryTabGroup(tab.id, tab.groupId);
+    ActiveWindow.setPrimaryTabAndTabGroup(tab.windowId, tab.id, tab.groupId);
   }
 }
 
@@ -84,6 +84,6 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
   //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
   if (!triggerWasEnabled) {
-    await ActiveWindow.setPrimaryTabGroup(tab.id, tab.groupId);
+    await ActiveWindow.setPrimaryTabAndTabGroup(tab.windowId, tab.id, tab.groupId);
   }
 }

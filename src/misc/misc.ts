@@ -81,6 +81,34 @@ export async function updateTabGroupAndWait(tabGroupId: ChromeTabGroupId, update
   return await Promise.all([onUpdatedPromise, updatePromise]);
 }
 
+export async function moveTabAndWait(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
+  const onMovedPromise = new Promise<void>((resolve, reject) => {
+    chrome.tabs.onMoved.addListener(async function onMoved(movedTabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) {
+      if (movedTabId === tabId) {
+        chrome.tabs.onMoved.removeListener(onMoved);
+        resolve();
+      }
+    });
+  });
+
+  const movePromise = chrome.tabs.move(tabId, moveProperties);
+  return await Promise.all([onMovedPromise, movePromise]);
+}
+
+export async function moveTabGroupAndWait(tabGroupId: ChromeTabGroupId, moveProperties: chrome.tabGroups.MoveProperties) {
+  const onMovedPromise = new Promise<void>((resolve, reject) => {
+    chrome.tabGroups.onMoved.addListener(async function onMoved(movedTabGroup: chrome.tabGroups.TabGroup) {
+      if (movedTabGroup.id === tabGroupId) {
+        chrome.tabGroups.onMoved.removeListener(onMoved);
+        resolve();
+      }
+    });
+  });
+
+  const movePromise = chrome.tabGroups.move(tabGroupId, moveProperties);
+  return await Promise.all([onMovedPromise, movePromise]);
+}
+
 export function tabGroupWasCollapsed(
   tabGroupCollapsed: chrome.tabGroups.TabGroup["collapsed"],
   prevTabGroupCollapsed: chrome.tabGroups.TabGroup["collapsed"]

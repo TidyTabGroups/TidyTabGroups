@@ -175,7 +175,21 @@ export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
 
 export async function setPrimaryTabGroup(tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
   await chrome.tabGroups.move(tabGroupId, { index: -1 });
-  await chrome.tabs.move(tabId, { index: -1 });
+}
+
+export async function setPrimaryTabAndTabGroup(windowId: ChromeWindowId, tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
+  const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
+  const tabGroupsOrdered = await Misc.getTabGroupsOrdered(tabs);
+  const primaryTabGroup = tabGroupsOrdered[tabGroupsOrdered.length - 1] as ChromeTabGroupWithId | undefined;
+  if (primaryTabGroup?.id !== tabGroupId) {
+    await Misc.moveTabGroupAndWait(tabGroupId, { index: -1 });
+  }
+
+  const tabsInGroup = tabs.filter((tab) => tab.groupId === tab.groupId);
+  const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
+  if (tabId !== lastTabInGroup.id) {
+    await Misc.moveTabAndWait(tabId, { index: -1 });
+  }
 }
 
 export async function enableAutoCollapseTriggerForTab(tabId: ChromeTabId) {
