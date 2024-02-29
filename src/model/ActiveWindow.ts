@@ -202,16 +202,16 @@ export async function setPrimaryTabAndTabGroup(windowId: ChromeWindowId, tabId: 
   }
 }
 
-export async function enableAutoCollapseTriggerForTab(tabOrTabId: ChromeTabId | ChromeTabWithId) {
+export async function enablePrimaryTabTriggerForTab(tabOrTabId: ChromeTabId | ChromeTabWithId) {
   const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
   if (tab.status !== "complete") {
     await ChromeWindowHelper.waitForTabToLoad(tab);
   }
 
   return new Promise<boolean>((resolve) => {
-    chrome.tabs.sendMessage(tab.id, { type: "enableAutoCollapseTrigger" }, () => {
+    chrome.tabs.sendMessage(tab.id, { type: "enablePrimaryTabTrigger" }, () => {
       if (chrome.runtime.lastError) {
-        console.warn(`enableAutoCollapseTriggerForTab::chrome.runtime.lastError for ${tab.id}:`, chrome.runtime.lastError.message);
+        console.warn(`enablePrimaryTabTriggerForTab::chrome.runtime.lastError for ${tab.id}:`, chrome.runtime.lastError.message);
         resolve(false);
       }
       resolve(true);

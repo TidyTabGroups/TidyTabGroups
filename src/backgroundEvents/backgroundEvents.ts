@@ -80,7 +80,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     return;
   }
   console.log(`onTabActivated::`, tab.title);
-  let triggerWasEnabled = await ActiveWindow.enableAutoCollapseTriggerForTab(tab.id);
+  let triggerWasEnabled = await ActiveWindow.enablePrimaryTabTriggerForTab(tab.id);
   // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
   //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
   if (!triggerWasEnabled) {
