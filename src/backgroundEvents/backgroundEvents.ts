@@ -29,10 +29,8 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
     // TODO: open the onboarding page
   }
 
-  await chrome.storage.local.set({ hasActivated: false });
   const newActiveWindows = await ActiveWindow.reactivateAllWindows();
   console.log(`onInstalled::reactivated all windows:`, newActiveWindows);
-  await chrome.storage.local.set({ hasActivated: true });
 
   // inject the content script into all tabs
   const tabs = (await chrome.tabs.query({})) as ChromeTabWithId[];
@@ -78,8 +76,9 @@ export async function onWindowCreated(window: chrome.windows.Window) {
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
-  const { hasActivated } = (await chrome.storage.local.get("hasActivated")) as { hasActivated: boolean };
-  if (!hasActivated) {
+  try {
+    await ActiveWindow.get(tabGroup.windowId);
+  } catch (error) {
     return;
   }
 
