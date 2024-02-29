@@ -181,8 +181,8 @@ export async function setPrimaryTabGroup(tabId: ChromeTabId, tabGroupId: ChromeT
 export async function enableAutoCollapseTriggerForTab(tabId: ChromeTabId) {
   return new Promise<boolean>((resolve) => {
     chrome.tabs.sendMessage(tabId, { type: "enableAutoCollapseTrigger" }, () => {
-      if (chrome.runtime.lastError?.message === "Could not establish connection. Receiving end does not exist.") {
-        console.warn(`enableAutoCollapseTriggerForTab::Receiving end does not exist for tab:`, tabId);
+      if (chrome.runtime.lastError) {
+        console.warn(`enableAutoCollapseTriggerForTab::Receiving end does not exist for tab:`, chrome.runtime.lastError.message);
         resolve(false);
       }
       resolve(true);

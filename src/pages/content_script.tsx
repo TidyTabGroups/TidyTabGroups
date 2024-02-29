@@ -9,6 +9,8 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   } else if (msg.type === "disableAutoCollapseTrigger") {
     primaryTabGroupTrigger = false;
   }
+
+  sendResponse();
 });
 
 
