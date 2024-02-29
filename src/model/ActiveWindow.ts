@@ -4,6 +4,7 @@ import Types from "../types";
 import { ChromeWindowWithId, ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabGroupId, ChromeTabId } from "../types/types";
 import * as ActiveTabGroup from "./ActiveTabGroup";
 import Misc from "../misc";
+import ChromeWindowHelper from "../chromeWindowHelper";
 
 export async function get(
   id: Types.ActiveWindow["windowId"],
@@ -115,7 +116,7 @@ export async function activateWindow(windowId: ChromeWindowId) {
   };
 
   let tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
-  let tabGroups = await Misc.getTabGroupsOrdered(tabs);
+  let tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
   const primaryTabGroupId = tabGroups.length > 0 ? tabGroups[tabGroups.length - 1].id : null;
 
   let { selectedTab, nonGroupedTabs } = getTabsInfo(tabs);
@@ -169,16 +170,16 @@ export async function activateWindow(windowId: ChromeWindowId) {
 }
 
 export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
-  const tabGroupsOrdered = await Misc.getTabGroupsOrdered(windowId);
+  const tabGroupsOrdered = await ChromeWindowHelper.getTabGroupsOrdered(windowId);
   return tabGroupsOrdered.length > 0 ? tabGroupsOrdered[tabGroupsOrdered.length - 1] : null;
 }
 
 export async function setPrimaryTabAndTabGroup(windowId: ChromeWindowId, tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
   const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
-  const tabGroupsOrdered = await Misc.getTabGroupsOrdered(tabs);
+  const tabGroupsOrdered = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
   const primaryTabGroup = tabGroupsOrdered[tabGroupsOrdered.length - 1] as ChromeTabGroupWithId | undefined;
   if (primaryTabGroup?.id !== tabGroupId) {
-    await Misc.moveTabGroupAndWait(tabGroupId, { index: -1 });
+    await ChromeWindowHelper.moveTabGroupAndWait(tabGroupId, { index: -1 });
   }
 
   const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroupId);
@@ -187,7 +188,7 @@ export async function setPrimaryTabAndTabGroup(windowId: ChromeWindowId, tabId: 
     tryToMove();
     async function tryToMove() {
       try {
-        await Misc.moveTabAndWait(tabId, { index: -1 });
+        await ChromeWindowHelper.moveTabAndWait(tabId, { index: -1 });
       } catch (error) {
         // @ts-ignore
         if (error?.message === "Tabs cannot be edited right now (user may be dragging a tab).") {

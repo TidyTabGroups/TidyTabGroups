@@ -1,6 +1,6 @@
 import { ActiveWindow } from "../model";
-import Misc from "../misc";
 import { ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId } from "../types/types";
+import ChromeWindowHelper from "../chromeWindowHelper";
 
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   console.log(`onInstalled::Extension was installed because of: ${details.reason}`);
@@ -57,7 +57,7 @@ export async function onWindowCreated(window: chrome.windows.Window) {
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   console.log(`onTabGroupsUpdated::tabGroup:`, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
-  const tabGroupsOrdered = await Misc.getTabGroupsOrdered(tabs);
+  const tabGroupsOrdered = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
   const primaryTabGroup = tabGroupsOrdered[tabGroupsOrdered.length - 1] as ChromeTabGroupWithId | undefined;
   if (!tabGroup.collapsed && primaryTabGroup?.id !== tabGroup.id) {
     // if the active tab isnt already in this group, activate the last tab in the group
@@ -65,11 +65,11 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
     const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
     if (!activeTabInGroup) {
       const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
-      await Misc.activateTabAndWait(lastTabInGroup.id);
+      await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
     }
 
     if (primaryTabGroup) {
-      await Misc.updateTabGroupAndWait(primaryTabGroup.id, { collapsed: true });
+      await ChromeWindowHelper.updateTabGroupAndWait(primaryTabGroup.id, { collapsed: true });
     }
   }
 }
