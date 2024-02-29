@@ -173,10 +173,6 @@ export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
   return tabGroupsOrdered.length > 0 ? tabGroupsOrdered[tabGroupsOrdered.length - 1] : null;
 }
 
-export async function setPrimaryTabGroup(tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
-  await chrome.tabGroups.move(tabGroupId, { index: -1 });
-}
-
 export async function setPrimaryTabAndTabGroup(windowId: ChromeWindowId, tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
   const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
   const tabGroupsOrdered = await Misc.getTabGroupsOrdered(tabs);
