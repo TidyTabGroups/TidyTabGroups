@@ -18,3 +18,8 @@ export async function openDummyTab() {
     chrome.tabs.create({ windowId: lastFocusedWindow.id, url: "dummy-page.html", active: false, index: activeTab.index + 1 });
   }
 }
+
+export async function getTabFromTabOrTabId(tabOrTabId: ChromeTabId | ChromeTabWithId) {
+  const tab = typeof tabOrTabId === "number" ? ((await chrome.tabs.get(tabOrTabId)) as ChromeTabWithId) : tabOrTabId;
+  return tab;
+}

@@ -1,4 +1,5 @@
 import { ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabId, ChromeTabGroupId } from "../types/types";
+import Misc from "../misc";
 
 export async function getTabGroupsOrdered(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[], tabGroupsToOrder?: ChromeTabGroupWithId[]) {
   // Since querying tabs returns them in an ordered list, we can use that data to get the ordered list of tab group ids
@@ -102,6 +103,22 @@ export async function callWithUserTabDraggingHandler(fn: () => Promise<any>): Pr
       throw error;
     }
   }
+}
+
+export async function waitForTabToLoad(tabOrTabId: ChromeTabId | ChromeTabWithId) {
+  const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
+  if (tab.status === "complete") {
+    return;
+  }
+
+  return new Promise<void>((resolve) => {
+    chrome.tabs.onUpdated.addListener(function onUpdated(tabId, changeInfo, tab) {
+      if (tabId === tab.id && changeInfo.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+        resolve();
+      }
+    });
+  });
 }
 
 export function tabGroupWasCollapsed(
