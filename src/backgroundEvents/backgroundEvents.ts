@@ -57,9 +57,7 @@ export async function onWindowCreated(window: chrome.windows.Window) {
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   console.log(`onTabGroupsUpdated::tabGroup:`, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
-  const tabGroupsOrdered = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
-  const primaryTabGroup = tabGroupsOrdered[tabGroupsOrdered.length - 1] as ChromeTabGroupWithId | undefined;
-  if (!tabGroup.collapsed && primaryTabGroup?.id !== tabGroup.id) {
+  if (!tabGroup.collapsed) {
     // if the active tab isnt already in this group, activate the last tab in the group
     const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
     const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
@@ -68,9 +66,14 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
     }
 
-    if (primaryTabGroup) {
-      await ChromeWindowHelper.updateTabGroupAndWait(primaryTabGroup.id, { collapsed: true });
-    }
+    const otherNonCollapsedTabGroups = (await chrome.tabGroups.query({ windowId: tabGroup.windowId, collapsed: false })).filter(
+      (otherTabGroup) => otherTabGroup.id !== tabGroup.id
+    ) as ChromeTabGroupWithId[];
+    await Promise.all(
+      otherNonCollapsedTabGroups.map(async (tabGroup) => {
+        await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
+      })
+    );
   }
 }
 
