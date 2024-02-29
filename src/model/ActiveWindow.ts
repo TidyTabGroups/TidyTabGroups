@@ -177,3 +177,15 @@ export async function setPrimaryTabGroup(tabId: ChromeTabId, tabGroupId: ChromeT
   await chrome.tabGroups.move(tabGroupId, { index: -1 });
   await chrome.tabs.move(tabId, { index: -1 });
 }
+
+export async function enableAutoCollapseTriggerForTab(tabId: ChromeTabId) {
+  return new Promise<boolean>((resolve) => {
+    chrome.tabs.sendMessage(tabId, { type: "enableAutoCollapseTrigger" }, () => {
+      if (chrome.runtime.lastError?.message === "Could not establish connection. Receiving end does not exist.") {
+        console.warn(`enableAutoCollapseTriggerForTab::Receiving end does not exist for tab:`, tabId);
+        resolve(false);
+      }
+      resolve(true);
+    });
+  });
+}

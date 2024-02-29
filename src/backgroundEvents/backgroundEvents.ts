@@ -1,6 +1,6 @@
 import { ActiveWindow } from "../model";
 import Misc from "../misc";
-import { ChromeTabGroupWithId, ChromeTabWithId } from "../types/types";
+import { ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId } from "../types/types";
 
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   console.log(`onInstalled::Extension was installed because of: ${details.reason}`);
@@ -60,32 +60,30 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   const tabGroupsOrdered = await Misc.getTabGroupsOrdered(tabs);
   const primaryTabGroup = tabGroupsOrdered[tabGroupsOrdered.length - 1] as ChromeTabGroupWithId | undefined;
   if (!tabGroup.collapsed && primaryTabGroup?.id !== tabGroup.id) {
-    // activate the last tab in the tab group
+    // if the active tab isnt already in this group, activate the last tab in the group
     const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
     const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
-    const newPrimaryTab = activeTabInGroup || tabsInGroup[tabsInGroup.length - 1];
-    let shouldSetPrimaryTabGroupNow = false;
-    await new Promise<void>((resolve) => {
-      chrome.tabs.sendMessage(newPrimaryTab.id, { type: "enableAutoCollapseTrigger" }, () => {
-        if (chrome.runtime.lastError?.message === "Could not establish connection. Receiving end does not exist.") {
-          console.warn(`onTabGroupsUpdated::onTabGroupsUpdated::chrome.tabs.sendMessage::Receiving end does not exist for tab:`, newPrimaryTab);
-          // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
-          //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
-          shouldSetPrimaryTabGroupNow = true;
-        }
-        resolve();
-      });
-    });
-    if (!newPrimaryTab.active) {
-      await Misc.activateTabAndWait(newPrimaryTab.id);
+    if (!activeTabInGroup) {
+      const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
+      await Misc.activateTabAndWait(lastTabInGroup.id);
     }
 
     if (primaryTabGroup) {
       await Misc.updateTabGroupAndWait(primaryTabGroup.id, { collapsed: true });
     }
+  }
+}
 
-    if (shouldSetPrimaryTabGroupNow) {
-      await ActiveWindow.setPrimaryTabGroup(newPrimaryTab.id, newPrimaryTab.groupId);
-    }
+export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
+  const tab = (await chrome.tabs.get(activeInfo.tabId)) as ChromeTabWithId;
+  if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+    return;
+  }
+  console.log(`onTabActivated::`, tab.title);
+  let triggerWasEnabled = await ActiveWindow.enableAutoCollapseTriggerForTab(tab.id);
+  // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
+  //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
+  if (!triggerWasEnabled) {
+    await ActiveWindow.setPrimaryTabGroup(tab.id, tab.groupId);
   }
 }
