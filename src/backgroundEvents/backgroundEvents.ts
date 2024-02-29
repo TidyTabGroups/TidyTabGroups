@@ -1,6 +1,6 @@
 import { ActiveWindow, ActiveTabGroup, ActiveTabGroupAutoCollapseTimer } from "../model";
 import Misc from "../misc";
-import { ChromeTabWithId } from "../types/types";
+import { ChromeTabGroupWithId, ChromeTabWithId } from "../types/types";
 
 export async function onAlarm(alarm: chrome.alarms.Alarm) {
   console.log(`onAlarm::alarm:`, alarm.name);
@@ -76,36 +76,20 @@ export async function onWindowCreated(window: chrome.windows.Window) {
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
-  try {
-    await ActiveWindow.get(tabGroup.windowId);
-  } catch (error) {
-    return;
-  }
-
-  const activeTabGroup = await ActiveTabGroup.get(tabGroup.id);
-  if (!activeTabGroup) {
-    Misc.onWindowError(tabGroup.windowId);
-    throw new Error(`onTabGroupsUpdated::activeTabGroup with id ${tabGroup.id} not found`);
-  }
-
-  const existingActiveTabGroupAutoCollapseTimer = await ActiveTabGroupAutoCollapseTimer.getFromIndex("windowId", tabGroup.windowId);
-  if (existingActiveTabGroupAutoCollapseTimer) {
-    chrome.alarms.clear(`${Misc.ACTIVE_TAB_GROUP_AUTO_COLLAPSE_TIMER_BASE_NAME}:${existingActiveTabGroupAutoCollapseTimer.tabGroupId}`);
-    await ActiveTabGroupAutoCollapseTimer.remove(existingActiveTabGroupAutoCollapseTimer.id);
-  }
-
-  const wasCollapsed = tabGroup.collapsed && !activeTabGroup.collapsed;
-  const wasExpanded = !tabGroup.collapsed && activeTabGroup.collapsed;
-
-  if (wasExpanded) {
+  console.log(`onTabGroupsUpdated::tabGroup:`, tabGroup.title, tabGroup.collapsed, tabGroup.color);
+  const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
+  const tabGroupsOrdered = await Misc.getTabGroupsOrdered(tabs);
+  const primaryTabGroup = tabGroupsOrdered[tabGroupsOrdered.length - 1] as ChromeTabGroupWithId | undefined;
+  if (!tabGroup.collapsed && primaryTabGroup?.id !== tabGroup.id) {
     // activate the last tab in the tab group
-    const tabs = (await chrome.tabs.query({ groupId: tabGroup.id })) as ChromeTabWithId[];
-    const lastTab = tabs[tabs.length - 1];
+    const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
+    const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
+    const newPrimaryTab = activeTabInGroup || tabsInGroup[tabsInGroup.length - 1];
     let shouldSetPrimaryTabGroupNow = false;
     await new Promise<void>((resolve) => {
-      chrome.tabs.sendMessage(lastTab.id, { type: "enableAutoCollapseTrigger" }, () => {
+      chrome.tabs.sendMessage(newPrimaryTab.id, { type: "enableAutoCollapseTrigger" }, () => {
         if (chrome.runtime.lastError?.message === "Could not establish connection. Receiving end does not exist.") {
-          console.warn(`onTabGroupsUpdated::onTabGroupsUpdated::chrome.tabs.sendMessage::Receiving end does not exist for tab:`, lastTab);
+          console.warn(`onTabGroupsUpdated::onTabGroupsUpdated::chrome.tabs.sendMessage::Receiving end does not exist for tab:`, newPrimaryTab);
           // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
           //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
           shouldSetPrimaryTabGroupNow = true;
@@ -113,17 +97,16 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
         resolve();
       });
     });
-    await Misc.activateTabAndWait(lastTab.id);
+    if (!newPrimaryTab.active) {
+      await Misc.activateTabAndWait(newPrimaryTab.id);
+    }
 
-    const primaryTabGroup = await ActiveWindow.getPrimaryTabGroup(tabGroup.windowId);
-    if (primaryTabGroup !== null && primaryTabGroup.id !== tabGroup.id) {
+    if (primaryTabGroup) {
       await Misc.updateTabGroupAndWait(primaryTabGroup.id, { collapsed: true });
     }
 
     if (shouldSetPrimaryTabGroupNow) {
-      await ActiveWindow.setPrimaryTabGroup(lastTab.id, lastTab.groupId);
+      await ActiveWindow.setPrimaryTabGroup(newPrimaryTab.id, newPrimaryTab.groupId);
     }
   }
-
-  await ActiveTabGroup.update(tabGroup.id, tabGroup);
 }
