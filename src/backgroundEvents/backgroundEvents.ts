@@ -69,6 +69,14 @@ export async function onMessage(message: any, sender: chrome.runtime.MessageSend
   }
 }
 
+export async function onWindowCreated(window: chrome.windows.Window) {
+  if (window.type !== "normal" || !window.id) {
+    return;
+  }
+  console.log(`onWindowCreated::window:`, window);
+  const newActiveWindow = await ActiveWindow.activateWindow(window.id);
+}
+
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   const { hasActivated } = (await chrome.storage.local.get("hasActivated")) as { hasActivated: boolean };
   if (!hasActivated) {
