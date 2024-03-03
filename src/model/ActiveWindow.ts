@@ -185,20 +185,7 @@ export async function setPrimaryTabAndTabGroup(windowId: ChromeWindowId, tabId: 
   const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroupId);
   const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
   if (tabId !== lastTabInGroup.id) {
-    tryToMove();
-    async function tryToMove() {
-      try {
-        await ChromeWindowHelper.moveTabAndWait(tabId, { index: -1 });
-      } catch (error) {
-        // @ts-ignore
-        if (error?.message === "Tabs cannot be edited right now (user may be dragging a tab).") {
-          console.log(`onTabActivated::setPrimaryTabAndTabGroup::user may be dragging a tab`, error);
-          tryToMove();
-        } else {
-          throw error;
-        }
-      }
-    }
+    await ChromeWindowHelper.moveTabAndWait(tabId, { index: -1 });
   }
 }
 
