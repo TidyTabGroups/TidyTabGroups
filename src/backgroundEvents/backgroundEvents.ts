@@ -30,19 +30,14 @@ export async function onMessage(message: any, sender: chrome.runtime.MessageSend
 
   if (message.type === "primaryTabGroupTrigger") {
     const { tab } = sender;
-    if (!tab || !tab.id) {
-      console.warn("onMessage::primaryTabGroupTrigger::sender.tab is not valid:", sender.tab);
+    if (!tab || !tab.id || tab.pinned) {
+      console.warn("onMessage::primaryTabGroupTrigger::sender.tab is not valid:", sender);
       return;
     }
     const { triggerType } = message.data;
     console.log(`onMessage::primaryTabGroupTrigger::triggerType:`, triggerType);
 
-    if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-      console.warn(`onMessage::primaryTabGroupTrigger::tab is not in a tab group`);
-      return;
-    }
-
-    ActiveWindow.setPrimaryTabAndTabGroup(tab.windowId, tab.id, tab.groupId);
+    ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
   }
 }
 
@@ -65,35 +60,27 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
       await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
     }
-
-    const otherNonCollapsedTabGroups = (await chrome.tabGroups.query({ windowId: tabGroup.windowId, collapsed: false })).filter(
-      (otherTabGroup) => otherTabGroup.id !== tabGroup.id
-    ) as ChromeTabGroupWithId[];
-    await Promise.all(
-      otherNonCollapsedTabGroups.map(async (tabGroup) => {
-        await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
-      })
-    );
   }
 }
 
 export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   const tab = (await chrome.tabs.get(activeInfo.tabId)) as ChromeTabWithId;
   console.log(`onTabActivated::`, tab.title);
-  if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-    const nonCollapsedTabGroups = (await chrome.tabGroups.query({ windowId: tab.windowId, collapsed: false })) as ChromeTabGroupWithId[];
-    await Promise.all(
-      nonCollapsedTabGroups.map(async (tabGroup) => {
-        await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
-      })
-    );
-    return;
-  }
+  const tabGroups = (await chrome.tabGroups.query({ windowId: tab.windowId, collapsed: false })) as ChromeTabGroupWithId[];
+  const otherNonCollapsedTabGroups =
+    tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE ? tabGroups.filter((tabGroup) => tabGroup.id !== tab.groupId) : tabGroups;
+  await Promise.all(
+    otherNonCollapsedTabGroups.map(async (tabGroup) => {
+      await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
+    })
+  );
 
-  let triggerWasEnabled = await ActiveWindow.enablePrimaryTabTriggerForTab(tab.id);
-  // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
-  //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
-  if (!triggerWasEnabled) {
-    await ActiveWindow.setPrimaryTabAndTabGroup(tab.windowId, tab.id, tab.groupId);
+  if (!tab.pinned) {
+    let triggerWasEnabled = await ActiveWindow.enablePrimaryTabTriggerForTab(tab.id);
+    // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
+    //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
+    if (!triggerWasEnabled) {
+      await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
+    }
   }
 }

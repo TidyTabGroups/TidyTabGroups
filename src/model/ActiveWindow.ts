@@ -174,17 +174,29 @@ export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
   return tabGroupsOrdered.length > 0 ? tabGroupsOrdered[tabGroupsOrdered.length - 1] : null;
 }
 
-export async function setPrimaryTabAndTabGroup(windowId: ChromeWindowId, tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
+export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
   const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
-  const tabGroupsOrdered = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
-  const primaryTabGroup = tabGroupsOrdered[tabGroupsOrdered.length - 1] as ChromeTabGroupWithId | undefined;
-  if (primaryTabGroup?.id !== tabGroupId) {
-    await ChromeWindowHelper.moveTabGroupAndWait(tabGroupId, { index: -1 });
+  const tab = tabs.find((tab) => tab.id === tabId);
+  if (!tab) {
+    throw new Error(`setPrimaryTab::tabId ${tabId} not found in windowId ${windowId}`);
   }
 
-  const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroupId);
-  const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
-  if (tabId !== lastTabInGroup.id) {
+  let shouldMoveTab = false;
+  if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+    const tabsInGroup = tabs.filter((otherTab) => otherTab.groupId === tab.groupId);
+    const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
+    if (lastTabInGroup.index < tabs[tabs.length - 1].index) {
+      await ChromeWindowHelper.moveTabGroupAndWait(tab.groupId, { index: -1 });
+    }
+
+    if (tab.index < lastTabInGroup.index) {
+      shouldMoveTab = true;
+    }
+  } else if (tab.index < tabs[tabs.length - 1].index) {
+    shouldMoveTab = true;
+  }
+
+  if (shouldMoveTab) {
     await ChromeWindowHelper.moveTabAndWait(tabId, { index: -1 });
   }
 }
