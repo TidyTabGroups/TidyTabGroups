@@ -6,6 +6,7 @@ import Database from "../database";
   chrome.tabGroups.onUpdated.addListener(BackgroundEvents.onTabGroupsUpdated);
   chrome.tabs.onActivated.addListener(BackgroundEvents.onTabActivated);
   chrome.windows.onCreated.addListener(BackgroundEvents.onWindowCreated);
+  chrome.tabs.onCreated.addListener(BackgroundEvents.onTabCreated);
 
   Database.initializeDatabaseConnection("model");
 })();

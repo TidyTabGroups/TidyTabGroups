@@ -84,3 +84,15 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     }
   }
 }
+
+export async function onTabCreated(tab: chrome.tabs.Tab) {
+  const primaryTabGroup = await ActiveWindow.getPrimaryTabGroup(tab.windowId);
+  if (!primaryTabGroup) {
+    return;
+  }
+
+  const tabs = (await chrome.tabs.query({ windowId: tab.windowId })) as ChromeTabWithId[];
+  if (tabs.length > 1 && tabs[tabs.length - 2].groupId === primaryTabGroup.id) {
+    await chrome.tabs.group({ tabIds: tab.id, groupId: primaryTabGroup.id });
+  }
+}
