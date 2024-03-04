@@ -28,14 +28,14 @@ export async function onMessage(message: any, sender: chrome.runtime.MessageSend
 
   console.log(`onMessage::message:`, message);
 
-  if (message.type === "primaryTabGroupTrigger") {
+  if (message.type === "primaryTabTrigger") {
     const { tab } = sender;
     if (!tab || !tab.id || tab.pinned) {
-      console.warn("onMessage::primaryTabGroupTrigger::sender.tab is not valid:", sender);
+      console.warn("onMessage::primaryTabTrigger::sender.tab is not valid:", sender);
       return;
     }
     const { triggerType } = message.data;
-    console.log(`onMessage::primaryTabGroupTrigger::triggerType:`, triggerType);
+    console.log(`onMessage::primaryTabTrigger::triggerType:`, triggerType);
 
     ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
   }

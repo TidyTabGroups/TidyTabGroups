@@ -1,18 +1,18 @@
 import DetachableDOM from "../detachableDOM";
 
-let primaryTabGroupTrigger = false;
-let primaryTabGroupTriggerTimeoutId: number | null = null
+let primaryTabTrigger = false;
+let primaryTabTriggerTimeoutId: number | null = null
 
-function onPrimaryTabGroupTriggerTimeout() {
-  chrome.runtime.sendMessage({ type: "primaryTabGroupTrigger", data: { triggerType: "mouseenter" } });
+function onPrimaryTabTriggerTimeout() {
+  chrome.runtime.sendMessage({ type: "primaryTabTrigger", data: { triggerType: "mouseenter" } });
 }
 
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   console.log("content_script.tsx::onMessage::msg:", msg);
   if (msg.type === "enablePrimaryTabTrigger") {
-    primaryTabGroupTrigger = true;
+    primaryTabTrigger = true;
   } else if (msg.type === "disablePrimaryTabTrigger") {
-    primaryTabGroupTrigger = false;
+    primaryTabTrigger = false;
   }
 
   sendResponse();
@@ -21,16 +21,16 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 
 DetachableDOM.addEventListener(document, "mouseenter", event => {
   console.log("mouseenter event:", event);
-  if(primaryTabGroupTrigger) {
-    primaryTabGroupTriggerTimeoutId = DetachableDOM.setTimeout(onPrimaryTabGroupTriggerTimeout, 500);
-    primaryTabGroupTrigger = false;
+  if(primaryTabTrigger) {
+    primaryTabTriggerTimeoutId = DetachableDOM.setTimeout(onPrimaryTabTriggerTimeout, 500);
+    primaryTabTrigger = false;
   }
 }, true)
 
 DetachableDOM.addEventListener(document, "mouseleave", event => {
   console.log("mouseleave event:", event);
-  if(primaryTabGroupTriggerTimeoutId !== null) {
-    DetachableDOM.clearTimeout(primaryTabGroupTriggerTimeoutId)
-    primaryTabGroupTrigger = true
+  if(primaryTabTriggerTimeoutId !== null) {
+    DetachableDOM.clearTimeout(primaryTabTriggerTimeoutId)
+    primaryTabTrigger = true
   }
 }, true)
