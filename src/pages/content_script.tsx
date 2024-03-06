@@ -20,17 +20,26 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 
 
 DetachableDOM.addEventListener(document, "mouseenter", event => {
-  console.log("mouseenter event:", event);
+  if(event.target !== document) {
+    return
+  }
+
   if(primaryTabTrigger) {
+    console.log("ttg::mouseenter", event);
     primaryTabTriggerTimeoutId = DetachableDOM.setTimeout(onPrimaryTabTriggerTimeout, 500);
     primaryTabTrigger = false;
   }
 }, true)
 
 DetachableDOM.addEventListener(document, "mouseleave", event => {
-  console.log("mouseleave event:", event);
+  if(event.target !== document) {
+    return
+  }
+
   if(primaryTabTriggerTimeoutId !== null) {
+    console.log("ttg:mouseleave:", event);
     DetachableDOM.clearTimeout(primaryTabTriggerTimeoutId)
+    primaryTabTriggerTimeoutId = null;
     primaryTabTrigger = true
   }
 }, true)
