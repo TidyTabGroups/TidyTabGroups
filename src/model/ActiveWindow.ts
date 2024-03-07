@@ -103,36 +103,21 @@ export async function activateWindow(windowId: ChromeWindowId) {
     throw new Error(`activateWindow::window with id ${window} is not a normal window`);
   }
 
-  const getTabsInfo = (tabs: ChromeTabWithId[]) => {
-    let selectedTab: ChromeTabWithId | undefined;
-    let nonGroupedTabs: ChromeTabWithId[] = [];
-    tabs.forEach((tab) => {
-      if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-        nonGroupedTabs.push(tab);
-      }
-      if (tab.active) {
-        selectedTab = tab;
-      }
-    });
+  const getSelectedTab = (tabs: ChromeTabWithId[]) => {
+    let selectedTab = tabs.find((tab) => tab.active);
     if (!selectedTab) {
       throw new Error(`activateWindow::Error: No selected tab found`);
     }
-    return {
-      selectedTab,
-      nonGroupedTabs,
-    };
+    return selectedTab;
   };
 
   let tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
   let tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
-  const primaryTabGroupId = tabGroups.length > 0 ? tabGroups[tabGroups.length - 1].id : null;
-
-  let { selectedTab, nonGroupedTabs } = getTabsInfo(tabs);
+  let selectedTab = getSelectedTab(tabs);
 
   // adjust the "shape" of the new active window, using the following adjustments:
   // 1. collapse all but the selected tab group
-  // 2. move all non grouped tabs to before all the tab groups
-  // 3. move the selected tab group to the end position, making it the new primary tab group
+  // 2. start the primary tab trigger for the active tab
 
   // adjustment 1
   tabGroups = await Promise.all(
@@ -145,22 +130,7 @@ export async function activateWindow(windowId: ChromeWindowId) {
   );
 
   // adjustment 2
-  if (nonGroupedTabs.length > 0) {
-    const pinnedTabs = nonGroupedTabs.filter((tab) => tab.pinned);
-    await chrome.tabs.move(
-      nonGroupedTabs.map((tab) => tab.id),
-      { windowId, index: pinnedTabs.length }
-    );
-    tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
-    const newTabsInfo = getTabsInfo(tabs);
-    selectedTab = newTabsInfo.selectedTab;
-    nonGroupedTabs = newTabsInfo.nonGroupedTabs;
-  }
-
-  // adjustment 3
-  if (selectedTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && selectedTab.groupId !== primaryTabGroupId) {
-    await chrome.tabGroups.move(selectedTab.groupId, { index: -1 });
-  }
+  await enablePrimaryTabTriggerForTab(selectedTab.id);
 
   const transaction = await Database.createTransaction<Types.ModelDataBase, ["activeWindows", "activeTabGroups"], "readwrite">(
     "model",
@@ -215,13 +185,12 @@ export async function enablePrimaryTabTriggerForTab(tabOrTabId: ChromeTabId | Ch
     await ChromeWindowHelper.waitForTabToLoad(tab);
   }
 
-  return new Promise<boolean>((resolve) => {
-    chrome.tabs.sendMessage(tab.id, { type: "enablePrimaryTabTrigger" }, () => {
-      if (chrome.runtime.lastError) {
-        console.warn(`enablePrimaryTabTriggerForTab::chrome.runtime.lastError for ${tab.id}:`, chrome.runtime.lastError.message);
-        resolve(false);
-      }
-      resolve(true);
-    });
+  chrome.tabs.sendMessage(tab.id, { type: "enablePrimaryTabTrigger" }, async () => {
+    if (chrome.runtime.lastError) {
+      console.warn(`enablePrimaryTabTriggerForTab::chrome.runtime.lastError for ${tab.id}:`, chrome.runtime.lastError.message);
+      // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
+      //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
+      await setPrimaryTab(tab.windowId, tab.id);
+    }
   });
 }
