@@ -1,5 +1,5 @@
 import { ActiveWindow } from "../model";
-import { ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId } from "../types/types";
+import { ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
@@ -47,9 +47,22 @@ export async function onWindowCreated(window: chrome.windows.Window) {
   }
   console.log(`onWindowCreated::window:`, window);
   const newActiveWindow = await ActiveWindow.activateWindow(window.id);
+  console.log(`onWindowCreated::newActiveWindow:`, newActiveWindow);
+}
+
+export async function onWindowRemoved(windowId: ChromeWindowId) {
+  console.log(`onWindowRemoved::windowId:`, windowId);
+  await ActiveWindow.remove(windowId);
+  console.log(`onWindowRemoved::removedActiveWindow:`, windowId);
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
+  const activeWindowId = await ActiveWindow.getKey(tabGroup.windowId);
+  if (!activeWindowId) {
+    console.warn(`onTabGroupsUpdated::activeWindow not found for windowId:`, tabGroup.windowId);
+    return;
+  }
+
   console.log(`onTabGroupsUpdated::tabGroup:`, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
   if (!tabGroup.collapsed) {
@@ -64,6 +77,12 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
 }
 
 export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
+  const activeWindowId = await ActiveWindow.getKey(activeInfo.windowId);
+  if (!activeWindowId) {
+    console.warn(`onTabActivated::activeWindow not found for windowId:`, activeInfo.windowId);
+    return;
+  }
+
   const tab = (await chrome.tabs.get(activeInfo.tabId)) as ChromeTabWithId;
   console.log(`onTabActivated::`, tab.title);
   const tabGroups = (await chrome.tabGroups.query({ windowId: tab.windowId, collapsed: false })) as ChromeTabGroupWithId[];
@@ -76,16 +95,17 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   );
 
   if (!tab.pinned) {
-    let triggerWasEnabled = await ActiveWindow.enablePrimaryTabTriggerForTab(tab.id);
-    // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
-    //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
-    if (!triggerWasEnabled) {
-      await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
-    }
+    await ActiveWindow.enablePrimaryTabTriggerForTab(tab.id);
   }
 }
 
 export async function onTabCreated(tab: chrome.tabs.Tab) {
+  const activeWindowId = await ActiveWindow.getKey(tab.windowId);
+  if (!activeWindowId) {
+    console.warn(`onTabCreated::activeWindow not found for windowId:`, tab.windowId);
+    return;
+  }
+
   const primaryTabGroup = await ActiveWindow.getPrimaryTabGroup(tab.windowId);
   if (!primaryTabGroup) {
     return;
