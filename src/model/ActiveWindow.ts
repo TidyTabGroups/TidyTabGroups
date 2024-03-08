@@ -103,31 +103,30 @@ export async function activateWindow(windowId: ChromeWindowId) {
     throw new Error(`activateWindow::window with id ${window} is not a normal window`);
   }
 
-  const getSelectedTab = (tabs: ChromeTabWithId[]) => {
-    let selectedTab = tabs.find((tab) => tab.active);
-    if (!selectedTab) {
-      throw new Error(`activateWindow::Error: No selected tab found`);
-    }
-    return selectedTab;
-  };
-
-  let tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
-  let tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
-  let selectedTab = getSelectedTab(tabs);
+  const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
+  const selectedTab = tabs.find((tab) => tab.active);
+  if (!selectedTab) {
+    throw new Error(`activateWindow::window with id ${windowId} has no active tab`);
+  }
+  const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
 
   // adjust the "shape" of the new active window, using the following adjustments:
   // 1. collapse all but the selected tab group
   // 2. start the primary tab trigger for the active tab
 
   // adjustment 1
-  tabGroups = await Promise.all(
-    tabGroups.map(async (tabGroup) => {
-      if (tabGroup.id !== selectedTab.groupId) {
-        return await chrome.tabGroups.update(tabGroup.id, { collapsed: true });
-      }
-      return tabGroup;
-    })
-  );
+  const remaingTabGroupsToCollapse = tabGroups.filter((tabGroup) => tabGroup.id !== selectedTab.groupId);
+  const collapseNextTabGroup = async () => {
+    const tabGroup = remaingTabGroupsToCollapse.pop();
+    if (!tabGroup) {
+      return;
+    }
+
+    await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
+    await collapseNextTabGroup();
+  };
+
+  await collapseNextTabGroup();
 
   // adjustment 2
   await enablePrimaryTabTriggerForTab(selectedTab.id);
