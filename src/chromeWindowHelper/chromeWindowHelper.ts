@@ -50,17 +50,18 @@ export async function activateTabAndWait(tabId: ChromeTabId) {
 }
 
 export async function updateTabGroupAndWait(tabGroupId: ChromeTabGroupId, updatedProperties: chrome.tabGroups.UpdateProperties) {
-  const onUpdatedPromise = new Promise<void>((resolve, reject) => {
+  const onUpdatedPromise = new Promise<ChromeTabGroupWithId>((resolve, reject) => {
     chrome.tabGroups.onUpdated.addListener(async function onUpdated(updatedTabGroup: chrome.tabGroups.TabGroup) {
       if (updatedTabGroup.id === tabGroupId) {
         chrome.tabGroups.onUpdated.removeListener(onUpdated);
-        resolve();
+        resolve(updatedTabGroup);
       }
     });
   });
 
   const updatePromise = callWithUserTabDraggingHandler(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
-  return await Promise.all([onUpdatedPromise, updatePromise]);
+  const [updatedTabGroup] = await Promise.all([onUpdatedPromise, updatePromise]);
+  return updatedTabGroup;
 }
 
 export async function moveTabAndWait(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
