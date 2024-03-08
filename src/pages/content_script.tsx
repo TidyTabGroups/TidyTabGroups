@@ -5,6 +5,7 @@ let primaryTabTriggerTimeoutId: number | null = null
 
 function onPrimaryTabTriggerTimeout() {
   chrome.runtime.sendMessage({ type: "primaryTabTrigger", data: { triggerType: "mouseenter" } });
+  primaryTabTriggerTimeoutId = null;
 }
 
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
