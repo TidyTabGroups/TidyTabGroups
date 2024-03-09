@@ -112,7 +112,8 @@ export async function activateWindow(windowId: ChromeWindowId) {
 
   // adjust the "shape" of the new active window, using the following adjustments:
   // 1. collapse all but the selected tab group
-  // 2. start the primary tab trigger for the active tab
+  // 2. un-collapse the selected tab group
+  // 3. start the primary tab trigger for the active tab
 
   // adjustment 1
   const remaingTabGroupsToCollapse = tabGroups.filter((tabGroup) => tabGroup.id !== selectedTab.groupId);
@@ -129,6 +130,12 @@ export async function activateWindow(windowId: ChromeWindowId) {
   await collapseNextTabGroup();
 
   // adjustment 2
+  const selectedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === selectedTab.groupId);
+  if (selectedTabGroup && selectedTabGroup.collapsed) {
+    await ChromeWindowHelper.updateTabGroupAndWait(selectedTabGroup.id, { collapsed: false });
+  }
+
+  // adjustment 3
   await enablePrimaryTabTriggerForTab(selectedTab.id);
 
   const transaction = await Database.createTransaction<Types.ModelDataBase, ["activeWindows", "activeTabGroups"], "readwrite">(
