@@ -123,7 +123,9 @@ export async function activateWindow(windowId: ChromeWindowId) {
       return;
     }
 
-    await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
+    if (!tabGroup.collapsed) {
+      await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
+    }
     await collapseNextTabGroup();
   };
 
