@@ -2,7 +2,7 @@
   "manifest_version": 3,
 
   "name": "Tidy Tab Bar",
-  "description": "Automatically reposition active tabs & tab groups to the tab bar's end, streamlining your focus and eliminating tab clutter.",
+  "description": "Automatically repositions your active tab or tab group to the end, allowing you to keep focus in one place and eliminate tab clutter.",
   "version": "1.0",
   "options_ui": {
     "page": "options.html"
