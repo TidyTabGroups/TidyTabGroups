@@ -1,7 +1,11 @@
 import { ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabId, ChromeTabGroupId } from "../types/types";
 import Misc from "../misc";
 
-export async function getTabGroupsOrdered(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[], tabGroupsToOrder?: ChromeTabGroupWithId[]) {
+export async function getTabGroupsOrdered(
+  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[],
+  tabGroupsToOrderOrQueryInfo?: ChromeTabGroupWithId[] | chrome.tabGroups.QueryInfo
+) {
+  const tabGroupsToOrder = Array.isArray(tabGroupsToOrderOrQueryInfo) ? tabGroupsToOrderOrQueryInfo : undefined;
   // Since querying tabs returns them in an ordered list, we can use that data to get the ordered list of tab group ids
   if ((Array.isArray(windowIdOrTabs) && windowIdOrTabs.length === 0) || tabGroupsToOrder?.length === 0) {
     return [];
@@ -9,7 +13,7 @@ export async function getTabGroupsOrdered(windowIdOrTabs: ChromeWindowId | Chrom
 
   const windowId = Array.isArray(windowIdOrTabs) ? windowIdOrTabs[0]?.windowId : windowIdOrTabs;
   const tabs = Array.isArray(windowIdOrTabs) ? (windowIdOrTabs as ChromeTabWithId[]) : ((await chrome.tabs.query({ windowId })) as ChromeTabWithId[]);
-  const remainingTabGroupsToOrder = tabGroupsToOrder ? tabGroupsToOrder : await chrome.tabGroups.query({ windowId });
+  const remainingTabGroupsToOrder = tabGroupsToOrder || (await chrome.tabGroups.query({ windowId, ...tabGroupsToOrderOrQueryInfo }));
   const orderedTabGroups: ChromeTabGroupWithId[] = [];
 
   tabs.forEach((tab) => {
