@@ -106,13 +106,11 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
     return;
   }
 
-  const primaryTabGroup = await ActiveWindow.getPrimaryTabGroup(tab.windowId);
-  if (!primaryTabGroup) {
-    return;
-  }
+  const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tab.windowId);
+  const uncollapsedTabGroups = tabGroups.filter((tabGroup) => !tabGroup.collapsed);
+  const selectedTabGroup = uncollapsedTabGroups[0];
 
-  const tabs = (await chrome.tabs.query({ windowId: tab.windowId })) as ChromeTabWithId[];
-  if (tabs.length > 1 && tabs[tabs.length - 2].groupId === primaryTabGroup.id) {
-    await chrome.tabs.group({ tabIds: tab.id, groupId: primaryTabGroup.id });
+  if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+    await chrome.tabs.group({ tabIds: tab.id, groupId: selectedTabGroup.id });
   }
 }
