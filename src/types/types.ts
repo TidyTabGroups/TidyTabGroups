@@ -29,3 +29,8 @@ export type ChromeTabGroupWithId = chrome.tabGroups.TabGroup & {
 export type ChromeTabWithId = chrome.tabs.Tab & { id: ChromeTabId };
 
 export interface LocalStorageShape {}
+
+export interface LastActiveTabInfo {
+  tabId: ChromeTabId;
+  tabGroupId: ChromeTabGroupId;
+}

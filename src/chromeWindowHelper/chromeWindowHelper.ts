@@ -174,3 +174,12 @@ export function isWindow(object: any): object is chrome.windows.Window {
 
   return object && properties.every((property) => property in object);
 }
+
+export async function doesTabExist(tabId: ChromeTabId) {
+  try {
+    await chrome.tabs.get(tabId);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
