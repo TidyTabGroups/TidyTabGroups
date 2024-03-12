@@ -2,6 +2,8 @@ import { ActiveWindow } from "../model";
 import { ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 
+let newTabGroupingOperationInfo: { tabId: ChromeTabId; groupingOperationPromise: Promise<void> } | null = null;
+
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   console.log(`onInstalled::Extension was installed because of: ${details.reason}`);
   if (details.reason === "install") {
@@ -83,8 +85,12 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     return;
   }
 
+  if (newTabGroupingOperationInfo && newTabGroupingOperationInfo.tabId === activeInfo.tabId) {
+    await newTabGroupingOperationInfo.groupingOperationPromise;
+  }
+
   const tab = (await chrome.tabs.get(activeInfo.tabId)) as ChromeTabWithId;
-  console.log(`onTabActivated::`, tab.title);
+  console.log(`onTabActivated::`, tab.title, tab.groupId);
   const tabGroups = (await chrome.tabGroups.query({ windowId: tab.windowId, collapsed: false })) as ChromeTabGroupWithId[];
   const otherNonCollapsedTabGroups =
     tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE ? tabGroups.filter((tabGroup) => tabGroup.id !== tab.groupId) : tabGroups;
@@ -106,11 +112,28 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
     return;
   }
 
-  const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tab.windowId);
-  const uncollapsedTabGroups = tabGroups.filter((tabGroup) => !tabGroup.collapsed);
-  const selectedTabGroup = uncollapsedTabGroups[0];
+  if (!tab.id) {
+    console.warn(`onTabCreated::tab.id is not valid:`, tab);
+    return;
+  }
+
+  console.log(`onTabCreated::tab:`, tab.title, tab.groupId);
 
   if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-    await chrome.tabs.group({ tabIds: tab.id, groupId: selectedTabGroup.id });
+    newTabGroupingOperationInfo = {
+      tabId: tab.id,
+      groupingOperationPromise: new Promise<void>(async (resolve, reject) => {
+        try {
+          const uncollapsedTabGroups = await chrome.tabGroups.query({ windowId: tab.windowId, collapsed: false });
+          const selectedTabGroup = uncollapsedTabGroups[0];
+          await chrome.tabs.group({ tabIds: tab.id, groupId: selectedTabGroup.id });
+          resolve();
+        } catch (error) {
+          reject(`onTabCreated::tabGroupIdPromise::error resolving promise with selected tab group:${error}`);
+        } finally {
+          newTabGroupingOperationInfo = null;
+        }
+      }),
+    };
   }
 }
