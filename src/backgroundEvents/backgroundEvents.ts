@@ -167,7 +167,7 @@ export async function onTabRemoved(tabId: ChromeTabId, removeInfo: chrome.tabs.T
   }
 
   if (removeInfo.isWindowClosing) {
-    console.log(`onTabRemoved::window is closing:`, tabId);
+    console.log(`onTabRemoved::window is closing, nothing to do:`, tabId);
     return;
   }
 
