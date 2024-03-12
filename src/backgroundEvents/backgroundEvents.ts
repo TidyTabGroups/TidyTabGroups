@@ -99,8 +99,10 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       if (allTabGroupsCollapsed) {
         // if all tab groups are collapsed, then activate the primary tab, or if the primary tab group was collapsed,
         //  set the new primary tab to to the tab before the primary tab group
+
+        const lastTabInWindow = tabs[tabs.length - 1];
         const isLastTabGroup = tabGroups[tabGroups.length - 1].id === tabGroup.id;
-        if (isLastTabGroup) {
+        if (isLastTabGroup && lastTabInWindow.groupId === tabGroup.id) {
           const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
           const firstTabInGroup = tabsInGroup[0];
           const tabBeforeTabGroup = tabs[firstTabInGroup.index - 1] as ChromeTabWithId | undefined;
