@@ -167,14 +167,13 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
 
   console.log(`onTabCreated::tab:`, tab.title, tab.groupId);
 
-  if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+  const { tabGroupId: lastActiveTabGroupId } = await lastActiveTabInfo;
+  if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && lastActiveTabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
     newTabGroupingOperationInfo = {
       tabId: tab.id,
       groupingOperationPromise: new Promise(async (resolve, reject) => {
         try {
-          const uncollapsedTabGroups = await chrome.tabGroups.query({ windowId: tab.windowId, collapsed: false });
-          const selectedTabGroup = uncollapsedTabGroups[0];
-          const tabGroupId = await chrome.tabs.group({ tabIds: tab.id, groupId: selectedTabGroup.id });
+          const tabGroupId = await chrome.tabs.group({ tabIds: tab.id, groupId: lastActiveTabGroupId });
           resolve(tabGroupId);
         } catch (error) {
           reject(`onTabCreated::tabGroupIdPromise::error resolving promise with selected tab group:${error}`);
