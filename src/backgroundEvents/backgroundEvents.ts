@@ -3,6 +3,7 @@ import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, C
 import ChromeWindowHelper from "../chromeWindowHelper";
 
 let newTabGroupingOperationInfo: { tabId: ChromeTabId; groupingOperationPromise: Promise<ChromeTabGroupId> } | null = null;
+let activatedTabTabGroupCollapseOperation: ChromeTabGroupId[] = [];
 let lastActiveTabInfo: Promise<LastActiveTabInfo> | LastActiveTabInfo = new Promise(async (resolve, reject) => {
   try {
     const [activeTab] = (await chrome.tabs.query({
@@ -86,6 +87,31 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
       await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
     }
+  } else {
+    const activeTab = tabs.find((tab) => tab.active);
+    if (!activeTab) {
+      throw new Error(`onTabGroupsUpdated::activeTab not found for windowId:${tabGroup.windowId}`);
+    }
+
+    if (!activatedTabTabGroupCollapseOperation.includes(tabGroup.id)) {
+      const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
+      const allTabGroupsCollapsed = tabGroups.every((tabGroup) => tabGroup.collapsed);
+      if (allTabGroupsCollapsed) {
+        // if all tab groups are collapsed, then activate the primary tab, or if the primary tab group was collapsed,
+        //  set the new primary tab to to the tab before the primary tab group
+        const isLastTabGroup = tabGroups[tabGroups.length - 1].id === tabGroup.id;
+        if (isLastTabGroup) {
+          const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
+          const firstTabInGroup = tabsInGroup[0];
+          const tabBeforeTabGroup = tabs[firstTabInGroup.index - 1] as ChromeTabWithId | undefined;
+          if (tabBeforeTabGroup) {
+            await ChromeWindowHelper.activateTabAndWait(tabBeforeTabGroup.id);
+          }
+        } else {
+          await ActiveWindow.activatePrimaryTab(tabGroup.windowId);
+        }
+      }
+    }
   }
 }
 
@@ -95,6 +121,8 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     console.warn(`onTabActivated::activeWindow not found for windowId:`, activeInfo.windowId);
     return;
   }
+
+  activatedTabTabGroupCollapseOperation = [];
 
   let tab = (await chrome.tabs.get(activeInfo.tabId)) as ChromeTabWithId;
   lastActiveTabInfo = { tabId: tab.id, tabGroupId: tab.groupId };
@@ -111,6 +139,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   const tabGroups = (await chrome.tabGroups.query({ windowId: tab.windowId, collapsed: false })) as ChromeTabGroupWithId[];
   const otherNonCollapsedTabGroups =
     tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE ? tabGroups.filter((tabGroup) => tabGroup.id !== tab.groupId) : tabGroups;
+  activatedTabTabGroupCollapseOperation = otherNonCollapsedTabGroups.map((tabGroup) => tabGroup.id);
   await Promise.all(
     otherNonCollapsedTabGroups.map(async (tabGroup) => {
       await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
@@ -181,8 +210,24 @@ export async function onTabRemoved(tabId: ChromeTabId, removeInfo: chrome.tabs.T
   }
 
   console.log(`onTabRemoved::tabId:`, tabId, removeInfo);
-  // TODO: if this tab was at the end, and there is no other available tab that is in the second end position (i.e. the second last tab),
-  // then set the new primary tab group, if it exists, similar to onTabGroupRemoved. This will require storing a copy of tabs and their indexes.
+  const { tabId: lastActiveTabId, tabGroupId: lastActiveTabGroupId } = await lastActiveTabInfo;
+  if (lastActiveTabId === tabId) {
+    if (lastActiveTabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      const tabGroup = (await chrome.tabGroups.get(lastActiveTabGroupId)) as ChromeTabGroupWithId | undefined;
+      if (tabGroup) {
+        const tabsInGroup = (await chrome.tabs.query({ windowId: removeInfo.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
+        const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
+        if (!lastTabInGroup) {
+          throw new Error(`onTabRemoved::lastTabInGroup not found for tabGroupId:${tabGroup.id}`);
+        }
+
+        console.log(`onTabRemoved::activating lastTabInGroup:`, lastTabInGroup.title);
+        await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
+      }
+    } else {
+      await ActiveWindow.activatePrimaryTab(removeInfo.windowId);
+    }
+  }
 }
 
 export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) {
