@@ -1,6 +1,6 @@
 import DetachableDOM from "../detachableDOM";
 
-let primaryTabTrigger = false;
+let primaryTabTriggerEnabled = true;
 let primaryTabTriggerTimeoutId: number | null = null
 
 function onPrimaryTabTriggerTimeout() {
@@ -11,9 +11,9 @@ function onPrimaryTabTriggerTimeout() {
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   console.log("content_script.tsx::onMessage::msg:", msg);
   if (msg.type === "enablePrimaryTabTrigger") {
-    primaryTabTrigger = true;
+    primaryTabTriggerEnabled = true;
   } else if (msg.type === "disablePrimaryTabTrigger") {
-    primaryTabTrigger = false;
+    primaryTabTriggerEnabled = false;
   }
 
   sendResponse();
@@ -25,10 +25,10 @@ DetachableDOM.addEventListener(document, "mouseenter", event => {
     return
   }
 
-  if(primaryTabTrigger) {
+  if(primaryTabTriggerEnabled) {
     console.log("ttg::mouseenter", event);
     primaryTabTriggerTimeoutId = DetachableDOM.setTimeout(onPrimaryTabTriggerTimeout, 500);
-    primaryTabTrigger = false;
+    primaryTabTriggerEnabled = false;
   }
 }, true)
 
@@ -41,6 +41,6 @@ DetachableDOM.addEventListener(document, "mouseleave", event => {
     console.log("ttg:mouseleave:", event);
     DetachableDOM.clearTimeout(primaryTabTriggerTimeoutId)
     primaryTabTriggerTimeoutId = null;
-    primaryTabTrigger = true
+    primaryTabTriggerEnabled = true
   }
 }, true)
