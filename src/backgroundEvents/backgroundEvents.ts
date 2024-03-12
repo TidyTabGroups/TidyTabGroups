@@ -158,3 +158,20 @@ export async function onTabGroupRemoved(tabGroup: ChromeTabGroupWithId) {
     await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
   }
 }
+
+export async function onTabRemoved(tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
+  const activeWindowId = await ActiveWindow.getKey(removeInfo.windowId);
+  if (!activeWindowId) {
+    console.warn(`onTabRemoved::activeWindow not found for windowId:`, removeInfo.windowId);
+    return;
+  }
+
+  if (removeInfo.isWindowClosing) {
+    console.log(`onTabRemoved::window is closing:`, tabId);
+    return;
+  }
+
+  console.log(`onTabRemoved::tabId:`, tabId, removeInfo);
+  // TODO: if this tab was at the end, and there is no other available tab that is in the second end position (i.e. the second last tab),
+  // then set the new primary tab group, if it exists, similar to onTabGroupRemoved. This will require storing a copy of tabs and their indexes.
+}
