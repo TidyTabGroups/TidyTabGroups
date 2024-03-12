@@ -85,8 +85,12 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     return;
   }
 
+  let shouldMakePrimaryNow: boolean;
   if (newTabGroupingOperationInfo && newTabGroupingOperationInfo.tabId === activeInfo.tabId) {
     await newTabGroupingOperationInfo.groupingOperationPromise;
+    shouldMakePrimaryNow = true;
+  } else {
+    shouldMakePrimaryNow = false;
   }
 
   const tab = (await chrome.tabs.get(activeInfo.tabId)) as ChromeTabWithId;
@@ -101,7 +105,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   );
 
   if (!tab.pinned) {
-    await ActiveWindow.enablePrimaryTabTriggerForTab(tab.id);
+    await ActiveWindow.enablePrimaryTabTriggerForTab(tab.id, shouldMakePrimaryNow);
   }
 }
 
