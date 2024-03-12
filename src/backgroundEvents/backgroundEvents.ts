@@ -127,6 +127,8 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   activatedTabTabGroupCollapseOperation = [];
 
   let tab = (await chrome.tabs.get(activeInfo.tabId)) as ChromeTabWithId;
+  console.log(`onTabActivated::`, tab.title, tab.groupId);
+
   lastActiveTabInfo = { tabId: tab.id, tabGroupId: tab.groupId };
 
   let shouldMakePrimaryNow: boolean;
@@ -137,7 +139,6 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     shouldMakePrimaryNow = false;
   }
 
-  console.log(`onTabActivated::`, tab.title, tab.groupId);
   const tabGroups = (await chrome.tabGroups.query({ windowId: tab.windowId, collapsed: false })) as ChromeTabGroupWithId[];
   const otherNonCollapsedTabGroups =
     tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE ? tabGroups.filter((tabGroup) => tabGroup.id !== tab.groupId) : tabGroups;
