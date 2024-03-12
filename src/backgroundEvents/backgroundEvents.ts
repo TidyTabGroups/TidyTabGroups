@@ -141,3 +141,20 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
     };
   }
 }
+
+export async function onTabGroupRemoved(tabGroup: ChromeTabGroupWithId) {
+  const activeWindowId = await ActiveWindow.getKey(tabGroup.windowId);
+  if (!activeWindowId) {
+    console.warn(`onTabGroupRemoved::activeWindow not found for windowId:`, tabGroup.windowId);
+    return;
+  }
+
+  console.log(`onTabGroupRemoved::`, tabGroup.title);
+
+  const primaryTabGroup = await ActiveWindow.getPrimaryTabGroup(tabGroup.windowId);
+  if (primaryTabGroup) {
+    const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: primaryTabGroup.id })) as ChromeTabWithId[];
+    const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
+    await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
+  }
+}
