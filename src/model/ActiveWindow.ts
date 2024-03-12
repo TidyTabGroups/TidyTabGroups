@@ -185,6 +185,13 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
   if (shouldMoveTab) {
     await ChromeWindowHelper.moveTabAndWait(tabId, { index: -1 });
   }
+
+  const uncollapsedTabGroups = (await chrome.tabGroups.query({ windowId, collapsed: false })) as ChromeTabGroupWithId[];
+  uncollapsedTabGroups.forEach(async (tabGroup) => {
+    if (tabGroup.id !== tab.groupId) {
+      await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
+    }
+  });
 }
 
 export async function enablePrimaryTabTriggerForTab(tabOrTabId: ChromeTabId | ChromeTabWithId, makePrimaryNow = false) {
