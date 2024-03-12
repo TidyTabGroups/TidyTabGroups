@@ -198,7 +198,7 @@ export async function enablePrimaryTabTriggerForTab(tabOrTabId: ChromeTabId | Ch
       console.warn(`enablePrimaryTabTriggerForTab::chrome.runtime.lastError for ${tab.id}:`, chrome.runtime.lastError.message);
       // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
       //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
-      await setPrimaryTab(tab.windowId, tab.id);
+      // TODO: set the primary tab after timeout period using offscreen document
     }
   });
 }
