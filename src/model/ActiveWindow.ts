@@ -1,10 +1,19 @@
 import { IDBPTransaction, StoreNames } from "idb";
 import Database from "../database";
 import Types from "../types";
-import { ChromeWindowWithId, ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabGroupId, ChromeTabId } from "../types/types";
+import {
+  ChromeWindowWithId,
+  ChromeWindowId,
+  ChromeTabWithId,
+  ChromeTabGroupWithId,
+  ChromeTabGroupId,
+  ChromeTabId,
+  YesOrNoOrNA,
+} from "../types/types";
 import * as ActiveTabGroup from "./ActiveTabGroup";
 import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
+import { callWithUserTabDraggingHandler } from "../chromeWindowHelper/chromeWindowHelper";
 
 export async function get(
   id: Types.ActiveWindow["windowId"],
@@ -223,4 +232,113 @@ export async function enablePrimaryTabTriggerForTab(tabOrTabId: ChromeTabId | Ch
       }
     }
   });
+}
+
+export async function manuallyActivateTab(tabToManuallyActivateId: ChromeTabId, tabToDiscardId?: ChromeTabId) {
+  let didManuallyUncollapseTabGroup: YesOrNoOrNA = "no";
+  const tabToManuallyActivate = (await chrome.tabs.get(tabToManuallyActivateId)) as ChromeTabWithId;
+  const tabToManuallyActivateIsInTabGroup = tabToManuallyActivate.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE;
+  if (tabToManuallyActivateIsInTabGroup) {
+    const tabToManuallyActivateTabGroup = await chrome.tabGroups.get(tabToManuallyActivate.groupId);
+    if (tabToManuallyActivateTabGroup.collapsed) {
+      didManuallyUncollapseTabGroup = "yes";
+      console.log(`manuallyActivateTab::manually uncollapsing tab group for tab:`, tabToManuallyActivateId);
+      await ChromeWindowHelper.updateTabGroupAndWait(tabToManuallyActivateTabGroup.id, { collapsed: false });
+    }
+  } else {
+    didManuallyUncollapseTabGroup = "n/a";
+  }
+  console.log(`manuallyActivateTab::manually activating ${tabToManuallyActivateId}. Manually uncollapse tab group: ${didManuallyUncollapseTabGroup}`);
+  await ChromeWindowHelper.activateTabAndWait(tabToManuallyActivateId);
+
+  if (tabToDiscardId !== undefined) {
+    console.log(`manuallyActivateTab::discarding tab:`, tabToDiscardId);
+    await ChromeWindowHelper.discardTabIfNotDiscarded(tabToDiscardId);
+  }
+}
+
+export async function updateTabOpenerIdToTabToActivateIfClosed(
+  windowId: ChromeWindowId,
+  tabInfo: { tabId: ChromeTabId; tabGroupId: ChromeTabGroupId; openerTabId: chrome.tabs.Tab["openerTabId"]; title: chrome.tabs.Tab["title"] }
+) {
+  const tabToActivateIfClosedId = await getTabToActivateIfTabClosed(windowId, tabInfo);
+  if (tabToActivateIfClosedId !== undefined && tabInfo.openerTabId !== tabToActivateIfClosedId) {
+    const tabToActivateIfClosed = (await chrome.tabs.get(tabToActivateIfClosedId)) as ChromeTabWithId;
+    console.log(
+      `updateTabOpenerIdToTabToActivateIfClosed::setting tab to activate if closed for ${tabInfo.title || tabInfo.tabId} to ${
+        tabToActivateIfClosed.title || tabInfo.tabId
+      }`
+    );
+    return (await callWithUserTabDraggingHandler(() => {
+      return chrome.tabs.update(tabInfo.tabId, { openerTabId: tabToActivateIfClosedId });
+    })) as ChromeTabWithId;
+  }
+}
+
+export async function getTabToActivateIfTabClosed(
+  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[],
+  tabInfo: { tabId: ChromeTabId; tabGroupId: ChromeTabGroupId }
+) {
+  const windowId = typeof windowIdOrTabs === "number" ? windowIdOrTabs : windowIdOrTabs[0].windowId;
+  const tabs = typeof windowIdOrTabs === "number" ? ((await chrome.tabs.query({ windowId })) as ChromeTabWithId[]) : windowIdOrTabs;
+  let tabToActivateIfClosedId: ChromeTabId | undefined;
+  const lastTabInWindow = tabs[tabs.length - 1];
+  const isLastTabInWindow = lastTabInWindow.id === tabInfo.tabId;
+
+  if (isLastTabInWindow) {
+    const secondLastTabInWindow = tabs[tabs.length - 2];
+    tabToActivateIfClosedId = secondLastTabInWindow.id;
+  } else if (tabInfo.tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+    tabToActivateIfClosedId = lastTabInWindow.id;
+  } else {
+    const tabsInGroup = tabs.filter((tabInGroup) => tabInfo.tabGroupId === tabInGroup.groupId);
+    const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
+    const firstTabInGroup = tabsInGroup[0];
+    const tabBeforeTabGroup = tabs[firstTabInGroup.index - 1] as ChromeTabWithId | undefined;
+
+    const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
+    const isLastTabGroup = tabGroups[tabGroups.length - 1].id === tabInfo.tabGroupId;
+
+    if (tabsInGroup.length > 1) {
+      const isLastTabInGroup = lastTabInGroup.id === tabInfo.tabId;
+      if (isLastTabInGroup) {
+        const secondLastTabInGroup = tabsInGroup[tabsInGroup.length - 2];
+        tabToActivateIfClosedId = secondLastTabInGroup.id;
+      }
+    } else {
+      if (isLastTabGroup) {
+        tabToActivateIfClosedId = tabBeforeTabGroup?.id;
+      } else {
+        tabToActivateIfClosedId = lastTabInWindow.id;
+      }
+    }
+  }
+
+  return tabToActivateIfClosedId;
+}
+
+export async function getTabToActivateIfTabGroupCollapsed(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[], tabGroupId: ChromeTabGroupId) {
+  if (tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+    throw new Error(`getTabToActivateIfTabGroupCollapsed::tabGroupId is not valid: ${tabGroupId}`);
+  }
+
+  const windowId = typeof windowIdOrTabs === "number" ? windowIdOrTabs : windowIdOrTabs[0].windowId;
+  const tabs = typeof windowIdOrTabs === "number" ? ((await chrome.tabs.query({ windowId })) as ChromeTabWithId[]) : windowIdOrTabs;
+
+  let tabToActivateIfTabGroupCollapsedId: ChromeTabId | undefined;
+  // if the tab group is at the end, activate the tab before the tab group. Otherwise, active the last tab in the window
+  const lastTabInWindow = tabs[tabs.length - 1];
+  const tabGroupIsAtEnd = lastTabInWindow.groupId === tabGroupId;
+  if (tabGroupIsAtEnd) {
+    const firstTabInGroup = tabs.find((_tab) => _tab.groupId === tabGroupId);
+    if (!firstTabInGroup) {
+      throw new Error(`getTabToActivateIfTabGroupCollapsed::firstTabInGroup not found for tabGroupId: ${tabGroupId}`);
+    }
+    const tabBeforeTabGroup = tabs[firstTabInGroup.index - 1] as ChromeTabWithId | undefined;
+    tabToActivateIfTabGroupCollapsedId = tabBeforeTabGroup?.id;
+  } else {
+    tabToActivateIfTabGroupCollapsedId = lastTabInWindow.id;
+  }
+
+  return tabToActivateIfTabGroupCollapsedId;
 }

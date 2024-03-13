@@ -97,14 +97,14 @@ export async function moveTabGroupAndWait(tabGroupId: ChromeTabGroupId, moveProp
   return await Promise.all([onMovedPromise, movePromise]);
 }
 
-export async function callWithUserTabDraggingHandler(fn: () => Promise<any>): Promise<any> {
+export async function callWithUserTabDraggingHandler<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (error) {
     // @ts-ignore
     if (error?.message === "Tabs cannot be edited right now (user may be dragging a tab).") {
       console.log(`callWithUserTabDraggingHandler::user may be dragging a tab: `, fn.toString());
-      await callWithUserTabDraggingHandler(fn);
+      return await callWithUserTabDraggingHandler<T>(fn);
     } else {
       throw error;
     }
@@ -181,6 +181,16 @@ export async function doesTabExist(tabId: ChromeTabId) {
     await chrome.tabs.get(tabId);
     return true;
   } catch (error) {
+    return false;
+  }
+}
+
+export async function discardTabIfNotDiscarded(tabId: ChromeTabId) {
+  try {
+    await chrome.tabs.discard(tabId);
+    return true;
+  } catch (error) {
+    console.error(`discardTabIfNotDiscarded::failed to discard tab: `, error);
     return false;
   }
 }

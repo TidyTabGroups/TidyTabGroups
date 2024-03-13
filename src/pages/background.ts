@@ -13,7 +13,6 @@ import Database from "../database";
   chrome.tabs.onRemoved.addListener(BackgroundEvents.onTabRemoved);
 
   chrome.tabGroups.onUpdated.addListener(BackgroundEvents.onTabGroupsUpdated);
-  chrome.tabGroups.onRemoved.addListener(BackgroundEvents.onTabGroupRemoved);
 
   Database.initializeDatabaseConnection("model");
 })();

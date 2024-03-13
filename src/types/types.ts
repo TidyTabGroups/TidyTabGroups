@@ -34,3 +34,6 @@ export interface LastActiveTabInfo {
   tabId: ChromeTabId;
   tabGroupId: ChromeTabGroupId;
 }
+
+export type YesOrNo = "yes" | "no";
+export type YesOrNoOrNA = "yes" | "no" | "n/a";
