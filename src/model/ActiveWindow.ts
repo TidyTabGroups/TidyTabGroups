@@ -235,33 +235,39 @@ export async function enablePrimaryTabTriggerForTab(tabOrTabId: ChromeTabId | Ch
 }
 
 export async function manuallyActivateTab(tabToManuallyActivateId: ChromeTabId, tabToDiscardId?: ChromeTabId) {
-  let didManuallyUncollapseTabGroup: YesOrNoOrNA = "no";
-  const tabToManuallyActivate = (await chrome.tabs.get(tabToManuallyActivateId)) as ChromeTabWithId;
-  const tabToManuallyActivateIsInTabGroup = tabToManuallyActivate.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE;
-  if (tabToManuallyActivateIsInTabGroup) {
-    const tabToManuallyActivateTabGroup = await chrome.tabGroups.get(tabToManuallyActivate.groupId);
-    if (tabToManuallyActivateTabGroup.collapsed) {
-      didManuallyUncollapseTabGroup = "yes";
-      console.log(`manuallyActivateTab::manually uncollapsing tab group for tab:`, tabToManuallyActivateId);
-      await ChromeWindowHelper.updateTabGroupAndWait(tabToManuallyActivateTabGroup.id, { collapsed: false });
+  try {
+    let didManuallyUncollapseTabGroup: YesOrNoOrNA = "no";
+    const tabToManuallyActivate = (await chrome.tabs.get(tabToManuallyActivateId)) as ChromeTabWithId;
+    const tabToManuallyActivateIsInTabGroup = tabToManuallyActivate.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE;
+    if (tabToManuallyActivateIsInTabGroup) {
+      const tabToManuallyActivateTabGroup = await chrome.tabGroups.get(tabToManuallyActivate.groupId);
+      if (tabToManuallyActivateTabGroup.collapsed) {
+        didManuallyUncollapseTabGroup = "yes";
+        console.log(`manuallyActivateTab::manually uncollapsing tab group for tab:`, tabToManuallyActivateId);
+        await ChromeWindowHelper.updateTabGroupAndWait(tabToManuallyActivateTabGroup.id, { collapsed: false });
+      }
+    } else {
+      didManuallyUncollapseTabGroup = "n/a";
     }
-  } else {
-    didManuallyUncollapseTabGroup = "n/a";
-  }
-  console.log(`manuallyActivateTab::manually activating ${tabToManuallyActivateId}. Manually uncollapse tab group: ${didManuallyUncollapseTabGroup}`);
-  await ChromeWindowHelper.activateTabAndWait(tabToManuallyActivateId);
+    console.log(
+      `manuallyActivateTab::manually activating ${tabToManuallyActivateId}. Manually uncollapse tab group: ${didManuallyUncollapseTabGroup}`
+    );
+    await ChromeWindowHelper.activateTabAndWait(tabToManuallyActivateId);
 
-  if (tabToDiscardId !== undefined) {
-    console.log(`manuallyActivateTab::discarding tab:`, tabToDiscardId);
-    await ChromeWindowHelper.discardTabIfNotDiscarded(tabToDiscardId);
+    if (tabToDiscardId !== undefined) {
+      console.log(`manuallyActivateTab::discarding tab:`, tabToDiscardId);
+      await ChromeWindowHelper.discardTabIfNotDiscarded(tabToDiscardId);
+    }
+  } catch (error) {
+    throw new Error(`manuallyActivateTab::${error}`);
   }
 }
 
 export async function updateTabOpenerIdToTabToActivateIfClosed(
-  windowId: ChromeWindowId,
+  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[],
   tabInfo: { tabId: ChromeTabId; tabGroupId: ChromeTabGroupId; openerTabId: chrome.tabs.Tab["openerTabId"]; title: chrome.tabs.Tab["title"] }
 ) {
-  const tabToActivateIfClosedId = await getTabToActivateIfTabClosed(windowId, tabInfo);
+  const tabToActivateIfClosedId = await getTabToActivateIfTabClosed(windowIdOrTabs, tabInfo);
   if (tabToActivateIfClosedId !== undefined && tabInfo.openerTabId !== tabToActivateIfClosedId) {
     const tabToActivateIfClosed = (await chrome.tabs.get(tabToActivateIfClosedId)) as ChromeTabWithId;
     console.log(

@@ -126,7 +126,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   const tabs = (await chrome.tabs.query({ windowId: tab.windowId })) as ChromeTabWithId[];
 
   // 4
-  const updatedTab = await ActiveWindow.updateTabOpenerIdToTabToActivateIfClosed(tab.windowId, {
+  const updatedTab = await ActiveWindow.updateTabOpenerIdToTabToActivateIfClosed(tabs, {
     tabId: tab.id,
     tabGroupId: tab.groupId,
     openerTabId: tab.openerTabId,
