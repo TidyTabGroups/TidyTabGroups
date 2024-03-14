@@ -26,17 +26,18 @@ export async function getTabGroupsOrdered(
 }
 
 export async function updateTabAndWait(tabId: ChromeTabId, updatedProperties: chrome.tabs.UpdateProperties) {
-  const onUpdatedPromise = new Promise<void>((resolve, reject) => {
-    chrome.tabs.onUpdated.addListener(async function onUpdated(updatedTabId: ChromeTabId, changeInfo: any) {
+  const onUpdatedPromise = new Promise<ChromeTabWithId>((resolve, reject) => {
+    chrome.tabs.onUpdated.addListener(async function onUpdated(updatedTabId: ChromeTabId, changeInfo: any, tab: chrome.tabs.Tab) {
       if (updatedTabId === tabId) {
         chrome.tabs.onUpdated.removeListener(onUpdated);
-        resolve();
+        resolve(tab as ChromeTabWithId);
       }
     });
   });
 
   const updatePromise = callWithUserTabDraggingHandler(() => chrome.tabs.update(tabId, updatedProperties));
-  return await Promise.all([onUpdatedPromise, updatePromise]);
+  const [updatedTab] = await Promise.all([onUpdatedPromise, updatePromise]);
+  return updatedTab;
 }
 
 export async function activateTabAndWait(tabId: ChromeTabId) {
