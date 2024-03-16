@@ -176,13 +176,26 @@ export function isWindow(object: any): object is chrome.windows.Window {
   return object && properties.every((property) => property in object);
 }
 
-export async function doesTabExist(tabId: ChromeTabId) {
+export async function getIfTabExists(tabId: ChromeTabId) {
   try {
-    await chrome.tabs.get(tabId);
-    return true;
-  } catch (error) {
-    return false;
-  }
+    return await chrome.tabs.get(tabId);
+  } catch (error) {}
+}
+
+export async function doesTabExist(tabId: ChromeTabId) {
+  const tab = await getIfTabExists(tabId);
+  return !!tab;
+}
+
+export async function getIfTabGroupExists(tabGroupId: ChromeTabGroupId) {
+  try {
+    return await chrome.tabGroups.get(tabGroupId);
+  } catch (error) {}
+}
+
+export async function doesTabGroupExist(tabGroupId: ChromeTabGroupId) {
+  const tabGroup = await getIfTabGroupExists(tabGroupId);
+  return !!tabGroup;
 }
 
 export async function discardTabIfNotDiscarded(tabId: ChromeTabId) {

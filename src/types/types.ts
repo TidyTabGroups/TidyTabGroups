@@ -33,6 +33,7 @@ export interface LocalStorageShape {}
 export interface LastActiveTabInfo {
   tabId: ChromeTabId;
   tabGroupId: ChromeTabGroupId;
+  title: string | undefined;
 }
 
 export type YesOrNo = "yes" | "no";
