@@ -298,7 +298,7 @@ export async function getTabToActivateIfTabClosed(
 
     if (isLastTabInWindow) {
       const secondLastTabInWindow = tabs[tabs.length - 2];
-      tabToActivateIfClosedId = secondLastTabInWindow.id;
+      tabToActivateIfClosedId = secondLastTabInWindow?.id;
     } else if (tabInfo.tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
       tabToActivateIfClosedId = lastTabInWindow.id;
     } else {
