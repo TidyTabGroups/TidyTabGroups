@@ -263,28 +263,6 @@ export async function manuallyActivateTab(tabToManuallyActivateId: ChromeTabId, 
   }
 }
 
-export async function updateTabOpenerIdToTabToActivateIfClosed(
-  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[],
-  tabInfo: { tabId: ChromeTabId; tabGroupId: ChromeTabGroupId; openerTabId: chrome.tabs.Tab["openerTabId"]; title: chrome.tabs.Tab["title"] }
-) {
-  try {
-    const tabToActivateIfClosedId = await getTabToActivateIfTabClosed(windowIdOrTabs, tabInfo);
-    if (tabToActivateIfClosedId !== undefined && tabInfo.openerTabId !== tabToActivateIfClosedId) {
-      const tabToActivateIfClosed = (await chrome.tabs.get(tabToActivateIfClosedId)) as ChromeTabWithId;
-      console.log(
-        `updateTabOpenerIdToTabToActivateIfClosed::setting tab to activate if closed for ${tabInfo.title || tabInfo.tabId} to ${
-          tabToActivateIfClosed.title || tabInfo.tabId
-        }`
-      );
-      return (await callWithUserTabDraggingHandler(() => {
-        return chrome.tabs.update(tabInfo.tabId, { openerTabId: tabToActivateIfClosedId });
-      })) as ChromeTabWithId;
-    }
-  } catch (error) {
-    throw new Error(`updateTabOpenerIdToTabToActivateIfClosed::${error}`);
-  }
-}
-
 export async function getTabToActivateIfTabClosed(
   windowIdOrTabs: ChromeWindowId | ChromeTabWithId[],
   tabInfo: { tabId: ChromeTabId; tabGroupId: ChromeTabGroupId }
