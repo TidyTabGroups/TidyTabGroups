@@ -129,8 +129,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   // 1. if the window hasnt been activated yet, return
   // 2. reset manualTabActivationOperationInfo
   // 3. if the last active tab was closed, or the last active tab group was collapsed, do a manual tab activation, then return
-  // 4. set the opener tab id of the tab to the tab to activate if closed
-  // 5. collapse all other tab groups in the window, and enable the primary tab trigger for the new active tab
+  // 4. collapse all other tab groups in the window, and enable the primary tab trigger for the new active tab
 
   console.log(`onTabActivated::`, activeInfo.tabId);
   let lastActiveTabInfoPromise = new Misc.NonRejectablePromise<LastActiveTabInfo | null>();
@@ -153,19 +152,19 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     console.log(`onTabActivated::title and groupId:`, tab.title, tab.groupId);
     console.log(`onTabActivated::lastActiveTabInfo:`, previousLastActiveTabInfo?.title || "N/A", previousLastActiveTabInfo?.tabId || "N/A");
 
-    // 2
+    // 1
     const activeWindowId = await ActiveWindow.getKey(activeInfo.windowId);
     if (!activeWindowId) {
       console.warn(`onTabActivated::activeWindow not found for windowId:`, activeInfo.windowId);
       return;
     }
 
-    // 3
+    // 2
     manualTabActivationOperationInfo = null;
 
     const tabs = (await chrome.tabs.query({ windowId: tab.windowId })) as ChromeTabWithId[];
 
-    // 4
+    // 3
     if (previousLastActiveTabInfo) {
       const previousLastActiveTabWasClosed = !(await ChromeWindowHelper.doesTabExist(previousLastActiveTabInfo.tabId));
 
@@ -199,16 +198,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
       }
     }
 
-    // 5
-    const updatedTab = await ActiveWindow.updateTabOpenerIdToTabToActivateIfClosed(tabs, {
-      tabId: tab.id,
-      tabGroupId: tab.groupId,
-      openerTabId: tab.openerTabId,
-      title: tab.title,
-    });
-    tab = updatedTab ? updatedTab : tab;
-
-    // 6
+    // 4
     let shouldMakePrimaryNow: boolean;
     console.log(
       `onTabActivated::previousCreatedTabGroupingOperationInfo:`,
@@ -382,15 +372,6 @@ export async function onTabMoved(tabId: ChromeTabId, moveInfo: chrome.tabs.TabMo
 
   let tab = (await chrome.tabs.get(tabId)) as ChromeTabWithId;
   console.log(`onTabMoved::title and groupId:`, tab.title, tab.groupId);
-
-  // update the tab's opener tab id to the tab to activate if closed
-  const updatedTab = await ActiveWindow.updateTabOpenerIdToTabToActivateIfClosed(tab.windowId, {
-    tabId: tab.id,
-    tabGroupId: tab.groupId,
-    openerTabId: tab.openerTabId,
-    title: tab.title,
-  });
-  tab = updatedTab ? updatedTab : tab;
 }
 
 export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: ChromeTabId) {
