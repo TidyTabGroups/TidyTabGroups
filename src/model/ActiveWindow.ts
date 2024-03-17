@@ -1,4 +1,4 @@
-import { IDBPTransaction, StoreNames } from "idb";
+import { IDBPTransaction, IndexKey, IndexNames, StoreNames } from "idb";
 import Database from "../database";
 import Types from "../types";
 import {
@@ -34,6 +34,24 @@ export async function getKey(
 ) {
   const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
   return await transaction.objectStore("activeWindows").getKey(id);
+}
+
+export async function getKeyByIndex<ActiveWindowIndexName extends IndexNames<Types.ModelDataBase, "activeWindows">>(
+  indexName: ActiveWindowIndexName,
+  indexValue: IndexKey<Types.ModelDataBase, "activeWindows", ActiveWindowIndexName>,
+  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
+) {
+  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
+  return await transaction.objectStore("activeWindows").index(indexName).getKey(indexValue);
+}
+
+export async function getByIndex<ActiveWindowIndexName extends IndexNames<Types.ModelDataBase, "activeWindows">>(
+  indexName: ActiveWindowIndexName,
+  indexValue: IndexKey<Types.ModelDataBase, "activeWindows", ActiveWindowIndexName>,
+  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
+) {
+  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
+  return await transaction.objectStore("activeWindows").index(indexName).get(indexValue);
 }
 
 export async function add(
@@ -154,7 +172,7 @@ export async function activateWindow(windowId: ChromeWindowId) {
     ["activeWindows", "activeTabGroups"],
     "readwrite"
   );
-  await add({ windowId }, transaction);
+  await add({ windowId, lastActiveTabInfo: { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title } }, transaction);
   await Promise.all(
     tabGroups.map((tabGroup) => {
       ActiveTabGroup.add(tabGroup, transaction);

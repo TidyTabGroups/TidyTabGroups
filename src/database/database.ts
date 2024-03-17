@@ -28,6 +28,7 @@ const schemas = {
         options: {
           keyPath: "windowId",
         },
+        indexes: [{ name: "lastActiveTabId", keyPath: "lastActiveTabInfo.tabId", options: { unique: true } }],
       },
       {
         name: "activeTabGroups",

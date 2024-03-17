@@ -4,6 +4,7 @@ export interface ModelDataBase extends DBSchema {
   activeWindows: {
     value: ActiveWindow;
     key: ChromeWindowId;
+    indexes: { lastActiveTabId: LastActiveTabInfo["tabId"] };
   };
   activeTabGroups: {
     value: ActiveTabGroup;
@@ -13,6 +14,7 @@ export interface ModelDataBase extends DBSchema {
 
 export interface ActiveWindow {
   windowId: ChromeWindowId;
+  lastActiveTabInfo: LastActiveTabInfo;
 }
 
 export type ActiveTabGroup = chrome.tabGroups.TabGroup;

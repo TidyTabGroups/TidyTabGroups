@@ -6,7 +6,6 @@ import Database from "../database";
 
   chrome.windows.onCreated.addListener(BackgroundEvents.onWindowCreated);
   chrome.windows.onRemoved.addListener(BackgroundEvents.onWindowRemoved);
-  chrome.windows.onFocusChanged.addListener(BackgroundEvents.onWindowFocusChanged);
 
   chrome.tabs.onCreated.addListener(BackgroundEvents.onTabCreated);
   chrome.tabs.onActivated.addListener(BackgroundEvents.onTabActivated);
