@@ -23,3 +23,24 @@ export async function getTabFromTabOrTabId(tabOrTabId: ChromeTabId | ChromeTabWi
   const tab = typeof tabOrTabId === "number" ? ((await chrome.tabs.get(tabOrTabId)) as ChromeTabWithId) : tabOrTabId;
   return tab;
 }
+
+export class NonRejectablePromise<T> {
+  //FIXME: compiler cant see that these are indeed being set in the constructor. Issue could be because they are being set in a Promise callback
+  // @ts-ignore
+  private _resolve: (value: T | PromiseLike<T>) => void;
+  private promise: Promise<T>;
+
+  constructor() {
+    this.promise = new Promise<T>((resolve) => {
+      this._resolve = resolve;
+    });
+  }
+
+  getPromise() {
+    return this.promise;
+  }
+
+  resolve(value: T) {
+    this._resolve(value);
+  }
+}
