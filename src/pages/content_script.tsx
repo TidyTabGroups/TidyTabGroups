@@ -10,13 +10,9 @@ function onPrimaryTabTriggerTimeout() {
 
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   console.log("content_script.tsx::onMessage::msg:", msg);
-  if (msg.type === "enablePrimaryTabTrigger") {
-    primaryTabTriggerEnabled = true;
-  } else if (msg.type === "disablePrimaryTabTrigger") {
-    primaryTabTriggerEnabled = false;
+  if (msg.type === "ping") {
+    sendResponse();
   }
-
-  sendResponse();
 });
 
 

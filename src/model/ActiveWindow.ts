@@ -238,7 +238,7 @@ export async function enablePrimaryTabTriggerForTab(tabOrTabId: ChromeTabId | Ch
     await ChromeWindowHelper.waitForTabToLoad(tab);
   }
 
-  chrome.tabs.sendMessage(tab.id, { type: "enablePrimaryTabTrigger" }, async () => {
+  chrome.tabs.sendMessage(tab.id, { type: "ping" }, async () => {
     if (chrome.runtime.lastError) {
       console.warn(`enablePrimaryTabTriggerForTab::chrome.runtime.lastError for ${tab.id}:`, chrome.runtime.lastError.message);
       // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
