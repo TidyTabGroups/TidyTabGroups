@@ -112,18 +112,23 @@ export async function callWithUserTabDraggingHandler<T>(fn: () => Promise<T>): P
 }
 
 export async function waitForTabToLoad(tabOrTabId: ChromeTabId | ChromeTabWithId) {
-  const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
-  if (tab.status === "complete") {
-    return;
-  }
+  return new Promise<void>(async (resolve) => {
+    const waitForTabId = typeof tabOrTabId === "number" ? tabOrTabId : tabOrTabId.id;
+    chrome.tabs.onUpdated.addListener(onUpdated);
 
-  return new Promise<void>((resolve) => {
-    chrome.tabs.onUpdated.addListener(function onUpdated(tabId, changeInfo, tab) {
-      if (tabId === tab.id && changeInfo.status === "complete") {
+    const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
+    if (tab.status === "complete") {
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      resolve();
+      return;
+    }
+
+    function onUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo) {
+      if (tabId === waitForTabId && changeInfo.status === "complete") {
         chrome.tabs.onUpdated.removeListener(onUpdated);
         resolve();
       }
-    });
+    }
   });
 }
 
