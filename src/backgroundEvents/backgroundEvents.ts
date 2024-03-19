@@ -218,7 +218,7 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
 }
 
 export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) {
-  const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["discarded", "groupId"];
+  const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId"];
   if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
     return;
   }
