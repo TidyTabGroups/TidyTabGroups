@@ -165,7 +165,7 @@ export async function activateWindow(windowId: ChromeWindowId) {
   }
 
   // adjustment 3
-  await enablePrimaryTabTriggerForTab(selectedTab.id);
+  await enablePrimaryTabActivationTriggerForTab(selectedTab.id);
 
   const transaction = await Database.createTransaction<Types.ModelDataBase, ["activeWindows", "activeTabGroups"], "readwrite">(
     "model",
@@ -232,7 +232,7 @@ export async function activatePrimaryTab(windowIdOrTabs: ChromeWindowId | Chrome
   }
 }
 
-export async function enablePrimaryTabTriggerForTab(tabOrTabId: ChromeTabId | ChromeTabWithId, makePrimaryNow = false) {
+export async function enablePrimaryTabActivationTriggerForTab(tabOrTabId: ChromeTabId | ChromeTabWithId, makePrimaryNow = false) {
   const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
   if (tab.status !== "complete") {
     await ChromeWindowHelper.waitForTabToLoad(tab);
@@ -240,7 +240,7 @@ export async function enablePrimaryTabTriggerForTab(tabOrTabId: ChromeTabId | Ch
 
   chrome.tabs.sendMessage(tab.id, { type: "ping" }, async () => {
     if (chrome.runtime.lastError) {
-      console.warn(`enablePrimaryTabTriggerForTab::chrome.runtime.lastError for ${tab.id}:`, chrome.runtime.lastError.message);
+      console.warn(`enablePrimaryTabActivationTriggerForTab::chrome.runtime.lastError for ${tab.id}:`, chrome.runtime.lastError.message);
       // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
       //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
       if (makePrimaryNow) {

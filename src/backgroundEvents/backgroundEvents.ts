@@ -26,23 +26,21 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
 }
 
 export async function onMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
-  if (!message || !message.type || !message.data) {
+  if (!message || !message.type) {
     console.warn("onMessage::message is not valid:", message);
     return;
   }
 
   console.log(`onMessage::message:`, message);
 
-  if (message.type === "primaryTabTrigger") {
+  if (message.type === "primaryTabActivationTrigger") {
     const { tab } = sender;
     if (!tab || !tab.id || tab.pinned) {
-      console.warn("onMessage::primaryTabTrigger::sender.tab is not valid:", sender);
+      console.warn("onMessage::primaryTabActivationTrigger::sender.tab is not valid:", sender);
       return;
     }
-    const { triggerType } = message.data;
-    console.log(`onMessage::primaryTabTrigger::triggerType:`, triggerType);
 
-    ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
+    await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
   }
 }
 
@@ -153,7 +151,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     );
 
     if (!tab.pinned) {
-      await ActiveWindow.enablePrimaryTabTriggerForTab(tab.id, shouldMakePrimaryNow);
+      await ActiveWindow.enablePrimaryTabActivationTriggerForTab(tab.id, shouldMakePrimaryNow);
     }
   } catch (error) {
     console.error(`onTabActivated::tabGroupIdPromise::error resolving promise with selected tab group:${error}`);
