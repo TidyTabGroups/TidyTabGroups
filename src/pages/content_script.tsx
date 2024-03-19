@@ -1,12 +1,5 @@
 import DetachableDOM from "../detachableDOM";
-
-let primaryTabTriggerEnabled = true;
-let primaryTabTriggerTimeoutId: number | null = null
-
-function onPrimaryTabTriggerTimeout() {
-  chrome.runtime.sendMessage({ type: "primaryTabTrigger", data: { triggerType: "mouseenter" } });
-  primaryTabTriggerTimeoutId = null;
-}
+import { PDFViewerOverlay } from "../DOM";
 
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   console.log("content_script.tsx::onMessage::msg:", msg);
@@ -15,28 +8,102 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   }
 });
 
+// @ts-ignore
+const isPDFViewer = document.body.childNodes.values().find((node) => node.tagName === "EMBED" && node.type === "application/pdf");
+if (isPDFViewer) {
+  PDFViewerOverlay.attach();
+}
 
-DetachableDOM.addEventListener(document, "mouseenter", event => {
-  if(event.target !== document) {
-    return
-  }
+let listenToPrimaryTabActivationTrigger = true;
+let primaryTabActivationTimeoutId: number | null = null;
+let initialMousePosition: { x: number, y: number } | null = null;
+const MINIMUM_MOUSE_MOVEMENT_PX = 2
 
-  if(primaryTabTriggerEnabled) {
-    console.log("ttg::mouseenter", event);
-    primaryTabTriggerTimeoutId = DetachableDOM.setTimeout(onPrimaryTabTriggerTimeout, 500);
-    primaryTabTriggerEnabled = false;
+// the events that start the primary tab activation:
+// 1. mouse down
+// 2. click
+// 3. keydown
+// 4. mouse move (if the mouse moves more than 2px)
+
+// the events that stop the primary tab activation:
+// 5. mouse leave
+// 6. visibility change to hidden
+
+// 1
+DetachableDOM.addEventListener(window, "mousedown", () => {
+  if(listenToPrimaryTabActivationTrigger) {
+    startPrimaryTabActivation()
   }
 }, true)
 
+// 2
+DetachableDOM.addEventListener(window, "click", () => {
+  if(listenToPrimaryTabActivationTrigger) {
+    startPrimaryTabActivation()
+  }
+}, true)
+
+// 3
+DetachableDOM.addEventListener(window, "keydown", () => {
+  if(listenToPrimaryTabActivationTrigger) {
+    startPrimaryTabActivation()
+  }
+}, true)
+
+// 4
+DetachableDOM.addEventListener(window, "mousemove", async event => {
+  // @ts-ignore
+  const { screenX, screenY } = event;
+
+  if(initialMousePosition === null) {
+    initialMousePosition = { x: screenX, y: screenY }
+  }
+
+  const hasMovedMouseMinimum = Math.abs(screenX - initialMousePosition.x) > MINIMUM_MOUSE_MOVEMENT_PX || Math.abs(screenY - initialMousePosition.y) > MINIMUM_MOUSE_MOVEMENT_PX;
+  if(hasMovedMouseMinimum && listenToPrimaryTabActivationTrigger) {
+    startPrimaryTabActivation()
+  }
+}, true)
+
+// 5
 DetachableDOM.addEventListener(document, "mouseleave", event => {
   if(event.target !== document) {
     return
   }
 
-  if(primaryTabTriggerTimeoutId !== null) {
-    console.log("ttg:mouseleave:", event);
-    DetachableDOM.clearTimeout(primaryTabTriggerTimeoutId)
-    primaryTabTriggerTimeoutId = null;
-    primaryTabTriggerEnabled = true
+  stopPrimaryTabActivation()
+}, true)
+
+// 6
+DetachableDOM.addEventListener(window, "visibilitychange", event => {
+  if (document.visibilityState === "hidden") {
+    stopPrimaryTabActivation();
   }
 }, true)
+
+function startPrimaryTabActivation() {
+  listenToPrimaryTabActivationTrigger = false;
+
+  if(isPDFViewer && PDFViewerOverlay.attached()) {
+    PDFViewerOverlay.remove();
+  }
+
+  primaryTabActivationTimeoutId = DetachableDOM.setTimeout(() => {
+    chrome.runtime.sendMessage({ type: "primaryTabActivationTrigger" });
+    primaryTabActivationTimeoutId = null;
+  }, 1500);
+}
+
+function stopPrimaryTabActivation() {
+  initialMousePosition = null;
+  listenToPrimaryTabActivationTrigger = true
+
+  if(primaryTabActivationTimeoutId !== null) {
+    DetachableDOM.clearTimeout(primaryTabActivationTimeoutId)
+    primaryTabActivationTimeoutId = null;
+  }
+
+  if(isPDFViewer && !PDFViewerOverlay.attached()) {
+    PDFViewerOverlay.attach()
+  }
+}
