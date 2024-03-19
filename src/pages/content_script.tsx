@@ -2,7 +2,6 @@ import DetachableDOM from "../detachableDOM";
 import { PDFViewerOverlay } from "../DOM";
 
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
-  console.log("content_script.tsx::onMessage::msg:", msg);
   if (msg.type === "ping") {
     sendResponse();
   }
