@@ -14,6 +14,7 @@ import * as ActiveTabGroup from "./ActiveTabGroup";
 import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import { callWithUserTabDraggingHandler } from "../chromeWindowHelper/chromeWindowHelper";
+import { ActiveWindow } from ".";
 
 export async function get(
   id: Types.ActiveWindow["windowId"],
@@ -140,9 +141,8 @@ export async function activateWindow(windowId: ChromeWindowId) {
   // adjust the "shape" of the new active window, using the following adjustments:
   // 1. collapse all but the selected tab group
   // 2. un-collapse the selected tab group
-  // 3. start the primary tab trigger for the active tab
 
-  // adjustment 1
+  // 1
   const remaingTabGroupsToCollapse = tabGroups.filter((tabGroup) => tabGroup.id !== selectedTab.groupId);
   const collapseNextTabGroup = async () => {
     const tabGroup = remaingTabGroupsToCollapse.pop();
@@ -158,26 +158,32 @@ export async function activateWindow(windowId: ChromeWindowId) {
 
   await collapseNextTabGroup();
 
-  // adjustment 2
+  // 2
   const selectedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === selectedTab.groupId);
   if (selectedTabGroup && selectedTabGroup.collapsed) {
     await ChromeWindowHelper.updateTabGroupAndWait(selectedTabGroup.id, { collapsed: false });
   }
-
-  // adjustment 3
-  await enablePrimaryTabActivationTriggerForTab(selectedTab.id);
 
   const transaction = await Database.createTransaction<Types.ModelDataBase, ["activeWindows", "activeTabGroups"], "readwrite">(
     "model",
     ["activeWindows", "activeTabGroups"],
     "readwrite"
   );
-  await add({ windowId, lastActiveTabInfo: { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title } }, transaction);
+  await add(
+    {
+      windowId,
+      lastActiveTabInfo: { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title },
+      primaryTabActivationTimeoutInfo: null,
+    },
+    transaction
+  );
   await Promise.all(
     tabGroups.map((tabGroup) => {
       ActiveTabGroup.add(tabGroup, transaction);
     })
   );
+
+  await startPrimaryTabActivationIfNotScriptable(selectedTab.id);
 
   return tabGroups;
 }
@@ -221,22 +227,44 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
   });
 }
 
-export async function enablePrimaryTabActivationTriggerForTab(tabOrTabId: ChromeTabId | ChromeTabWithId, makePrimaryNow = false) {
+export async function startPrimaryTabActivationIfNotScriptable(tabOrTabId: ChromeTabId | ChromeTabWithId) {
   const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
   if (tab.status !== "complete") {
     await ChromeWindowHelper.waitForTabToLoad(tab);
   }
 
-  chrome.tabs.sendMessage(tab.id, { type: "ping" }, async () => {
-    if (chrome.runtime.lastError) {
-      console.warn(`enablePrimaryTabActivationTriggerForTab::chrome.runtime.lastError for ${tab.id}:`, chrome.runtime.lastError.message);
-      // if the connection to the tab is invalid, or if the tab cant run content scripts (e.g chrome://*, the chrome web
-      //  store, and accounts.google.com), then just set the primary tab group right now without waiting for the trigger
-      if (makePrimaryNow) {
-        setPrimaryTab(tab.windowId, tab.id);
-      } else {
-        // TODO: set the primary tab after timeout period using offscreen document
-      }
+  const isTabScriptable = await ChromeWindowHelper.isTabScriptable(tab.id);
+  if (!isTabScriptable) {
+    await startPrimaryTabActivation(tab.windowId, tab.id);
+  }
+}
+
+export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabId: ChromeTabId) {
+  const primaryTabActivationTimeoutId = self.setTimeout(async () => {
+    ActiveWindow.update(windowId, { primaryTabActivationTimeoutInfo: null });
+    if (await ChromeWindowHelper.getIfTabExists(tabId)) {
+      await setPrimaryTab(windowId, tabId);
+    } else {
+      console.warn(
+        `startPrimaryTabActivation::tabId ${tabId} no longer exists. The timeout should have been cancelled by the chrome.tabs.onRemoved listener the timeout owner, but it was not.`
+      );
     }
-  });
+  }, 6500);
+  await ActiveWindow.update(windowId, { primaryTabActivationTimeoutInfo: { tabId, timeoutId: primaryTabActivationTimeoutId } });
+}
+
+export async function clearPrimaryTabActivation(windowId: ChromeWindowId, timeoutId: number) {
+  self.clearTimeout(timeoutId);
+  await ActiveWindow.update(windowId, { primaryTabActivationTimeoutInfo: null });
+}
+
+export async function restartPrimaryTabActivation(windowId: ChromeWindowId) {
+  const activeWindow = await get(windowId);
+  const { primaryTabActivationTimeoutInfo } = activeWindow;
+  if (primaryTabActivationTimeoutInfo === null) {
+    return;
+  }
+
+  await clearPrimaryTabActivation(windowId, primaryTabActivationTimeoutInfo.timeoutId);
+  await startPrimaryTabActivation(windowId, primaryTabActivationTimeoutInfo.tabId);
 }

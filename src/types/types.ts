@@ -15,6 +15,7 @@ export interface ModelDataBase extends DBSchema {
 export interface ActiveWindow {
   windowId: ChromeWindowId;
   lastActiveTabInfo: LastActiveTabInfo;
+  primaryTabActivationTimeoutInfo: PrimaryTabActivationTimeoutInfo | null;
 }
 
 export type ActiveTabGroup = chrome.tabGroups.TabGroup;
@@ -36,6 +37,11 @@ export interface LastActiveTabInfo {
   tabId: ChromeTabId;
   tabGroupId: ChromeTabGroupId;
   title: string | undefined;
+}
+
+export interface PrimaryTabActivationTimeoutInfo {
+  tabId: ChromeTabId;
+  timeoutId: number;
 }
 
 export type YesOrNo = "yes" | "no";

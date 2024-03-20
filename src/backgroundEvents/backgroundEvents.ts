@@ -1,7 +1,16 @@
 import { ActiveWindow } from "../model";
-import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, LastActiveTabInfo } from "../types/types";
+import {
+  ChromeTabGroupId,
+  ChromeTabGroupWithId,
+  ChromeTabId,
+  ChromeTabWithId,
+  ChromeWindowId,
+  LastActiveTabInfo,
+  PrimaryTabActivationTimeoutInfo,
+} from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Misc from "../misc";
+import { update } from "../model/ActiveTabGroup";
 
 let createdTabGroupingOperationInfo: Promise<{ tabId: ChromeTabId; tabGroupId: ChromeTabGroupId } | null> = Promise.resolve(null);
 let tabActivationDueToTabGroupUncollapseOperation: Promise<{ tabId: ChromeTabId; tabGroupId: ChromeTabGroupId } | null> = Promise.resolve(null);
@@ -100,7 +109,8 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
 
 export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   // 1. if the window hasnt been activated yet, return
-  // 2. collapse all other tab groups in the window, and enable the primary tab trigger for the new active tab
+  // 2. if the activated tab isnt the tab waiting for a primary tab activation, clear the primary tab activation
+  // 3. collapse all other tab groups in the window, and enable the primary tab trigger for the new active tab
 
   console.log(`onTabActivated::`, activeInfo.tabId);
 
@@ -123,9 +133,15 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
       return;
     }
 
+    const activeWindow = await ActiveWindow.get(activeWindowId);
+    const { primaryTabActivationTimeoutInfo } = activeWindow;
+    if (primaryTabActivationTimeoutInfo && primaryTabActivationTimeoutInfo.tabId !== tab.id) {
+      ActiveWindow.clearPrimaryTabActivation(activeWindowId, primaryTabActivationTimeoutInfo.timeoutId);
+    }
+
     updateLastActiveTabInfoInfo = { activeWindowId, lastActiveTabInfo: { tabId: tab.id, tabGroupId: tab.groupId, title: tab.title } };
 
-    // 2
+    // 3
     let shouldMakePrimaryNow: boolean;
     console.log(
       `onTabActivated::previousCreatedTabGroupingOperationInfo:`,
@@ -151,7 +167,11 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     );
 
     if (!tab.pinned) {
-      await ActiveWindow.enablePrimaryTabActivationTriggerForTab(tab.id, shouldMakePrimaryNow);
+      if (shouldMakePrimaryNow) {
+        await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
+      } else {
+        await ActiveWindow.startPrimaryTabActivationIfNotScriptable(tab.id);
+      }
     }
   } catch (error) {
     console.error(`onTabActivated::tabGroupIdPromise::error resolving promise with selected tab group:${error}`);
@@ -169,6 +189,8 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
 }
 
 export async function onTabCreated(tab: chrome.tabs.Tab) {
+  // 1. if the window has a primary tab activation timeout, restart it
+  // 2. if the tab is not in a group, and the last active tab was in a group, add the tab to the last active tab group
   console.log(`onTabCreated::tab:`, tab.title);
 
   if (!tab.id) {
@@ -198,11 +220,14 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
     }
 
     const activeWindow = await ActiveWindow.get(activeWindowId);
-    const previousLastActiveTabInfo = activeWindow.lastActiveTabInfo;
-
-    // 1. if the tab is not in a group, and the last active tab was in a group, add the tab to the last active tab group
+    const { lastActiveTabInfo: previousLastActiveTabInfo, primaryTabActivationTimeoutInfo } = activeWindow;
 
     // 1
+    if (primaryTabActivationTimeoutInfo) {
+      ActiveWindow.restartPrimaryTabActivation(activeWindowId);
+    }
+
+    // 2
     if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && previousLastActiveTabInfo.tabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
       console.log(`onTabCreated::adding created tab '${tab.title}' to last active tab group: '${previousLastActiveTabInfo.title}'`);
       const tabGroupId = await chrome.tabs.group({ tabIds: tab.id, groupId: previousLastActiveTabInfo.tabGroupId });
@@ -221,14 +246,14 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     return;
   }
 
+  // 1. update the activeWindow's lastActiveTabInfo's groupId property
+
   console.log(`onTabUpdated::title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
   const updateLastActiveTabInfoOperationPromise = new Misc.NonRejectablePromise<void>();
   let updateLastActiveTabInfoInfo: { activeWindowId: ChromeWindowId; lastActiveTabInfo: LastActiveTabInfo } | null = null;
 
   try {
-    // 1. update the activeWindow's lastActiveTabInfo's groupId property
-
     const previousLastActiveTabInfoPromise = updateLastActiveTabInfoOperation;
     updateLastActiveTabInfoOperation = updateLastActiveTabInfoOperationPromise.getPromise();
 
@@ -271,11 +296,18 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
 }
 
 export async function onTabRemoved(tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
+  // 1. if the tab was awaiting a primary tab activation, clear the timeout
   console.log(`onTabRemoved::tabId:`, tabId, removeInfo);
   const activeWindowId = await ActiveWindow.getKey(removeInfo.windowId);
   if (!activeWindowId) {
     console.warn(`onTabRemoved::activeWindow not found for windowId:`, removeInfo.windowId);
     return;
+  }
+
+  const activeWindow = await ActiveWindow.get(activeWindowId);
+  const { primaryTabActivationTimeoutInfo } = activeWindow;
+  if (primaryTabActivationTimeoutInfo && primaryTabActivationTimeoutInfo.tabId === tabId) {
+    await ActiveWindow.clearPrimaryTabActivation(activeWindowId, primaryTabActivationTimeoutInfo.timeoutId);
   }
 
   if (removeInfo.isWindowClosing) {
@@ -285,6 +317,7 @@ export async function onTabRemoved(tabId: ChromeTabId, removeInfo: chrome.tabs.T
 }
 
 export async function onTabMoved(tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) {
+  // 1. if the window has a primary tab activation timeout, restart it
   console.log(`onTabMoved::tabId and moveInfo:`, tabId, moveInfo);
 
   try {
@@ -296,16 +329,28 @@ export async function onTabMoved(tabId: ChromeTabId, moveInfo: chrome.tabs.TabMo
 
     let tab = (await chrome.tabs.get(tabId)) as ChromeTabWithId;
     console.log(`onTabMoved::title and groupId:`, tab.title, tab.groupId);
+
+    // 1
+    const activeWindow = await ActiveWindow.get(activeWindowId);
+    const { primaryTabActivationTimeoutInfo } = activeWindow;
+    if (primaryTabActivationTimeoutInfo) {
+      ActiveWindow.restartPrimaryTabActivation(activeWindowId);
+    }
   } catch (error) {
     console.error(`onTabMoved::error resolving promise with selected tab group:${error}`);
   }
 }
 
 export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: ChromeTabId) {
+  // 1. update the activeWindow's primaryTabActivationTimeoutInfo's tabId property
+  // 2. update the activeWindow's lastActiveTabInfo's tabId property
   console.log(`onTabReplaced::addedTabId and removedTabId:`, addedTabId, removedTabId);
 
   const updateLastActiveTabInfoOperationPromise = new Misc.NonRejectablePromise<void>();
-  let updateLastActiveTabInfoInfo: { activeWindowId: ChromeWindowId; lastActiveTabInfo: LastActiveTabInfo } | null = null;
+  let updateActiveWindowInfo: {
+    activeWindowId: ChromeWindowId;
+    updateProps: { lastActiveTabInfo?: LastActiveTabInfo; primaryTabActivationInfo?: PrimaryTabActivationTimeoutInfo };
+  } | null = null;
 
   try {
     const previousLastActiveTabInfoPromise = updateLastActiveTabInfoOperation;
@@ -314,23 +359,38 @@ export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: Chrom
 
     await previousLastActiveTabInfoPromise;
 
-    const activeWindow = await ActiveWindow.getByIndex("lastActiveTabId", removedTabId);
-    if (!activeWindow) {
+    const addedTab = (await chrome.tabs.get(addedTabId)) as ChromeTabWithId;
+    const { windowId } = addedTab;
+
+    const activeWindowId = await ActiveWindow.getKey(windowId);
+    if (!activeWindowId) {
       console.warn(`onTabReplaced::activeWindow not found for removedTabId:`, removedTabId);
       return;
     }
 
-    updateLastActiveTabInfoInfo = {
+    const activeWindow = await ActiveWindow.get(activeWindowId);
+    const { lastActiveTabInfo: previousLastActiveTabInfo, primaryTabActivationTimeoutInfo } = activeWindow;
+
+    const updateProps: { lastActiveTabInfo?: LastActiveTabInfo; primaryTabActivationInfo?: PrimaryTabActivationTimeoutInfo } = {};
+    // 1
+    if (primaryTabActivationTimeoutInfo && primaryTabActivationTimeoutInfo.tabId === removedTabId) {
+      updateProps.primaryTabActivationInfo = { ...primaryTabActivationTimeoutInfo, tabId: addedTabId };
+    }
+
+    // 2
+    updateProps.lastActiveTabInfo = { ...previousLastActiveTabInfo, tabId: addedTabId };
+
+    updateActiveWindowInfo = {
       activeWindowId: activeWindow.windowId,
-      lastActiveTabInfo: { ...activeWindow.lastActiveTabInfo, tabId: addedTabId },
+      updateProps,
     };
   } catch (error) {
     console.error(`onTabReplaced::error resolving promise with selected tab group:${error}`);
   } finally {
-    if (updateLastActiveTabInfoInfo) {
+    if (updateActiveWindowInfo) {
       try {
-        const { activeWindowId, lastActiveTabInfo } = updateLastActiveTabInfoInfo;
-        await ActiveWindow.update(activeWindowId, { lastActiveTabInfo });
+        const { activeWindowId, updateProps } = updateActiveWindowInfo;
+        await ActiveWindow.update(activeWindowId, updateProps);
       } catch (error) {
         console.error(`onTabReplaced::error updating lastActiveTabInfo:${error}`);
       }
