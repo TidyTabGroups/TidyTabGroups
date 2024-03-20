@@ -221,17 +221,6 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
   });
 }
 
-export async function activatePrimaryTab(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
-  const tabs = Array.isArray(windowIdOrTabs) ? windowIdOrTabs : ((await chrome.tabs.query({ windowId: windowIdOrTabs })) as ChromeTabWithId[]);
-  const lastTab = tabs[tabs.length - 1];
-  if (lastTab) {
-    if (lastTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-      await ChromeWindowHelper.updateTabGroupAndWait(lastTab.groupId, { collapsed: false });
-    }
-    await ChromeWindowHelper.activateTabAndWait(lastTab.id);
-  }
-}
-
 export async function enablePrimaryTabActivationTriggerForTab(tabOrTabId: ChromeTabId | ChromeTabWithId, makePrimaryNow = false) {
   const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
   if (tab.status !== "complete") {
