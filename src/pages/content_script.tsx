@@ -90,7 +90,7 @@ function startPrimaryTabActivation() {
   primaryTabActivationTimeoutId = DetachableDOM.setTimeout(() => {
     chrome.runtime.sendMessage({ type: "primaryTabActivationTrigger" });
     primaryTabActivationTimeoutId = null;
-  }, 1500);
+  }, 4000);
 }
 
 function stopPrimaryTabActivation() {
