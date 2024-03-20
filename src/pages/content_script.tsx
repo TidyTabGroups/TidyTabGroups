@@ -5,6 +5,7 @@ import ContentHelper from "../contentHelper";
 
 const isMainFrame = window === window.top;
 
+// Ping-pong message to check if the content script is running
 if(isMainFrame) {
   chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (msg.type === "ping") {
@@ -13,12 +14,14 @@ if(isMainFrame) {
   });
 }
 
+// PDF Viewer Overlay
 // @ts-ignore
 const isPDFViewer = document.body.childNodes.values().find((node) => node.tagName === "EMBED" && node.type === "application/pdf");
 if (isPDFViewer) {
   PDFViewerOverlay.attach();
 }
 
+// Primary Tab Activation
 let listenToPrimaryTabActivationTrigger = true;
 let primaryTabActivationTimeoutId: number | null = null;
 let initialMousePosition: { x: number, y: number } | null = null;
