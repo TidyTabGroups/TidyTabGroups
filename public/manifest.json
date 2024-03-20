@@ -15,6 +15,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
+      "all_frames": true,
       "js": ["js/vendor.js", "js/content_script.js"]
     }
   ],

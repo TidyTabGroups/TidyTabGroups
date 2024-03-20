@@ -28,7 +28,7 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   // inject the content script into all tabs
   const tabs = (await chrome.tabs.query({})) as ChromeTabWithId[];
   for (const tab of tabs) {
-    chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["js/content_script.js"] });
+    chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["js/content_script.js"] });
   }
 
   // Misc.openDummyTab();
