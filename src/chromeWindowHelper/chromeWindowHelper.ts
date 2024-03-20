@@ -216,7 +216,7 @@ export async function discardTabIfNotDiscarded(tabId: ChromeTabId) {
 // some tabs may not be scriptable, for example chrome://*, the chrome web store, accounts.google.com
 export async function isTabScriptable(tabId: ChromeTabId) {
   return new Promise((resolve) => {
-    chrome.tabs.sendMessage(tabId, { type: "ping" }, async () => {
+    chrome.tabs.sendMessage(tabId, { type: "ping" }, { frameId: 0 }, async () => {
       if (chrome.runtime.lastError) {
         console.warn(`isTabScriptable::chrome.runtime.lastError for ${tabId}:`, chrome.runtime.lastError.message);
         resolve(false);

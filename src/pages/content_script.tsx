@@ -1,11 +1,17 @@
 import DetachableDOM from "../detachableDOM";
 import { PDFViewerOverlay } from "../DOM";
+import Misc from "../misc";
+import ContentHelper from "../contentHelper";
 
-chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
-  if (msg.type === "ping") {
-    sendResponse();
-  }
-});
+const isMainFrame = window === window.top;
+
+if(isMainFrame) {
+  chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+    if (msg.type === "ping") {
+      sendResponse();
+    }
+  });
+}
 
 // @ts-ignore
 const isPDFViewer = document.body.childNodes.values().find((node) => node.tagName === "EMBED" && node.type === "application/pdf");
@@ -18,13 +24,31 @@ let primaryTabActivationTimeoutId: number | null = null;
 let initialMousePosition: { x: number, y: number } | null = null;
 const MINIMUM_MOUSE_MOVEMENT_PX = 2
 
+window.addEventListener("message", event => {
+  if(event.data.type === "startPrimaryTabActivation") {
+    // this message is sent only to the main frame by a nested frame when it wants to start the activation
+    if(!isMainFrame) {
+      console.warn("the startPrimaryTabActivation message should only be sent to the main frame");
+      return;
+    }
+    startPrimaryTabActivation()
+  } else if(event.data.type === "stopPrimaryTabActivation") {
+    // this message is sent by the main frame to all nested frames when it wants to stop the activation
+    if(isMainFrame) {
+      console.warn("the stopPrimaryTabActivation message should not be sent to the main frame");
+      return;
+    }
+    stopPrimaryTabActivation()
+  }
+})
+
 // the events that start the primary tab activation:
 // 1. mouse down
 // 2. click
 // 3. keydown
 // 4. mouse move (if the mouse moves more than 2px)
 
-// the events that stop the primary tab activation:
+// the events that stop the primary tab activation (main frame only):
 // 5. mouse leave
 // 6. visibility change to hidden
 
@@ -64,27 +88,41 @@ DetachableDOM.addEventListener(window, "mousemove", async event => {
   }
 }, true)
 
-// 5
-DetachableDOM.addEventListener(document, "mouseleave", event => {
-  if(event.target !== document) {
-    return
-  }
+if(isMainFrame) {
+  // 5
+  DetachableDOM.addEventListener(document, "mouseleave", event => {
+    if(event.target !== document) {
+      return
+    }
 
-  stopPrimaryTabActivation()
-}, true)
+    stopPrimaryTabActivation()
+  }, true)
 
-// 6
-DetachableDOM.addEventListener(window, "visibilitychange", event => {
-  if (document.visibilityState === "hidden") {
-    stopPrimaryTabActivation();
-  }
-}, true)
+  // 6
+  DetachableDOM.addEventListener(window, "visibilitychange", event => {
+    if (document.visibilityState === "hidden") {
+      stopPrimaryTabActivation();
+    }
+  }, true)
+}
 
 function startPrimaryTabActivation() {
   listenToPrimaryTabActivationTrigger = false;
 
   if(isPDFViewer && PDFViewerOverlay.attached()) {
     PDFViewerOverlay.remove();
+  }
+
+  if(!isMainFrame) {
+    // let the main frame do the rest
+    if(window.top) {
+      window.top.postMessage({ type: "startPrimaryTabActivation" }, "*");
+    } else {
+      // FIXME: in which cases is window.top null?
+      console.warn("window.top is null, cannot send message to top frame")
+    }
+
+    return;
   }
 
   primaryTabActivationTimeoutId = DetachableDOM.setTimeout(() => {
@@ -94,6 +132,16 @@ function startPrimaryTabActivation() {
 }
 
 function stopPrimaryTabActivation() {
+
+  if(isMainFrame) {
+    // let all child frames know to stop
+    Misc.callAsync(() => {
+      ContentHelper.forEachNestedFrame(frame => {
+        frame.postMessage({ type: "stopPrimaryTabActivation" }, "*");
+      })
+    })
+  }
+
   initialMousePosition = null;
   listenToPrimaryTabActivationTrigger = true
 
