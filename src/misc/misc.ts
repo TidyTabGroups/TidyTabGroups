@@ -44,3 +44,11 @@ export class NonRejectablePromise<T> {
     this._resolve(value);
   }
 }
+
+export function callAsync(fn: Function) {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(fn());
+    });
+  });
+}
