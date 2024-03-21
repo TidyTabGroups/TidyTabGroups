@@ -35,7 +35,7 @@ export async function updateTabAndWait(tabId: ChromeTabId, updatedProperties: ch
     });
   });
 
-  const updatePromise = callWithUserTabDraggingHandler(() => chrome.tabs.update(tabId, updatedProperties));
+  const updatePromise = waitForUserTabDraggingUsingCall(() => chrome.tabs.update(tabId, updatedProperties));
   const [updatedTab] = await Promise.all([onUpdatedPromise, updatePromise]);
   return updatedTab;
 }
@@ -50,7 +50,7 @@ export async function activateTabAndWait(tabId: ChromeTabId) {
     });
   });
 
-  const updatePromise = callWithUserTabDraggingHandler(() => chrome.tabs.update(tabId, { active: true }));
+  const updatePromise = waitForUserTabDraggingUsingCall(() => chrome.tabs.update(tabId, { active: true }));
   return await Promise.all([onActivatedPromise, updatePromise]);
 }
 
@@ -64,7 +64,7 @@ export async function updateTabGroupAndWait(tabGroupId: ChromeTabGroupId, update
     });
   });
 
-  const updatePromise = callWithUserTabDraggingHandler(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
+  const updatePromise = waitForUserTabDraggingUsingCall(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
   const [updatedTabGroup] = await Promise.all([onUpdatedPromise, updatePromise]);
   return updatedTabGroup;
 }
@@ -79,7 +79,7 @@ export async function moveTabAndWait(tabId: ChromeTabId, moveProperties: chrome.
     });
   });
 
-  const movePromise = callWithUserTabDraggingHandler(() => chrome.tabs.move(tabId, moveProperties));
+  const movePromise = waitForUserTabDraggingUsingCall(() => chrome.tabs.move(tabId, moveProperties));
   return await Promise.all([onMovedPromise, movePromise]);
 }
 
@@ -93,18 +93,18 @@ export async function moveTabGroupAndWait(tabGroupId: ChromeTabGroupId, moveProp
     });
   });
 
-  const movePromise = callWithUserTabDraggingHandler(() => chrome.tabGroups.move(tabGroupId, moveProperties));
+  const movePromise = waitForUserTabDraggingUsingCall(() => chrome.tabGroups.move(tabGroupId, moveProperties));
   return await Promise.all([onMovedPromise, movePromise]);
 }
 
-export async function callWithUserTabDraggingHandler<T>(fn: () => Promise<T>): Promise<T> {
+export async function waitForUserTabDraggingUsingCall<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (error) {
     // @ts-ignore
     if (error?.message === "Tabs cannot be edited right now (user may be dragging a tab).") {
-      console.log(`callWithUserTabDraggingHandler::user may be dragging a tab: `, fn.toString());
-      return await callWithUserTabDraggingHandler<T>(fn);
+      console.log(`waitForUserTabDraggingUsingCall::user may be dragging a tab: `, fn.toString());
+      return await waitForUserTabDraggingUsingCall<T>(fn);
     } else {
       throw error;
     }

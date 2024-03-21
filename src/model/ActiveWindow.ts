@@ -13,7 +13,7 @@ import {
 import * as ActiveTabGroup from "./ActiveTabGroup";
 import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
-import { callWithUserTabDraggingHandler } from "../chromeWindowHelper/chromeWindowHelper";
+import { waitForUserTabDraggingUsingCall } from "../chromeWindowHelper/chromeWindowHelper";
 import { ActiveWindow } from ".";
 
 export async function get(
