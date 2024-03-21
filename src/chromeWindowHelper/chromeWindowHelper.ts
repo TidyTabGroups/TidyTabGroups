@@ -104,7 +104,7 @@ export async function waitForUserTabDraggingUsingCall<T>(fn: () => Promise<T>): 
     // @ts-ignore
     if (error?.message === "Tabs cannot be edited right now (user may be dragging a tab).") {
       console.log(`waitForUserTabDraggingUsingCall::user may be dragging a tab: `, fn.toString());
-      return await waitForUserTabDraggingUsingCall<T>(fn);
+      return new Promise((resolve) => setTimeout(() => resolve(waitForUserTabDraggingUsingCall(fn)), 100));
     } else {
       throw error;
     }
