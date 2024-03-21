@@ -357,7 +357,7 @@ export async function onTabMoved(tabId: ChromeTabId, moveInfo: chrome.tabs.TabMo
     const activeWindow = await ActiveWindow.get(activeWindowId);
     const { primaryTabActivationInfo } = activeWindow;
     if (primaryTabActivationInfo) {
-      ActiveWindow.restartPrimaryTabActivation(activeWindowId);
+      ActiveWindow.restartPrimaryTabActivationTimeout(activeWindowId);
     }
   } catch (error) {
     console.error(`onTabMoved::error resolving promise with selected tab group:${error}`);

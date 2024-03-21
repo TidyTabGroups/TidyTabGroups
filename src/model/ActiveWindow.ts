@@ -235,22 +235,7 @@ export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrT
 
   const isTabScriptable = await ChromeWindowHelper.isTabScriptable(tab.id);
   const timeoutPeriod = isTabScriptable ? 15000 : 6500;
-  const primaryTabActivationTimeoutId = self.setTimeout(async () => {
-    if (await ChromeWindowHelper.doesTabExist(tab.id)) {
-      await triggerPrimaryTabActivation(windowId);
-    } else {
-      console.warn(
-        `startPrimaryTabActivationTimeout::tabId ${tab.id} no longer exists. The timeout should have been cancelled by the chrome.tabs.onRemoved listener the timeout owner, but it was not.`
-      );
-    }
-  }, timeoutPeriod);
-
-  try {
-    await ActiveWindow.update(windowId, { primaryTabActivationInfo: { tabId: tab.id, timeoutId: primaryTabActivationTimeoutId } });
-  } catch (error) {
-    self.clearTimeout(primaryTabActivationTimeoutId);
-    throw new Error(`startPrimaryTabActivationTimeout::${error}`);
-  }
+  startPrimaryTabActivationTimeout(windowId, tab.id, timeoutPeriod);
 }
 
 export async function triggerPrimaryTabActivation(windowId: ChromeWindowId) {
@@ -275,13 +260,32 @@ export async function clearPrimaryTabActivation(windowId: ChromeWindowId) {
   await ActiveWindow.update(windowId, { primaryTabActivationInfo: null });
 }
 
-export async function restartPrimaryTabActivation(windowId: ChromeWindowId) {
+export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowId) {
   const activeWindow = await get(windowId);
   const { primaryTabActivationInfo } = activeWindow;
   if (primaryTabActivationInfo === null) {
     return;
   }
 
-  await clearPrimaryTabActivation(windowId);
-  await startPrimaryTabActivation(windowId, primaryTabActivationInfo.tabId);
+  self.clearTimeout(primaryTabActivationInfo.timeoutId);
+  await startPrimaryTabActivationTimeout(windowId, primaryTabActivationInfo.tabId, primaryTabActivationInfo.timeoutPeriod);
+}
+
+async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId: ChromeTabId, timeoutPeriod: number) {
+  const primaryTabActivationTimeoutId = self.setTimeout(async () => {
+    if (await ChromeWindowHelper.doesTabExist(tabId)) {
+      await triggerPrimaryTabActivation(windowId);
+    } else {
+      console.warn(
+        `startPrimaryTabActivationTimeout::tabId ${tabId} no longer exists. The timeout should have been cancelled by the chrome.tabs.onRemoved listener the timeout owner, but it was not.`
+      );
+    }
+  }, timeoutPeriod);
+
+  try {
+    await ActiveWindow.update(windowId, { primaryTabActivationInfo: { tabId: tabId, timeoutId: primaryTabActivationTimeoutId, timeoutPeriod } });
+  } catch (error) {
+    self.clearTimeout(primaryTabActivationTimeoutId);
+    throw new Error(`startPrimaryTabActivationTimeout::${error}`);
+  }
 }

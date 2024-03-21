@@ -42,6 +42,7 @@ export interface LastActiveTabInfo {
 export interface PrimaryTabActivationTimeoutInfo {
   tabId: ChromeTabId;
   timeoutId: number;
+  timeoutPeriod: number;
 }
 
 export type YesOrNo = "yes" | "no";
