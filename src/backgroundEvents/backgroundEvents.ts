@@ -126,8 +126,10 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
 export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   // 1. if the window hasnt been activated yet, return
   // 2. if the activated tab isnt awaiting a primary tab activation, clear the primary tab activation
-  // 3. collapse all other tab groups in the window,
-  // 4. start the primary tab activation for the new active tab
+  // 3. collapse all other tab groups in the window
+  // 4. by now, the active tab could have been moved to another position, group, or window, or closed, so
+  //    we need to get the tab again and reverse any previous invalid tab editing (e.g collapsing tab groups)
+  // 5. start the primary tab activation for the new active tab
 
   console.log(`onTabActivated::`, activeInfo.tabId);
 
@@ -185,6 +187,20 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     );
 
     // 4
+    const newTab = await ChromeWindowHelper.getIfTabExists(tab.id);
+    if (!newTab) {
+      console.warn(`onTabActivated::the active tab has been removed:`, tab);
+      return;
+    }
+    tab = newTab;
+
+    // if the tab was moved into a group that was collapsed, we need to uncollapse it
+    if (otherNonCollapsedTabGroups.find((tabGroup) => tabGroup.id === tab.groupId)) {
+      console.log(`onTabActivated::reverse uncollapsing tab group:`, tab.groupId);
+      await ChromeWindowHelper.updateTabGroupAndWait(tab.groupId, { collapsed: false });
+    }
+
+    // 5
     if (!tab.pinned) {
       if (shouldMakePrimaryNow) {
         await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
