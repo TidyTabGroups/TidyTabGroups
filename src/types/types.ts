@@ -15,7 +15,7 @@ export interface ModelDataBase extends DBSchema {
 export interface ActiveWindow {
   windowId: ChromeWindowId;
   lastActiveTabInfo: LastActiveTabInfo;
-  primaryTabActivationTimeoutInfo: PrimaryTabActivationTimeoutInfo | null;
+  primaryTabActivationInfo: PrimaryTabActivationTimeoutInfo | null;
 }
 
 export type ActiveTabGroup = chrome.tabGroups.TabGroup;

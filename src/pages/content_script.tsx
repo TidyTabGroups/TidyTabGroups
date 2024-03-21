@@ -21,58 +21,58 @@ if (isPDFViewer) {
   PDFViewerOverlay.attach();
 }
 
-// Primary Tab Activation
-let listenToPrimaryTabActivationTrigger = true;
-let primaryTabActivationTimeoutId: number | null = null;
+// user page focus detection
+let listenToPageFocusEvents = true;
+let pageFocusTimeoutId: number | null = null;
 let initialMousePosition: { x: number, y: number } | null = null;
 const MINIMUM_MOUSE_MOVEMENT_PX = 2
 
 window.addEventListener("message", event => {
-  if(event.data.type === "startPrimaryTabActivation") {
-    // this message is sent only to the main frame by a nested frame when it wants to start the activation
+  if(event.data.type === "startPageFocusTimeout") {
+    // this message is sent only to the main frame by a nested frame when it wants to start the page focus timeout
     if(!isMainFrame) {
-      console.warn("the startPrimaryTabActivation message should only be sent to the main frame");
+      console.warn("the startPageFocusTimeout message should only be sent to the main frame");
       return;
     }
-    startPrimaryTabActivation()
-  } else if(event.data.type === "stopPrimaryTabActivation") {
-    // this message is sent by the main frame to all nested frames when it wants to stop the activation
+    startPageFocusTimeout()
+  } else if(event.data.type === "clearPageFocusTimeout") {
+    // this message is sent by the main frame to all nested frames when it wants to clear the page focus timeout
     if(isMainFrame) {
-      console.warn("the stopPrimaryTabActivation message should not be sent to the main frame");
+      console.warn("the clearPageFocusTimeout message should not be sent to the main frame");
       return;
     }
-    stopPrimaryTabActivation()
+    clearPageFocusTimeout()
   }
 })
 
-// the events that start the primary tab activation:
+// the events that start the page focus timeout (all frames):
 // 1. mouse down
 // 2. click
 // 3. keydown
 // 4. mouse move (if the mouse moves more than 2px)
 
-// the events that stop the primary tab activation (main frame only):
+// the events that clear the page focus timeout (main frame only):
 // 5. mouse leave
 // 6. visibility change to hidden
 
 // 1
 DetachableDOM.addEventListener(window, "mousedown", () => {
-  if(listenToPrimaryTabActivationTrigger) {
-    startPrimaryTabActivation()
+  if(listenToPageFocusEvents) {
+    startPageFocusTimeout()
   }
 }, true)
 
 // 2
 DetachableDOM.addEventListener(window, "click", () => {
-  if(listenToPrimaryTabActivationTrigger) {
-    startPrimaryTabActivation()
+  if(listenToPageFocusEvents) {
+    startPageFocusTimeout()
   }
 }, true)
 
 // 3
 DetachableDOM.addEventListener(window, "keydown", () => {
-  if(listenToPrimaryTabActivationTrigger) {
-    startPrimaryTabActivation()
+  if(listenToPageFocusEvents) {
+    startPageFocusTimeout()
   }
 }, true)
 
@@ -86,8 +86,8 @@ DetachableDOM.addEventListener(window, "mousemove", async event => {
   }
 
   const hasMovedMouseMinimum = Math.abs(screenX - initialMousePosition.x) > MINIMUM_MOUSE_MOVEMENT_PX || Math.abs(screenY - initialMousePosition.y) > MINIMUM_MOUSE_MOVEMENT_PX;
-  if(hasMovedMouseMinimum && listenToPrimaryTabActivationTrigger) {
-    startPrimaryTabActivation()
+  if(hasMovedMouseMinimum && listenToPageFocusEvents) {
+    startPageFocusTimeout()
   }
 }, true)
 
@@ -98,19 +98,19 @@ if(isMainFrame) {
       return
     }
 
-    stopPrimaryTabActivation()
+    clearPageFocusTimeout()
   }, true)
 
   // 6
   DetachableDOM.addEventListener(window, "visibilitychange", event => {
     if (document.visibilityState === "hidden") {
-      stopPrimaryTabActivation();
+      clearPageFocusTimeout();
     }
   }, true)
 }
 
-function startPrimaryTabActivation() {
-  listenToPrimaryTabActivationTrigger = false;
+function startPageFocusTimeout() {
+  listenToPageFocusEvents = false;
 
   if(isPDFViewer && PDFViewerOverlay.attached()) {
     PDFViewerOverlay.remove();
@@ -119,7 +119,7 @@ function startPrimaryTabActivation() {
   if(!isMainFrame) {
     // let the main frame do the rest
     if(window.top) {
-      window.top.postMessage({ type: "startPrimaryTabActivation" }, "*");
+      window.top.postMessage({ type: "startPageFocusTimeout" }, "*");
     } else {
       // FIXME: in which cases is window.top null?
       console.warn("window.top is null, cannot send message to top frame")
@@ -128,29 +128,28 @@ function startPrimaryTabActivation() {
     return;
   }
 
-  primaryTabActivationTimeoutId = DetachableDOM.setTimeout(() => {
-    chrome.runtime.sendMessage({ type: "primaryTabActivationTrigger" });
-    primaryTabActivationTimeoutId = null;
+  pageFocusTimeoutId = DetachableDOM.setTimeout(() => {
+    chrome.runtime.sendMessage({ type: "pageFocused" });
+    pageFocusTimeoutId = null;
   }, 4000);
 }
 
-function stopPrimaryTabActivation() {
-
+function clearPageFocusTimeout() {
   if(isMainFrame) {
     // let all child frames know to stop
     Misc.callAsync(() => {
       ContentHelper.forEachNestedFrame(frame => {
-        frame.postMessage({ type: "stopPrimaryTabActivation" }, "*");
+        frame.postMessage({ type: "clearPageFocusTimeout" }, "*");
       })
     })
   }
 
   initialMousePosition = null;
-  listenToPrimaryTabActivationTrigger = true
+  listenToPageFocusEvents = true
 
-  if(primaryTabActivationTimeoutId !== null) {
-    DetachableDOM.clearTimeout(primaryTabActivationTimeoutId)
-    primaryTabActivationTimeoutId = null;
+  if(pageFocusTimeoutId !== null) {
+    DetachableDOM.clearTimeout(pageFocusTimeoutId)
+    pageFocusTimeoutId = null;
   }
 
   if(isPDFViewer && !PDFViewerOverlay.attached()) {
