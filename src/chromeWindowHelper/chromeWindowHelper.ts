@@ -183,7 +183,7 @@ export function isWindow(object: any): object is chrome.windows.Window {
 
 export async function getIfTabExists(tabId: ChromeTabId) {
   try {
-    return await chrome.tabs.get(tabId);
+    return (await chrome.tabs.get(tabId)) as ChromeTabWithId;
   } catch (error) {}
 }
 
