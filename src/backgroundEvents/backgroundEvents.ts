@@ -146,13 +146,18 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
       const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
       if (!activeTabInGroup) {
-        // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
-        const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
-        await Misc.waitMs(timeToWaitBeforeActivation);
-
         const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
         resultingTabActivationDueToTabGroupUncollapseOperation = { tabId: lastTabInGroup.id, tabGroupId: tabGroup.id };
 
+        // start loading the tab now (before waiting for the animations to finish)
+        if (lastTabInGroup.status === "unloaded") {
+          chrome.tabs
+            .update(lastTabInGroup.id, { url: lastTabInGroup.url })
+            .catch((error) => logger.error(`onTabGroupsUpdated::error discarding tab:${error}`));
+        }
+        // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
+        const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
+        await Misc.waitMs(timeToWaitBeforeActivation);
         await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
       }
     }
