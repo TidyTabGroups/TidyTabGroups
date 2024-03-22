@@ -164,7 +164,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     const activeWindow = await ActiveWindow.getOrThrow(activeWindowId);
     const { primaryTabActivationInfo } = activeWindow;
     if (primaryTabActivationInfo && primaryTabActivationInfo.tabId !== tab.id) {
-      ActiveWindow.clearPrimaryTabActivation(activeWindowId);
+      await ActiveWindow.clearPrimaryTabActivation(activeWindowId);
     }
 
     updateLastActiveTabInfoInfo = { activeWindowId, lastActiveTabInfo: { tabId: tab.id, tabGroupId: tab.groupId, title: tab.title } };
