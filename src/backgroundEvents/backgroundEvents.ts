@@ -98,7 +98,7 @@ export async function onWindowRemoved(windowId: ChromeWindowId) {
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   // 1. if the tab group is uncollapsed the active tab isnt already in this group:
-  //   a. uncollapse all other tab groups
+  //   a. collapse all other tab groups
   //   b. activate the last tab in the group
   logger.log(`onTabGroupsUpdated::tabGroup:`, tabGroup.title, tabGroup.collapsed);
   const tabActivationDueToTabGroupUncollapseOperationPromise = new Misc.NonRejectablePromise<{
