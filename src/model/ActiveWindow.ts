@@ -282,6 +282,19 @@ export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowI
 async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId: ChromeTabId, timeoutPeriod: number) {
   const primaryTabActivationTimeoutId = self.setTimeout(async () => {
     if (await ChromeWindowHelper.doesTabExist(tabId)) {
+      const activeWindow = await getIfExists(windowId);
+      if (!activeWindow) {
+        console.warn(`startPrimaryTabActivationTimeout::windowId ${windowId} no longer exists.`);
+        return;
+      }
+
+      if (activeWindow.primaryTabActivationInfo?.tabId !== tabId) {
+        console.warn(
+          `startPrimaryTabActivationTimeout::tabId ${tabId} is no longer the primary tab. The timeout should have been cancelled by the timeout owner, but it was not.`
+        );
+        return;
+      }
+
       await triggerPrimaryTabActivation(windowId);
     } else {
       console.warn(
