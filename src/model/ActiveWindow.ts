@@ -29,6 +29,14 @@ export async function get(
   return activeWindow;
 }
 
+export async function getIfExists(
+  id: Types.ActiveWindow["windowId"],
+  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
+) {
+  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
+  return await transaction.objectStore("activeWindows").get(id);
+}
+
 export async function getKey(
   id: Types.ActiveWindow["windowId"],
   _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
