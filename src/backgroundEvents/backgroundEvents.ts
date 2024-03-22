@@ -97,9 +97,9 @@ export async function onWindowRemoved(windowId: ChromeWindowId) {
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
-  // 1. if the tab group is uncollapsed the active tab isnt already in this group:
+  // 1. if the tab group is uncollapsed:
   //   a. collapse all other tab groups
-  //   b. activate the last tab in the group
+  //   b. if the active tab isnt already in this group, activate the last tab in the group
   logger.log(`onTabGroupsUpdated::tabGroup:`, tabGroup.title, tabGroup.collapsed);
   const tabActivationDueToTabGroupUncollapseOperationPromise = new Misc.NonRejectablePromise<{
     tabId: ChromeTabId;
@@ -121,23 +121,23 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
     }
 
     if (!tabGroup.collapsed) {
+      // 1.a
+      const tabGroups = (await chrome.tabGroups.query({ windowId: tabGroup.windowId, collapsed: false })) as ChromeTabGroupWithId[];
+      const otherTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.id !== tabGroup.id);
+      if (otherTabGroups.length > 0) {
+        logger.log(`onTabGroupsUpdated::collapsing all other tab groups`);
+        await Promise.all(
+          otherTabGroups.map(async (otherTabGroup) => {
+            await ChromeWindowHelper.updateTabGroupAndWait(otherTabGroup.id, { collapsed: true });
+          })
+        );
+      }
+
+      // 1.b
       const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
       const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
       if (!activeTabInGroup) {
-        // 1.a
-        const tabGroups = (await chrome.tabGroups.query({ windowId: tabGroup.windowId, collapsed: false })) as ChromeTabGroupWithId[];
-        const otherTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.id !== tabGroup.id);
-        if (otherTabGroups.length > 0) {
-          logger.log(`onTabGroupsUpdated::collapsing all other tab groups`);
-          await Promise.all(
-            otherTabGroups.map(async (otherTabGroup) => {
-              await ChromeWindowHelper.updateTabGroupAndWait(otherTabGroup.id, { collapsed: true });
-            })
-          );
-        }
-
-        // 1.b
         // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
         const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
         await Misc.waitMs(timeToWaitBeforeActivation);
