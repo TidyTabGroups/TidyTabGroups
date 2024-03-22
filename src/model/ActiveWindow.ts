@@ -16,7 +16,7 @@ import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import { ActiveWindow } from ".";
 
-const logger = Logger.getLogger("ActiveWindow", { color: "green" });
+const logger = Logger.getLogger("ActiveWindow", { color: "#b603fc" });
 
 export async function getOrThrow(
   id: Types.ActiveWindow["windowId"],
