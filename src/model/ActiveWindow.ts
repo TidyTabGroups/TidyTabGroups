@@ -196,6 +196,16 @@ export async function activateWindow(windowId: ChromeWindowId) {
   return tabGroups;
 }
 
+export async function deactivateWindow(windowId: ChromeWindowId) {
+  const activeWindow = await get(windowId);
+  if (!activeWindow) {
+    throw new Error(`deactivateWindow::windowId ${windowId} not found`);
+  }
+
+  await clearPrimaryTabActivation(windowId);
+  await remove(windowId);
+}
+
 export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
   const tabGroupsOrdered = await ChromeWindowHelper.getTabGroupsOrdered(windowId);
   return tabGroupsOrdered.length > 0 ? tabGroupsOrdered[tabGroupsOrdered.length - 1] : null;
@@ -290,7 +300,7 @@ async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId:
 
       if (activeWindow.primaryTabActivationInfo?.tabId !== tabId) {
         console.warn(
-          `startPrimaryTabActivationTimeout::tabId ${tabId} is no longer the primary tab. The timeout should have been cancelled by the timeout owner, but it was not.`
+          `startPrimaryTabActivationTimeout::tabId ${tabId} is no longer the primary tab. The timeout should have been cancelled by the when the window was removed, but it was not.`
         );
         return;
       }

@@ -80,8 +80,13 @@ export async function onWindowCreated(window: chrome.windows.Window) {
 
 export async function onWindowRemoved(windowId: ChromeWindowId) {
   console.log(`onWindowRemoved::windowId:`, windowId);
-  await ActiveWindow.remove(windowId);
-  console.log(`onWindowRemoved::removedActiveWindow:`, windowId);
+  if (!(await ActiveWindow.getKey(windowId))) {
+    console.warn(`onWindowRemoved::activeWindow not found for windowId:`, windowId);
+    return;
+  }
+
+  await ActiveWindow.deactivateWindow(windowId);
+  console.log(`onWindowRemoved::deactivated window:`, windowId);
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
