@@ -120,8 +120,8 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       return;
     }
 
-    const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
     if (!tabGroup.collapsed) {
+      const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
       const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
       if (!activeTabInGroup) {
