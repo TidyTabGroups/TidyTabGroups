@@ -11,6 +11,7 @@ import Database from "../database";
   chrome.tabs.onActivated.addListener(BackgroundEvents.onTabActivated);
   chrome.tabs.onUpdated.addListener(BackgroundEvents.onTabUpdated);
   chrome.tabs.onRemoved.addListener(BackgroundEvents.onTabRemoved);
+  chrome.tabs.onMoved.addListener(BackgroundEvents.onTabMoved);
   chrome.tabs.onReplaced.addListener(BackgroundEvents.onTabReplaced);
 
   chrome.tabGroups.onUpdated.addListener(BackgroundEvents.onTabGroupsUpdated);

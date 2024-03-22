@@ -291,7 +291,9 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     return;
   }
 
-  // 1. update the activeWindow's lastActiveTabInfo's groupId property
+  // 1. if the groupId property is updated:
+  //  a. if the window has a primary tab activation timeout, restart it
+  //  b. update the activeWindow's lastActiveTabInfo's groupId property
 
   logger.log(`onTabUpdated::title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
@@ -312,14 +314,20 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     const previousLastActiveTabInfo = activeWindow.lastActiveTabInfo;
 
     // 1
-    // we check if the tab still exists because the chrome.tabs.onUpdated event gets called with groupId = -1 when the tab is removed, and we
-    //  dont want to forget which tab group the removed tab belonged to in lastActiveTabInfo
+    // we check if the tab still exists because the chrome.tabs.onUpdated event gets called with groupId = -1 when the tab
+    //  is removed, in which case we dont care about this event for the current use cases
     if (
       previousLastActiveTabInfo &&
       previousLastActiveTabInfo.tabId === tabId &&
       changeInfo.groupId !== undefined &&
       (await ChromeWindowHelper.doesTabExist(tabId))
     ) {
+      // 1.a
+      if (activeWindow.primaryTabActivationInfo) {
+        await ActiveWindow.restartPrimaryTabActivationTimeout(activeWindow.windowId);
+      }
+
+      // 1.b
       updateLastActiveTabInfoInfo = {
         activeWindowId: activeWindow.windowId,
         lastActiveTabInfo: { ...previousLastActiveTabInfo, tabGroupId: changeInfo.groupId },
