@@ -13,14 +13,16 @@ export function getLogger(prefix?: string, prefixOptions?: { color?: string; div
   }
 
   return {
-    log: (message: string, ...args: any[]) => {
+    log: (message: any, ...args: any[]) => {
       console.log(resultingPrefixString + message, ...otherLogArguments, ...args);
     },
-    warn: (message: string, ...args: any[]) => {
+    warn: (message: any, ...args: any[]) => {
       console.warn(resultingPrefixString + message, ...otherLogArguments, ...args);
     },
-    error: (message: string, ...args: any[]) => {
+    error: (message: any, ...args: any[]) => {
       console.error(resultingPrefixString + message, ...otherLogArguments, ...args);
     },
   };
 }
+
+export const attentionLogger = getLogger("ATTENTION", { color: "#ff0f0f" });
