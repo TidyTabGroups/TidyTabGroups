@@ -13,8 +13,10 @@ import {
 import * as ActiveTabGroup from "./ActiveTabGroup";
 import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
-import { waitForUserTabDraggingUsingCall } from "../chromeWindowHelper/chromeWindowHelper";
+import Logger from "../logger";
 import { ActiveWindow } from ".";
+
+const logger = Logger.getLogger("ActiveWindow", { color: "green" });
 
 export async function getOrThrow(
   id: Types.ActiveWindow["windowId"],
@@ -246,6 +248,8 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
 }
 
 export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrTabId: ChromeTabId | ChromeTabWithId) {
+  const tabId = typeof tabOrTabId === "number" ? tabOrTabId : tabOrTabId.id;
+  logger.log(`startPrimaryTabActivation::windowId: ${windowId}, tabId: ${tabId}`);
   const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
   if (tab.status !== "complete") {
     await ChromeWindowHelper.waitForTabToLoad(tab);
@@ -257,9 +261,11 @@ export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrT
 }
 
 export async function triggerPrimaryTabActivation(windowId: ChromeWindowId) {
+  logger.log(`triggerPrimaryTabActivation::windowId: ${windowId}`);
   const activeWindow = await getOrThrow(windowId);
   const { primaryTabActivationInfo } = activeWindow;
   if (primaryTabActivationInfo === null) {
+    logger.warn(`triggerPrimaryTabActivation::windowId ${windowId} has no primaryTabActivationInfo`);
     return;
   }
 
@@ -268,9 +274,11 @@ export async function triggerPrimaryTabActivation(windowId: ChromeWindowId) {
 }
 
 export async function clearPrimaryTabActivation(windowId: ChromeWindowId) {
+  logger.log(`clearPrimaryTabActivation::windowId: ${windowId}`);
   const activeWindow = await getOrThrow(windowId);
   const { primaryTabActivationInfo } = activeWindow;
   if (primaryTabActivationInfo === null) {
+    logger.warn(`clearPrimaryTabActivation::windowId ${windowId} has no primaryTabActivationInfo`);
     return;
   }
 
@@ -279,9 +287,11 @@ export async function clearPrimaryTabActivation(windowId: ChromeWindowId) {
 }
 
 export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowId) {
+  logger.log(`restartPrimaryTabActivationTimeout::windowId: ${windowId}`);
   const activeWindow = await getOrThrow(windowId);
   const { primaryTabActivationInfo } = activeWindow;
   if (primaryTabActivationInfo === null) {
+    logger.warn(`restartPrimaryTabActivationTimeout::windowId ${windowId} has no primaryTabActivationInfo`);
     return;
   }
 
@@ -290,16 +300,17 @@ export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowI
 }
 
 async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId: ChromeTabId, timeoutPeriod: number) {
+  logger.log(`startPrimaryTabActivationTimeout::windowId: ${windowId}, tabId: ${tabId}, timeoutPeriod: ${timeoutPeriod}`);
   const primaryTabActivationTimeoutId = self.setTimeout(async () => {
     if (await ChromeWindowHelper.doesTabExist(tabId)) {
       const activeWindow = await get(windowId);
       if (!activeWindow) {
-        console.warn(`startPrimaryTabActivationTimeout::windowId ${windowId} no longer exists.`);
+        logger.warn(`startPrimaryTabActivationTimeout::windowId ${windowId} no longer exists.`);
         return;
       }
 
       if (activeWindow.primaryTabActivationInfo?.tabId !== tabId) {
-        console.warn(
+        logger.warn(
           `startPrimaryTabActivationTimeout::tabId ${tabId} is no longer the primary tab. The timeout should have been cancelled by the when the window was removed, but it was not.`
         );
         return;
@@ -307,7 +318,7 @@ async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId:
 
       await triggerPrimaryTabActivation(windowId);
     } else {
-      console.warn(
+      logger.warn(
         `startPrimaryTabActivationTimeout::tabId ${tabId} no longer exists. The timeout should have been cancelled by the chrome.tabs.onRemoved listener the timeout owner, but it was not.`
       );
     }
