@@ -16,20 +16,20 @@ import ChromeWindowHelper from "../chromeWindowHelper";
 import { waitForUserTabDraggingUsingCall } from "../chromeWindowHelper/chromeWindowHelper";
 import { ActiveWindow } from ".";
 
-export async function get(
+export async function getOrThrow(
   id: Types.ActiveWindow["windowId"],
   _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly" | "readwrite">
 ) {
   const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
   const activeWindow = await transaction.objectStore("activeWindows").get(id);
   if (!activeWindow) {
-    throw new Error(`ActiveWindow::get with id ${id} not found`);
+    throw new Error(`ActiveWindow::getOrThrow with id ${id} not found`);
   }
 
   return activeWindow;
 }
 
-export async function getIfExists(
+export async function get(
   id: Types.ActiveWindow["windowId"],
   _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
 ) {
@@ -102,7 +102,7 @@ export async function update(
 ) {
   const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readwrite");
 
-  const activeWindow = await get(id, transaction);
+  const activeWindow = await getOrThrow(id, transaction);
 
   await transaction.objectStore("activeWindows").put({ ...activeWindow, ...updatedProperties });
 
@@ -247,7 +247,7 @@ export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrT
 }
 
 export async function triggerPrimaryTabActivation(windowId: ChromeWindowId) {
-  const activeWindow = await get(windowId);
+  const activeWindow = await getOrThrow(windowId);
   const { primaryTabActivationInfo } = activeWindow;
   if (primaryTabActivationInfo === null) {
     return;
@@ -258,7 +258,7 @@ export async function triggerPrimaryTabActivation(windowId: ChromeWindowId) {
 }
 
 export async function clearPrimaryTabActivation(windowId: ChromeWindowId) {
-  const activeWindow = await get(windowId);
+  const activeWindow = await getOrThrow(windowId);
   const { primaryTabActivationInfo } = activeWindow;
   if (primaryTabActivationInfo === null) {
     return;
@@ -269,7 +269,7 @@ export async function clearPrimaryTabActivation(windowId: ChromeWindowId) {
 }
 
 export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowId) {
-  const activeWindow = await get(windowId);
+  const activeWindow = await getOrThrow(windowId);
   const { primaryTabActivationInfo } = activeWindow;
   if (primaryTabActivationInfo === null) {
     return;
@@ -282,7 +282,7 @@ export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowI
 async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId: ChromeTabId, timeoutPeriod: number) {
   const primaryTabActivationTimeoutId = self.setTimeout(async () => {
     if (await ChromeWindowHelper.doesTabExist(tabId)) {
-      const activeWindow = await getIfExists(windowId);
+      const activeWindow = await get(windowId);
       if (!activeWindow) {
         console.warn(`startPrimaryTabActivationTimeout::windowId ${windowId} no longer exists.`);
         return;
