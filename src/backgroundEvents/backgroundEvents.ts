@@ -97,7 +97,8 @@ export async function onWindowRemoved(windowId: ChromeWindowId) {
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
-  // 1. if the tab group is uncollapsed:
+  // 1. restart the primary tab activation timeout for this window if it exists
+  // 2. if the tab group is uncollapsed:
   //   a. collapse all other tab groups
   //   b. if the active tab isnt already in this group, activate the last tab in the group
   logger.log(`onTabGroupsUpdated::tabGroup:`, tabGroup.title, tabGroup.collapsed);
@@ -120,8 +121,15 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       return;
     }
 
+    // 1
+    const activeWindow = await ActiveWindow.getOrThrow(activeWindowId);
+    const { primaryTabActivationInfo } = activeWindow;
+    if (primaryTabActivationInfo) {
+      await ActiveWindow.restartPrimaryTabActivationTimeout(activeWindowId);
+    }
+
     if (!tabGroup.collapsed) {
-      // 1.a
+      // 2.a
       const tabGroups = (await chrome.tabGroups.query({ windowId: tabGroup.windowId, collapsed: false })) as ChromeTabGroupWithId[];
       const otherTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.id !== tabGroup.id);
       if (otherTabGroups.length > 0) {
@@ -133,7 +141,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
         );
       }
 
-      // 1.b
+      // 2.b
       const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
       const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
