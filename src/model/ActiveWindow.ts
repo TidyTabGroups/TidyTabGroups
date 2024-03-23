@@ -221,18 +221,20 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
   }
 
   let shouldMoveTab = false;
-  if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-    const tabsInGroup = tabs.filter((otherTab) => otherTab.groupId === tab.groupId);
-    const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
-    if (lastTabInGroup.index < tabs[tabs.length - 1].index) {
-      await ChromeWindowHelper.moveTabGroupAndWait(tab.groupId, { index: -1 });
-    }
+  if (!tab.pinned) {
+    if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      const tabsInGroup = tabs.filter((otherTab) => otherTab.groupId === tab.groupId);
+      const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
+      if (lastTabInGroup.index < tabs[tabs.length - 1].index) {
+        await ChromeWindowHelper.moveTabGroupAndWait(tab.groupId, { index: -1 });
+      }
 
-    if (tab.index < lastTabInGroup.index) {
+      if (tab.index < lastTabInGroup.index) {
+        shouldMoveTab = true;
+      }
+    } else if (tab.index < tabs[tabs.length - 1].index) {
       shouldMoveTab = true;
     }
-  } else if (tab.index < tabs[tabs.length - 1].index) {
-    shouldMoveTab = true;
   }
 
   if (shouldMoveTab) {
@@ -333,5 +335,45 @@ async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId:
   } catch (error) {
     self.clearTimeout(primaryTabActivationTimeoutId);
     throw new Error(`startPrimaryTabActivationTimeout::${error}`);
+  }
+}
+
+// just a helper used by certain tab/group related events like tabs.onActivated, tabs.onUpdated, tabs.onMoved and tabGroups.onUpdated
+export async function clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(
+  activeWindowId: ChromeWindowId,
+  tabId: ChromeTabId,
+  tabIsActive: boolean,
+  tabIsPinned: boolean,
+  tabIsRemoved: boolean
+) {
+  const activeWindow = await get(activeWindowId);
+  if (!activeWindow) {
+    logger.warn(`clearOrRestartOrStartNewPrimaryTabActivationForTabEvent::active window not found:`, activeWindowId);
+    return;
+  }
+
+  const { primaryTabActivationInfo } = activeWindow;
+  const tabIsAwaitingPrimaryTabActivation = primaryTabActivationInfo?.tabId === tabId;
+
+  if (tabIsActive && tabIsPinned) {
+    if (primaryTabActivationInfo !== null) {
+      await clearPrimaryTabActivation(activeWindowId);
+    }
+    await setPrimaryTab(activeWindowId, tabId);
+  } else if (tabIsActive && primaryTabActivationInfo !== null) {
+    if (tabIsAwaitingPrimaryTabActivation) {
+      await restartPrimaryTabActivationTimeout(activeWindowId);
+    } else {
+      await clearPrimaryTabActivation(activeWindowId);
+      await startPrimaryTabActivation(activeWindowId, tabId);
+    }
+  } else if (tabIsActive) {
+    await startPrimaryTabActivation(activeWindowId, tabId);
+  } else if (primaryTabActivationInfo !== null) {
+    if (tabIsRemoved) {
+      await ActiveWindow.clearPrimaryTabActivation(activeWindowId);
+    } else {
+      await restartPrimaryTabActivationTimeout(activeWindowId);
+    }
   }
 }
