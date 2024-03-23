@@ -250,6 +250,13 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
 }
 
 export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrTabId: ChromeTabId | ChromeTabWithId) {
+  const activeWindow = await getOrThrow(windowId);
+  if (activeWindow.primaryTabActivationInfo !== null) {
+    throw new Error(
+      `startPrimaryTabActivation::windowId ${windowId} already has a primaryTabActivationInfo. If you want to restart the timeout, use restartPrimaryTabActivationTimeout instead. Otherwsie clear the timeout first`
+    );
+  }
+
   const tabId = typeof tabOrTabId === "number" ? tabOrTabId : tabOrTabId.id;
   logger.log(`startPrimaryTabActivation::windowId: ${windowId}, tabId: ${tabId}`);
   const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
