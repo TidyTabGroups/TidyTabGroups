@@ -249,7 +249,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
 export async function onTabCreated(tab: chrome.tabs.Tab) {
   // 1. if the tab isnt active and it's position is after the tab awaiting a primary tab activation, cancel the primary tab activation
   // 2. if the tab is not in a group, and the last active tab was in a group, add the tab to the last active tab group
-  logger.log(`onTabCreated::tab:`, tab.title);
+  logger.log(`onTabCreated::tab:`, tab.title, tab.groupId);
 
   if (!tab.id) {
     logger.warn(`onTabCreated::tabId not found for tab:`, tab);
