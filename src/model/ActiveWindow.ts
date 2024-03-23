@@ -305,7 +305,6 @@ export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowI
 }
 
 async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId: ChromeTabId, timeoutPeriod: number) {
-  logger.log(`startPrimaryTabActivationTimeout::windowId: ${windowId}, tabId: ${tabId}, timeoutPeriod: ${timeoutPeriod}`);
   const primaryTabActivationTimeoutId = self.setTimeout(async () => {
     if (await ChromeWindowHelper.doesTabExist(tabId)) {
       const activeWindow = await get(windowId);
