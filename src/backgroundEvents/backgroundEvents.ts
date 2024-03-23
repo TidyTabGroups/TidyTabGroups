@@ -70,8 +70,12 @@ export async function onMessage(message: any, sender: chrome.runtime.MessageSend
     }
 
     const activeWindow = await ActiveWindow.getOrThrow(activeWindowId);
-    if (activeWindow.primaryTabActivationInfo && activeWindow.primaryTabActivationInfo.tabId === tab.id) {
-      await ActiveWindow.triggerPrimaryTabActivation(activeWindowId, tab.id);
+    if (activeWindow.primaryTabActivationInfo) {
+      if (activeWindow.primaryTabActivationInfo.tabId === tab.id) {
+        await ActiveWindow.triggerPrimaryTabActivation(activeWindowId, tab.id);
+      } else {
+        logger.warn("onMessage::pageFocused::tab is not the primary tab:", tab, activeWindow.primaryTabActivationInfo);
+      }
     }
   }
 }
