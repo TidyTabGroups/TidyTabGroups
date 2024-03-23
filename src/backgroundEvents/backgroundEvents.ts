@@ -223,7 +223,6 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
       shouldMakePrimaryNow = false;
     }
 
-    // 3
     if (!tab.pinned) {
       if (shouldMakePrimaryNow) {
         await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
