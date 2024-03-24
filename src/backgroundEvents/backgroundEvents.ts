@@ -323,8 +323,11 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     const previousLastGroupedTabInfoPromise = lastGroupedTabInfo;
     lastGroupedTabInfo = lastGroupedTabInfoPromise.getPromise();
 
+    const previousCreatedTabGroupingOperationInfoPromise = createdTabGroupingOperationInfo;
+
     resultingLastGroupedTabInfo = await previousLastGroupedTabInfoPromise;
 
+    const previousCreatedTabGroupingOperationInfo = await previousCreatedTabGroupingOperationInfoPromise;
     await previousLastActiveTabInfoPromise;
 
     const activeWindow = await ActiveWindow.get(tab.windowId);
@@ -340,6 +343,14 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     //  is removed, in which case we dont care about this event for the current use cases
     if (changeInfo.groupId !== undefined && (await ChromeWindowHelper.doesTabExist(tabId))) {
       resultingLastGroupedTabInfo = { tabId, tabGroupId: changeInfo.groupId };
+
+      if (
+        previousCreatedTabGroupingOperationInfo &&
+        previousCreatedTabGroupingOperationInfo.tabId === tabId &&
+        changeInfo.groupId !== previousCreatedTabGroupingOperationInfo.tabGroupId
+      ) {
+        await chrome.tabs.group({ tabIds: tabId, groupId: changeInfo.groupId });
+      }
 
       // 1.a
       await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(activeWindow.windowId, tab.id, tab.active, tab.pinned, false);
