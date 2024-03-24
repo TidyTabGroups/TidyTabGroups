@@ -7,6 +7,7 @@ import {
   ChromeWindowId,
   LastActiveTabInfo,
   PrimaryTabActivationTimeoutInfo,
+  LastGroupedTabInfo,
 } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Misc from "../misc";
@@ -22,6 +23,7 @@ const logger = Logger.getLogger("backgroundEvents", { color: "#fcba03" });
 let createdTabGroupingOperationInfo: Promise<{ tabId: ChromeTabId; tabGroupId: ChromeTabGroupId } | null> = Promise.resolve(null);
 let tabActivationDueToTabGroupUncollapseOperation: Promise<{ tabId: ChromeTabId; tabGroupId: ChromeTabGroupId } | null> = Promise.resolve(null);
 let updateLastActiveTabInfoOperation: Promise<void> = Promise.resolve();
+let lastGroupedTabInfo: Promise<LastGroupedTabInfo | null> = Promise.resolve(null);
 
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   logger.log(`onInstalled::Extension was installed because of: ${details.reason}`);
@@ -267,6 +269,18 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
     }
 
     // 2
+    // By now, the the tab's group could have been updated. If so, lastGroupedTabInfo will contain that info. Note, for
+    //   this to work, it relies on the fact that this is code path is async, otherwise, lastGroupedTabInfo wont be updated in time in the tabs.onUpdated handler
+    const previousLastGroupedTabInfo = await lastGroupedTabInfo;
+    const updatedTabGroupId =
+      previousLastGroupedTabInfo?.tabId === tab.id && previousLastGroupedTabInfo.tabGroupId !== undefined
+        ? previousLastGroupedTabInfo.tabGroupId
+        : null;
+    if (updatedTabGroupId !== null) {
+      logger.log(`onTabCreated::updatedTabGroupId:`, updatedTabGroupId);
+      tab.groupId = updatedTabGroupId;
+    }
+
     if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && previousLastActiveTabInfo.tabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
       logger.log(`onTabCreated::adding created tab '${tab.title}' to last active tab group: '${previousLastActiveTabInfo.title}'`);
       const tabGroupId = await chrome.tabs.group({ tabIds: tab.id, groupId: previousLastActiveTabInfo.tabGroupId });
@@ -296,6 +310,9 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
 
   logger.log(`onTabUpdated::title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
+  const lastGroupedTabInfoPromise = new Misc.NonRejectablePromise<LastGroupedTabInfo | null>();
+  let resultingLastGroupedTabInfo: LastGroupedTabInfo | null = null;
+
   const updateLastActiveTabInfoOperationPromise = new Misc.NonRejectablePromise<void>();
   let updateLastActiveTabInfoInfo: { activeWindowId: ChromeWindowId; lastActiveTabInfo: LastActiveTabInfo } | null = null;
 
@@ -303,7 +320,13 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     const previousLastActiveTabInfoPromise = updateLastActiveTabInfoOperation;
     updateLastActiveTabInfoOperation = updateLastActiveTabInfoOperationPromise.getPromise();
 
+    const previousLastGroupedTabInfoPromise = lastGroupedTabInfo;
+    lastGroupedTabInfo = lastGroupedTabInfoPromise.getPromise();
+
+    resultingLastGroupedTabInfo = await previousLastGroupedTabInfoPromise;
+
     await previousLastActiveTabInfoPromise;
+
     const activeWindow = await ActiveWindow.get(tab.windowId);
     if (!activeWindow) {
       logger.warn(`onTabsUpdated::activeWindow not found for windowId:`, tab.windowId);
@@ -316,6 +339,8 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     // we check if the tab still exists because the chrome.tabs.onUpdated event gets called with groupId = -1 when the tab
     //  is removed, in which case we dont care about this event for the current use cases
     if (changeInfo.groupId !== undefined && (await ChromeWindowHelper.doesTabExist(tabId))) {
+      resultingLastGroupedTabInfo = { tabId, tabGroupId: changeInfo.groupId };
+
       // 1.a
       await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(activeWindow.windowId, tab.id, tab.active, tab.pinned, false);
 
@@ -339,6 +364,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
       }
     }
     updateLastActiveTabInfoOperationPromise.resolve();
+    lastGroupedTabInfoPromise.resolve(resultingLastGroupedTabInfo);
   }
 }
 
