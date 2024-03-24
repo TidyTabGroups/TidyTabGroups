@@ -128,6 +128,15 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       return;
     }
 
+    // This is a workaround for when Chrome restores a window and fires a bunch of tabGroup.onUpdated events with these "psuedo" tab groups.
+    // Note, for this to work, it relies on the fact that this is code path is async.
+    const tabGroupsWithSameTitle = await chrome.tabGroups.query({ windowId: tabGroup.windowId, title: tabGroup.title });
+    const tabGroupWithSameTitleAndId = tabGroupsWithSameTitle.find((otherTabGroup) => otherTabGroup.id === tabGroup.id);
+    if (!tabGroupWithSameTitleAndId) {
+      myLogger.warn(`tab group with same title and id not found for windowId:`, tabGroup.windowId, tabGroup.id);
+      return;
+    }
+
     // 1
     await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(activeWindow.windowId, -1, false, false, false);
 
