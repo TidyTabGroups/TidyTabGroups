@@ -250,6 +250,9 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
 }
 
 export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrTabId: ChromeTabId | ChromeTabWithId) {
+  const tabId = typeof tabOrTabId === "number" ? tabOrTabId : tabOrTabId.id;
+  logger.log(`startPrimaryTabActivation::windowId: ${windowId}, tabId: ${tabId}`);
+
   const activeWindow = await getOrThrow(windowId);
   if (activeWindow.primaryTabActivationInfo !== null) {
     throw new Error(
@@ -257,8 +260,6 @@ export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrT
     );
   }
 
-  const tabId = typeof tabOrTabId === "number" ? tabOrTabId : tabOrTabId.id;
-  logger.log(`startPrimaryTabActivation::windowId: ${windowId}, tabId: ${tabId}`);
   const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
   if (tab.status !== "complete") {
     await ChromeWindowHelper.waitForTabToLoad(tab);
@@ -270,7 +271,7 @@ export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrT
 }
 
 export async function triggerPrimaryTabActivation(windowId: ChromeWindowId, tabId: ChromeTabId) {
-  logger.log(`triggerPrimaryTabActivation::windowId: ${windowId}`);
+  logger.log(`triggerPrimaryTabActivation::windowId: ${windowId}, tabId: ${tabId}`);
   const activeWindow = await getOrThrow(windowId);
   const { primaryTabActivationInfo } = activeWindow;
   if (primaryTabActivationInfo === null) {
@@ -361,6 +362,10 @@ export async function clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(
 
   const { primaryTabActivationInfo } = activeWindow;
   const tabIsAwaitingPrimaryTabActivation = primaryTabActivationInfo?.tabId === tabId;
+
+  logger.log(
+    `clearOrRestartOrStartNewPrimaryTabActivationForTabEvent::tabId: ${tabId}, tabIsActive: ${tabIsActive}, tabIsPinned: ${tabIsPinned}, tabIsRemoved: ${tabIsRemoved}, primaryTabActivationInfo.tabId: ${primaryTabActivationInfo?.tabId}`
+  );
 
   if (tabIsActive && tabIsPinned) {
     if (primaryTabActivationInfo !== null) {
