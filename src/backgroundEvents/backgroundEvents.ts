@@ -266,7 +266,7 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
       const primaryTabActivationTab = (await chrome.tabs.get(primaryTabActivationInfo.tabId)) as ChromeTabWithId;
       if (tab.index > primaryTabActivationTab.index) {
         myLogger.log(`clearing primary tab activation for last active tab:`, primaryTabActivationTab.id, primaryTabActivationTab.title);
-        ActiveWindow.clearPrimaryTabActivation(activeWindowId);
+        await ActiveWindow.clearPrimaryTabActivation(activeWindowId);
       }
     }
 
