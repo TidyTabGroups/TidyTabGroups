@@ -46,8 +46,13 @@ export function getLogger(prefix?: string, options?: { color?: string; divider?:
     return getLogger(resultingPrefixString + formattedPrefixData[0], { filter }, cssColors);
   }
 
+  function getPrefixedMessage(message: string) {
+    return resultingPrefixString + message;
+  }
+
   return {
     getNestedLogger,
+    getPrefixedMessage,
     log: (message: any, ...args: any[]) => {
       log("log", message, ...args);
     },
