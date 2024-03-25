@@ -450,7 +450,9 @@ export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: Chrom
     }
 
     // 2
-    updateProps.lastActiveTabInfo = { ...previousLastActiveTabInfo, tabId: addedTabId };
+    if (previousLastActiveTabInfo && previousLastActiveTabInfo.tabId === removedTabId) {
+      updateProps.lastActiveTabInfo = { ...previousLastActiveTabInfo, tabId: addedTabId };
+    }
 
     updateActiveWindowInfo = {
       activeWindowId: activeWindow.windowId,
