@@ -20,10 +20,76 @@ function justWokeUp() {
   return new Date().getTime() - awokenTime.getTime() < 500;
 }
 
-let createdTabGroupingOperationInfo: Promise<{ tabId: ChromeTabId; tabGroupId: ChromeTabGroupId } | null> = Promise.resolve(null);
-let tabActivationDueToTabGroupUncollapseOperation: Promise<{ tabId: ChromeTabId; tabGroupId: ChromeTabGroupId } | null> = Promise.resolve(null);
-let updateLastActiveTabInfoOperation: Promise<void> = Promise.resolve();
-let lastGroupedTabInfo: Promise<LastGroupedTabInfo | null> = Promise.resolve(null);
+type AsyncOperation = () => Promise<void>;
+const operationQueue: AsyncOperation[] = [];
+let isProcessingQueue = false;
+
+function queueOperation(operation: AsyncOperation): void {
+  operationQueue.push(operation);
+  if (!isProcessingQueue) {
+    processQueue();
+  }
+}
+
+async function processQueue(): Promise<void> {
+  isProcessingQueue = true;
+  while (operationQueue.length > 0) {
+    const currentOperation = operationQueue.shift();
+    if (currentOperation) {
+      try {
+        await currentOperation();
+      } catch (error) {
+        logger.error("processQueue::Error processing operation:", error);
+      }
+    }
+  }
+  isProcessingQueue = false;
+}
+
+export async function initialize() {
+  chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {
+    queueOperation(() => onInstalled(details));
+  });
+  chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+    queueOperation(() => onMessage(message, sender, sendResponse));
+  });
+
+  chrome.windows.onCreated.addListener((window: chrome.windows.Window) => {
+    queueOperation(() => onWindowCreated(window));
+  });
+
+  chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
+    queueOperation(() => onWindowRemoved(windowId));
+  });
+
+  chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
+    queueOperation(() => onTabCreated(tab));
+  });
+
+  chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
+    queueOperation(() => onTabActivated(activeInfo));
+  });
+
+  chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+    queueOperation(() => onTabUpdated(tabId, changeInfo, tab));
+  });
+
+  chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
+    queueOperation(() => onTabRemoved(tabId, removeInfo));
+  });
+
+  chrome.tabs.onMoved.addListener((tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) => {
+    queueOperation(() => onTabMoved(tabId, moveInfo));
+  });
+
+  chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
+    queueOperation(() => onTabReplaced(addedTabId, removedTabId));
+  });
+
+  chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
+    queueOperation(() => onTabGroupsUpdated(tabGroup));
+  });
+}
 
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   logger.log(`onInstalled::Extension was installed because of: ${details.reason}`);
@@ -52,33 +118,37 @@ export async function onMessage(message: any, sender: chrome.runtime.MessageSend
 
   myLogger.log(`message:`, message);
 
-  if (message.type === "pageFocused") {
-    // 1. if the tab is pinned, ignore
-    // 2. if the tab is awaiting a primary tab activation, set it as the primary tab
-    const { tab } = sender;
-    if (!tab || !tab.id) {
-      myLogger.warn("pageFocused::sender.tab is not valid:", sender);
-      return;
-    }
+  try {
+    if (message.type === "pageFocused") {
+      // 1. if the tab is pinned, ignore
+      // 2. if the tab is awaiting a primary tab activation, set it as the primary tab
+      const { tab } = sender;
+      if (!tab || !tab.id) {
+        myLogger.warn("pageFocused::sender.tab is not valid:", sender);
+        return;
+      }
 
-    if (tab.pinned) {
-      myLogger.warn("pageFocused::tab is pinned:", tab);
-      return;
-    }
+      if (tab.pinned) {
+        myLogger.warn("pageFocused::tab is pinned:", tab);
+        return;
+      }
 
-    const activeWindow = await ActiveWindow.get(tab.windowId);
-    if (!activeWindow) {
-      myLogger.warn("pageFocused::activeWindow not found:", tab.windowId);
-      return;
-    }
+      const activeWindow = await ActiveWindow.get(tab.windowId);
+      if (!activeWindow) {
+        myLogger.warn("pageFocused::activeWindow not found:", tab.windowId);
+        return;
+      }
 
-    if (activeWindow.primaryTabActivationInfo) {
-      if (activeWindow.primaryTabActivationInfo.tabId === tab.id) {
-        await ActiveWindow.triggerPrimaryTabActivation(activeWindow.windowId, tab.id);
-      } else {
-        myLogger.warn("pageFocused::tab is not the primary tab:", tab, activeWindow.primaryTabActivationInfo);
+      if (activeWindow.primaryTabActivationInfo) {
+        if (activeWindow.primaryTabActivationInfo.tabId === tab.id) {
+          await ActiveWindow.triggerPrimaryTabActivation(activeWindow.windowId, tab.id);
+        } else {
+          myLogger.warn("pageFocused::tab is not the primary tab:", tab, activeWindow.primaryTabActivationInfo);
+        }
       }
     }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error processing message:${error}`));
   }
 }
 
@@ -87,19 +157,28 @@ export async function onWindowCreated(window: chrome.windows.Window) {
     return;
   }
   logger.log(`onWindowCreated::window:`, window);
-  const newActiveWindow = await ActiveWindow.activateWindow(window.id);
-  logger.log(`onWindowCreated::newActiveWindow:`, newActiveWindow);
+
+  try {
+    const newActiveWindow = await ActiveWindow.activateWindow(window.id);
+    logger.log(`onWindowCreated::newActiveWindow:`, newActiveWindow);
+  } catch (error) {
+    throw new Error(`onWindowCreated::error processing window:${error}`);
+  }
 }
 
 export async function onWindowRemoved(windowId: ChromeWindowId) {
   logger.log(`onWindowRemoved::windowId:`, windowId);
-  if (!(await ActiveWindow.get(windowId))) {
-    logger.warn(`onWindowRemoved::activeWindow not found for windowId:`, windowId);
-    return;
-  }
+  try {
+    if (!(await ActiveWindow.get(windowId))) {
+      logger.warn(`onWindowRemoved::activeWindow not found for windowId:`, windowId);
+      return;
+    }
 
-  await ActiveWindow.deactivateWindow(windowId);
-  logger.log(`onWindowRemoved::deactivated window:`, windowId);
+    await ActiveWindow.deactivateWindow(windowId);
+    logger.log(`onWindowRemoved::deactivated window:`, windowId);
+  } catch (error) {
+    throw new Error(`onWindowRemoved::error processing window:${error}`);
+  }
 }
 
 export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
@@ -109,19 +188,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   //   a. collapse all other tab groups
   //   b. if the active tab isnt already in this group, activate the last tab in the group
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed);
-  const tabActivationDueToTabGroupUncollapseOperationPromise = new Misc.NonRejectablePromise<{
-    tabId: ChromeTabId;
-    tabGroupId: ChromeTabGroupId;
-  } | null>();
-  let resultingTabActivationDueToTabGroupUncollapseOperation: { tabId: ChromeTabId; tabGroupId: ChromeTabGroupId } | null = null;
   try {
-    const previousTabActivationDueToTabGroupUncollapseOperationPromise = tabActivationDueToTabGroupUncollapseOperation;
-
-    tabActivationDueToTabGroupUncollapseOperation = tabActivationDueToTabGroupUncollapseOperationPromise.getPromise();
-
-    const previousTabActivationDueToTabGroupUncollapseOperation = await previousTabActivationDueToTabGroupUncollapseOperationPromise;
-    resultingTabActivationDueToTabGroupUncollapseOperation = previousTabActivationDueToTabGroupUncollapseOperation;
-
     const activeWindow = await ActiveWindow.get(tabGroup.windowId);
     if (!activeWindow) {
       myLogger.warn(`activeWindow not found for windowId:`, tabGroup.windowId);
@@ -159,7 +226,6 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
       if (!activeTabInGroup) {
         const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
-        resultingTabActivationDueToTabGroupUncollapseOperation = { tabId: lastTabInGroup.id, tabGroupId: tabGroup.id };
 
         // start loading the tab now (before waiting for the animations to finish)
         if (lastTabInGroup.status === "unloaded") {
@@ -172,9 +238,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
       }
     }
   } catch (error) {
-    myLogger.error(`error resolving promise with selected tab group:${error}`);
-  } finally {
-    tabActivationDueToTabGroupUncollapseOperationPromise.resolve(resultingTabActivationDueToTabGroupUncollapseOperation);
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
@@ -186,14 +250,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
 
   myLogger.log(``, activeInfo.tabId);
 
-  let updateLastActiveTabInfoOperationPromise = new Misc.NonRejectablePromise<void>();
-  let updateLastActiveTabInfoInfo: { activeWindowId: ChromeWindowId; lastActiveTabInfo: LastActiveTabInfo } | null = null;
-
   try {
-    updateLastActiveTabInfoOperation = updateLastActiveTabInfoOperationPromise.getPromise();
-
-    const previousCreatedTabGroupingOperationInfo = await createdTabGroupingOperationInfo;
-
     const activeWindow = await ActiveWindow.get(activeInfo.windowId);
     if (!activeWindow) {
       myLogger.warn(`activeWindow not found for windowId:`, activeInfo.windowId);
@@ -208,36 +265,13 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
 
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
 
-    myLogger.log(
-      `previousCreatedTabGroupingOperationInfo:`,
-      previousCreatedTabGroupingOperationInfo?.tabId,
-      previousCreatedTabGroupingOperationInfo?.tabId === activeInfo.tabId
-    );
-    if (previousCreatedTabGroupingOperationInfo && previousCreatedTabGroupingOperationInfo.tabId === activeInfo.tabId) {
-      tab.groupId = previousCreatedTabGroupingOperationInfo.tabGroupId;
-      createdTabGroupingOperationInfo = Promise.resolve(null);
-    }
-
     // 1
     await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(tab.windowId, tab.id, tab.active, tab.pinned, false);
 
     // 2
-    updateLastActiveTabInfoInfo = {
-      activeWindowId: activeWindow.windowId,
-      lastActiveTabInfo: { tabId: tab.id, tabGroupId: tab.groupId, title: tab.title },
-    };
+    await ActiveWindow.update(activeWindow.windowId, { lastActiveTabInfo: { tabId: tab.id, tabGroupId: tab.groupId, title: tab.title } });
   } catch (error) {
-    myLogger.error(`tabGroupIdPromise::error resolving promise with selected tab group:${error}`);
-  } finally {
-    if (updateLastActiveTabInfoInfo) {
-      try {
-        const { activeWindowId, lastActiveTabInfo } = updateLastActiveTabInfoInfo;
-        await ActiveWindow.update(activeWindowId, { lastActiveTabInfo });
-      } catch (error) {
-        myLogger.error(`error updating lastActiveTabInfo:${error}`);
-      }
-    }
-    updateLastActiveTabInfoOperationPromise.resolve();
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
@@ -252,21 +286,7 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
     return;
   }
 
-  const createdTabGroupingOperationInfoPromise = new Misc.NonRejectablePromise<{ tabId: ChromeTabId; tabGroupId: ChromeTabGroupId } | null>();
-  let resultingCreatedTabGroupingOperationInfo: { tabId: ChromeTabId; tabGroupId: ChromeTabGroupId } | null = null;
-
   try {
-    const previousLastActiveTabInfoPromise = updateLastActiveTabInfoOperation;
-    const previousCreatedTabGroupingOperationInfoPromise = createdTabGroupingOperationInfo;
-
-    createdTabGroupingOperationInfo = createdTabGroupingOperationInfoPromise.getPromise();
-
-    const [_, previousCreatedTabGroupingOperationInfo] = await Promise.all([
-      previousLastActiveTabInfoPromise,
-      previousCreatedTabGroupingOperationInfoPromise,
-    ]);
-    resultingCreatedTabGroupingOperationInfo = previousCreatedTabGroupingOperationInfo;
-
     const activeWindow = await ActiveWindow.get(tab.windowId);
     if (!activeWindow) {
       myLogger.warn(`activeWindow not found for windowId:`, tab.windowId);
@@ -288,16 +308,12 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
     }
 
     // 2
-    // By now, the the tab's group could have been updated. If so, lastGroupedTabInfo will contain that info. Note, for
-    //   this to work, it relies on the fact that this is code path is async, otherwise, lastGroupedTabInfo wont be updated in time in the tabs.onUpdated handler
-    const previousLastGroupedTabInfo = await lastGroupedTabInfo;
-    const updatedTabGroupId =
-      previousLastGroupedTabInfo?.tabId === tab.id && previousLastGroupedTabInfo.tabGroupId !== undefined
-        ? previousLastGroupedTabInfo.tabGroupId
-        : null;
-    if (updatedTabGroupId !== null) {
-      myLogger.log(`updatedTabGroupId:`, updatedTabGroupId);
-      tab.groupId = updatedTabGroupId;
+    // By now, the the tab's group could have been updated.
+    // Note, for this to work, it relies on the fact that this is code path is async
+    tab = (await chrome.tabs.get(tab.id)) as ChromeTabWithId;
+    if (!tab.id) {
+      myLogger.warn(`tabId not found for tab:`, tab);
+      return;
     }
 
     if (
@@ -306,13 +322,10 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
       previousLastActiveTabInfo.tabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE
     ) {
       myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${previousLastActiveTabInfo.title}'`);
-      const tabGroupId = await chrome.tabs.group({ tabIds: tab.id, groupId: previousLastActiveTabInfo.tabGroupId });
-      resultingCreatedTabGroupingOperationInfo = { tabId: tab.id, tabGroupId };
+      await chrome.tabs.group({ tabIds: tab.id, groupId: previousLastActiveTabInfo.tabGroupId });
     }
   } catch (error) {
-    myLogger.error(`tabGroupIdPromise::error resolving promise with selected tab group:${error}`);
-  } finally {
-    createdTabGroupingOperationInfoPromise.resolve(resultingCreatedTabGroupingOperationInfo);
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
@@ -334,23 +347,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
 
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
-  const lastGroupedTabInfoPromise = new Misc.NonRejectablePromise<LastGroupedTabInfo | null>();
-  let resultingLastGroupedTabInfo: LastGroupedTabInfo | null = null;
-
-  const updateLastActiveTabInfoOperationPromise = new Misc.NonRejectablePromise<void>();
-  let updateLastActiveTabInfoInfo: { activeWindowId: ChromeWindowId; lastActiveTabInfo: LastActiveTabInfo } | null = null;
-
   try {
-    const previousLastActiveTabInfoPromise = updateLastActiveTabInfoOperation;
-    updateLastActiveTabInfoOperation = updateLastActiveTabInfoOperationPromise.getPromise();
-
-    const previousLastGroupedTabInfoPromise = lastGroupedTabInfo;
-    lastGroupedTabInfo = lastGroupedTabInfoPromise.getPromise();
-
-    resultingLastGroupedTabInfo = await previousLastGroupedTabInfoPromise;
-
-    await previousLastActiveTabInfoPromise;
-
     const activeWindow = await ActiveWindow.get(tab.windowId);
     if (!activeWindow) {
       myLogger.warn(`onTabsUpdated::activeWindow not found for windowId:`, tab.windowId);
@@ -363,32 +360,16 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     // we check if the tab still exists because the chrome.tabs.onUpdated event gets called with groupId = -1 when the tab
     //  is removed, in which case we dont care about this event for the current use cases
     if (changeInfo.groupId !== undefined && (await ChromeWindowHelper.doesTabExist(tabId))) {
-      resultingLastGroupedTabInfo = { tabId, tabGroupId: changeInfo.groupId };
-
       // 1.a
       await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(activeWindow.windowId, tab.id, tab.active, tab.pinned, false);
 
-      if (previousLastActiveTabInfo && previousLastActiveTabInfo.tabId === tabId) {
-        // 1.b
-        updateLastActiveTabInfoInfo = {
-          activeWindowId: activeWindow.windowId,
-          lastActiveTabInfo: { ...previousLastActiveTabInfo, tabGroupId: changeInfo.groupId },
-        };
+      // 1.b
+      if (previousLastActiveTabInfo?.tabId === tabId) {
+        ActiveWindow.update(activeWindow.windowId, { lastActiveTabInfo: { ...previousLastActiveTabInfo, tabGroupId: changeInfo.groupId } });
       }
     }
   } catch (error) {
-    myLogger.error(`error resolving promise with selected tab group:${error}`);
-  } finally {
-    if (updateLastActiveTabInfoInfo) {
-      try {
-        const { activeWindowId, lastActiveTabInfo } = updateLastActiveTabInfoInfo;
-        await ActiveWindow.update(activeWindowId, { lastActiveTabInfo });
-      } catch (error) {
-        myLogger.error(`error updating lastActiveTabInfo:${error}`);
-      }
-    }
-    updateLastActiveTabInfoOperationPromise.resolve();
-    lastGroupedTabInfoPromise.resolve(resultingLastGroupedTabInfo);
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
@@ -425,7 +406,7 @@ export async function onTabMoved(tabId: ChromeTabId, moveInfo: chrome.tabs.TabMo
     // 1
     await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(moveInfo.windowId, tab.id, tab.active, tab.pinned, false);
   } catch (error) {
-    myLogger.error(`error resolving promise with selected tab group:${error}`);
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
@@ -435,19 +416,7 @@ export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: Chrom
   // 2. update the activeWindow's lastActiveTabInfo's tabId property
   myLogger.log(`addedTabId and removedTabId:`, addedTabId, removedTabId);
 
-  const updateLastActiveTabInfoOperationPromise = new Misc.NonRejectablePromise<void>();
-  let updateActiveWindowInfo: {
-    activeWindowId: ChromeWindowId;
-    updateProps: { lastActiveTabInfo?: LastActiveTabInfo; primaryTabActivationInfo?: PrimaryTabActivationTimeoutInfo };
-  } | null = null;
-
   try {
-    const previousLastActiveTabInfoPromise = updateLastActiveTabInfoOperation;
-
-    updateLastActiveTabInfoOperation = updateLastActiveTabInfoOperationPromise.getPromise();
-
-    await previousLastActiveTabInfoPromise;
-
     let addedTab = await ChromeWindowHelper.getIfTabExists(addedTabId);
     if (!addedTab || !addedTab.id) {
       myLogger.warn(`addedTab not found for addedTabId:`, addedTabId);
@@ -459,7 +428,7 @@ export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: Chrom
 
     const updateProps: { lastActiveTabInfo?: LastActiveTabInfo; primaryTabActivationInfo?: PrimaryTabActivationTimeoutInfo } = {};
     // 1
-    if (primaryTabActivationInfo && primaryTabActivationInfo.tabId === removedTabId) {
+    if (primaryTabActivationInfo?.tabId === removedTabId) {
       updateProps.primaryTabActivationInfo = { ...primaryTabActivationInfo, tabId: addedTabId };
     }
 
@@ -468,21 +437,8 @@ export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: Chrom
       updateProps.lastActiveTabInfo = { ...previousLastActiveTabInfo, tabId: addedTabId };
     }
 
-    updateActiveWindowInfo = {
-      activeWindowId: activeWindow.windowId,
-      updateProps,
-    };
+    ActiveWindow.update(activeWindow.windowId, updateProps);
   } catch (error) {
-    myLogger.error(`error resolving promise with selected tab group:${error}`);
-  } finally {
-    if (updateActiveWindowInfo) {
-      try {
-        const { activeWindowId, updateProps } = updateActiveWindowInfo;
-        await ActiveWindow.update(activeWindowId, updateProps);
-      } catch (error) {
-        myLogger.error(`error updating lastActiveTabInfo:${error}`);
-      }
-    }
-    updateLastActiveTabInfoOperationPromise.resolve();
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
