@@ -375,17 +375,21 @@ export async function onTabRemoved(tabId: ChromeTabId, removeInfo: chrome.tabs.T
   const myLogger = logger.getNestedLogger("onTabRemoved");
   // 1. adjust the window's primary tab activation for this event
   myLogger.log(`tabId:`, tabId, removeInfo);
-  const activeWindowId = await ActiveWindow.getKey(removeInfo.windowId);
-  if (!activeWindowId) {
-    myLogger.warn(`activeWindow not found for windowId:`, removeInfo.windowId);
-    return;
-  }
+  try {
+    const activeWindowId = await ActiveWindow.getKey(removeInfo.windowId);
+    if (!activeWindowId) {
+      myLogger.warn(`activeWindow not found for windowId:`, removeInfo.windowId);
+      return;
+    }
 
-  await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(activeWindowId, -1, false, false, true);
+    await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(activeWindowId, -1, false, false, true);
 
-  if (removeInfo.isWindowClosing) {
-    myLogger.log(`window is closing, nothing to do:`, tabId);
-    return;
+    if (removeInfo.isWindowClosing) {
+      myLogger.log(`window is closing, nothing to do:`, tabId);
+      return;
+    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
