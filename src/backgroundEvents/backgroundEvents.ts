@@ -273,15 +273,18 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
       return;
     }
 
-    const { lastActiveTabInfo: previousLastActiveTabInfo, primaryTabActivationInfo } = activeWindow;
+    let { lastActiveTabInfo: previousLastActiveTabInfo, primaryTabActivationInfo } = activeWindow;
+    // Since this code path is async, the primary tab activation tab could have been removed by now, so check if the tab still exists
+    const primaryTabActivationTab = primaryTabActivationInfo ? await ChromeWindowHelper.getIfTabExists(primaryTabActivationInfo.tabId) : undefined;
+    if (primaryTabActivationInfo && !primaryTabActivationTab) {
+      logger.warn(`primaryTabActivationTab not found. Tab id:`, primaryTabActivationInfo.tabId);
+      primaryTabActivationInfo = null;
+    }
 
     // 1
-    if (primaryTabActivationInfo && !tab.active) {
-      const primaryTabActivationTab = await ChromeWindowHelper.getIfTabExists(primaryTabActivationInfo.tabId);
-      if (primaryTabActivationTab && tab.index > primaryTabActivationTab.index) {
-        myLogger.log(`clearing primary tab activation for last active tab:`, primaryTabActivationTab.id, primaryTabActivationTab.title);
-        await ActiveWindow.clearPrimaryTabActivation(tab.windowId);
-      }
+    if (!tab.active && primaryTabActivationTab && tab.index > primaryTabActivationTab.index) {
+      myLogger.log(`clearing primary tab activation for last active tab:`, primaryTabActivationTab.id, primaryTabActivationTab.title);
+      await ActiveWindow.clearPrimaryTabActivation(activeWindow.windowId);
     }
 
     // 2
