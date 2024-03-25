@@ -266,7 +266,7 @@ export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrT
 
   const isTabScriptable = await ChromeWindowHelper.isTabScriptable(tab.id);
   const timeoutPeriod = isTabScriptable ? 15000 : 6500;
-  startPrimaryTabActivationTimeout(windowId, tab.id, timeoutPeriod);
+  await startPrimaryTabActivationTimeout(windowId, tab.id, timeoutPeriod);
 }
 
 export async function triggerPrimaryTabActivation(windowId: ChromeWindowId, tabId: ChromeTabId) {
