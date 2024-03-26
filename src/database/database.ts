@@ -16,8 +16,11 @@ interface Connection<T extends DBSchema> {
   onStoreCreatedListeners: ((storeName: StoreNames<T>) => void)[];
 }
 
-import { DBSchema, IDBPDatabase, IDBPTransaction, IndexNames, StoreNames, openDB, unwrap, wrap } from "idb";
+import { DBSchema, IDBPDatabase, IDBPTransaction, IndexNames, StoreNames, openDB, unwrap, wrap, deleteDB } from "idb";
 import { ModelDataBase } from "../types/types";
+import Logger from "../logger";
+
+const logger = Logger.getLogger("Database", { color: "blue" });
 
 const schemas = {
   model: {
@@ -164,4 +167,42 @@ export async function useOrCreateTransaction<
 
   const newTransaction = await createTransaction<DBTypes, TxStores, Mode>(connectionName, storeNames, mode);
   return [newTransaction, false];
+}
+
+export async function removeDBConnection<T extends DBSchema>(name: keyof typeof schemas) {
+  const db = connections[name];
+  if (!db) {
+    logger.warn(`removeDBConnection::${name} database not found`);
+    return;
+  }
+
+  delete connections[name];
+  db.close();
+}
+
+export async function deleteDatabase<T extends DBSchema>(name: keyof typeof schemas) {
+  return new Promise<void>(async (resolve, reject) => {
+    try {
+      const db = connections[name];
+      if (db) {
+        await removeDBConnection(name);
+      }
+
+      await deleteDB(name, {
+        blocked(currentVersion, event) {
+          // there should be no open connections to the database left
+          onError(`deleteDatabase::${name} database blocked. Current version: ${currentVersion}`);
+        },
+      });
+
+      resolve();
+    } catch (error) {
+      onError(`deleteDatabase::Error deleting ${name} database: ${error}`);
+    }
+
+    function onError(message: string) {
+      logger.error(message);
+      reject(message);
+    }
+  });
 }
