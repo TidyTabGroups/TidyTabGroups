@@ -191,7 +191,11 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
       return;
     }
 
-    const tab = (await chrome.tabs.get(activeInfo.tabId)) as ChromeTabWithId;
+    const tab = await ChromeWindowHelper.getIfTabExists(activeInfo.tabId);
+    if (!tab || !tab.id) {
+      myLogger.warn(`tab not found for tabId:`, activeInfo.tabId);
+      return;
+    }
 
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
 
@@ -264,8 +268,8 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
 
     // 1
     if (primaryTabActivationInfo && !tab.active) {
-      const primaryTabActivationTab = (await chrome.tabs.get(primaryTabActivationInfo.tabId)) as ChromeTabWithId;
-      if (tab.index > primaryTabActivationTab.index) {
+      const primaryTabActivationTab = await ChromeWindowHelper.getIfTabExists(primaryTabActivationInfo.tabId);
+      if (primaryTabActivationTab && tab.index > primaryTabActivationTab.index) {
         myLogger.log(`clearing primary tab activation for last active tab:`, primaryTabActivationTab.id, primaryTabActivationTab.title);
         await ActiveWindow.clearPrimaryTabActivation(activeWindow.windowId);
       }
@@ -410,7 +414,11 @@ export async function onTabMoved(tabId: ChromeTabId, moveInfo: chrome.tabs.TabMo
       return;
     }
 
-    const tab = (await chrome.tabs.get(tabId)) as ChromeTabWithId;
+    const tab = await ChromeWindowHelper.getIfTabExists(tabId);
+    if (!tab || !tab.id) {
+      myLogger.warn(`tab not found for tabId:`, tabId);
+      return;
+    }
 
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
 
@@ -440,9 +448,13 @@ export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: Chrom
 
     await previousLastActiveTabInfoPromise;
 
-    const addedTab = (await chrome.tabs.get(addedTabId)) as ChromeTabWithId;
-    const { windowId } = addedTab;
+    let addedTab = await ChromeWindowHelper.getIfTabExists(addedTabId);
+    if (!addedTab || !addedTab.id) {
+      myLogger.warn(`addedTab not found for addedTabId:`, addedTabId);
+      return;
+    }
 
+    const { windowId } = addedTab;
     const activeWindow = await ActiveWindow.get(windowId);
     if (!activeWindow) {
       myLogger.warn(`activeWindow not found for removedTabId:`, removedTabId);
