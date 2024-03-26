@@ -112,21 +112,38 @@ export async function waitForUserTabDraggingUsingCall<T>(fn: () => Promise<T>): 
 }
 
 export async function waitForTabToLoad(tabOrTabId: ChromeTabId | ChromeTabWithId) {
-  return new Promise<void>(async (resolve) => {
+  return new Promise<boolean>(async (resolve) => {
     const waitForTabId = typeof tabOrTabId === "number" ? tabOrTabId : tabOrTabId.id;
     chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.onRemoved.addListener(onRemoved);
 
     const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
-    if (tab.status === "complete") {
-      chrome.tabs.onUpdated.removeListener(onUpdated);
-      resolve();
+    if (!tab) {
+      removeListenersAndResolve(true);
       return;
+    }
+
+    // FIXME: we should be checking if tab.status is "loading" instead of "complete"
+    if (tab.status === "complete") {
+      removeListenersAndResolve(false);
+      return;
+    }
+
+    function removeListenersAndResolve(wasRemoved: boolean) {
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onRemoved.removeListener(onRemoved);
+      resolve(wasRemoved);
     }
 
     function onUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo) {
       if (tabId === waitForTabId && changeInfo.status === "complete") {
-        chrome.tabs.onUpdated.removeListener(onUpdated);
-        resolve();
+        removeListenersAndResolve(false);
+      }
+    }
+
+    function onRemoved(tabId: ChromeTabId) {
+      if (tabId === waitForTabId) {
+        removeListenersAndResolve(true);
       }
     }
   });

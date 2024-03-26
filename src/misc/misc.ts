@@ -1,3 +1,4 @@
+import { getIfTabExists } from "../chromeWindowHelper/chromeWindowHelper";
 import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../types/types";
 
 export function onWindowError(windowId: ChromeWindowId) {
@@ -20,7 +21,7 @@ export async function openDummyTab() {
 }
 
 export async function getTabFromTabOrTabId(tabOrTabId: ChromeTabId | ChromeTabWithId) {
-  const tab = typeof tabOrTabId === "number" ? ((await chrome.tabs.get(tabOrTabId)) as ChromeTabWithId) : tabOrTabId;
+  const tab = typeof tabOrTabId === "number" ? await getIfTabExists(tabOrTabId) : tabOrTabId;
   return tab;
 }
 

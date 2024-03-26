@@ -261,8 +261,15 @@ export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrT
   }
 
   const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
-  if (tab.status !== "complete") {
-    await ChromeWindowHelper.waitForTabToLoad(tab);
+  if (!tab) {
+    logger.warn(`startPrimaryTabActivation::tabId ${tabId} not found`);
+    return;
+  }
+
+  const wasRemoved = await ChromeWindowHelper.waitForTabToLoad(tab);
+  if (wasRemoved) {
+    logger.warn(`startPrimaryTabActivation::tabId ${tabId} was removed before it could load: ${wasRemoved}`);
+    return;
   }
 
   const isTabScriptable = await ChromeWindowHelper.isTabScriptable(tab.id);
