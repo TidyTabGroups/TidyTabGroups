@@ -20,33 +20,7 @@ function justWokeUp() {
   return new Date().getTime() - awokenTime.getTime() < 500;
 }
 
-type AsyncOperation = () => Promise<void>;
-const operationQueue: AsyncOperation[] = [];
-let isProcessingQueue = false;
-
-function queueOperation(operation: AsyncOperation): void {
-  operationQueue.push(operation);
-  if (!isProcessingQueue) {
-    processQueue();
-  }
-}
-
-async function processQueue(): Promise<void> {
-  isProcessingQueue = true;
-  while (operationQueue.length > 0) {
-    const currentOperation = operationQueue.shift();
-    if (currentOperation) {
-      try {
-        await currentOperation();
-      } catch (error) {
-        logger.error("processQueue::Error processing operation:", error);
-      }
-    }
-  }
-  isProcessingQueue = false;
-}
-
-export async function initialize() {
+export async function initialize(onError: () => void) {
   chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {
     queueOperation(() => onInstalled(details));
   });
@@ -89,6 +63,52 @@ export async function initialize() {
   chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
     queueOperation(() => onTabGroupsUpdated(tabGroup));
   });
+
+  type AsyncOperation = () => Promise<void>;
+  let operationQueue: AsyncOperation[] = [];
+  let isProcessingQueue = false;
+
+  function queueOperation(operation: AsyncOperation): void {
+    operationQueue.push(operation);
+    if (!isProcessingQueue) {
+      processQueue();
+    }
+  }
+
+  async function processQueue(): Promise<void> {
+    isProcessingQueue = true;
+    while (operationQueue.length > 0) {
+      const currentOperation = operationQueue.shift();
+      if (currentOperation) {
+        const operationTimeoutId = setTimeout(() => {
+          logger.error("processQueue::Operation timed out:", currentOperation);
+          onBackgroundEventError();
+        }, 7500);
+        try {
+          await currentOperation();
+        } catch (error) {
+          logger.error("processQueue::Error processing operation:", error);
+          onBackgroundEventError();
+        } finally {
+          clearTimeout(operationTimeoutId);
+        }
+      }
+    }
+    isProcessingQueue = false;
+  }
+
+  async function onBackgroundEventError() {
+    // reset the process queue
+    operationQueue = [];
+    isProcessingQueue = false;
+
+    try {
+      await ActiveWindow.reactivateAllWindows();
+    } catch (error) {
+      logger.error("onError::error reactivating all windows:", error);
+      onError();
+    }
+  }
 }
 
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
