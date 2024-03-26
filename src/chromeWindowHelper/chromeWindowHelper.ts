@@ -111,8 +111,8 @@ export async function waitForUserTabDraggingUsingCall<T>(fn: () => Promise<T>): 
   }
 }
 
-export async function waitForTabToLoad(tabOrTabId: ChromeTabId | ChromeTabWithId) {
-  return new Promise<boolean>(async (resolve) => {
+export async function waitForTabToLoad(tabOrTabId: ChromeTabId | ChromeTabWithId, forceLoad: boolean = false) {
+  return new Promise<boolean>(async (resolve, reject) => {
     const waitForTabId = typeof tabOrTabId === "number" ? tabOrTabId : tabOrTabId.id;
     chrome.tabs.onUpdated.addListener(onUpdated);
     chrome.tabs.onRemoved.addListener(onRemoved);
@@ -123,16 +123,29 @@ export async function waitForTabToLoad(tabOrTabId: ChromeTabId | ChromeTabWithId
       return;
     }
 
-    // FIXME: we should be checking if tab.status is "loading" instead of "complete"
-    if (tab.status === "complete") {
+    if (tab.status === "unloaded") {
+      if (forceLoad) {
+        await chrome.tabs.update(waitForTabId, { url: tab.url });
+      } else {
+        removeListenersAndReject(new Error(`waitForTabToLoad::tab is in an unloaded state, and the forceLoad option is false`));
+      }
+    } else if (tab.status === "complete") {
       removeListenersAndResolve(false);
-      return;
     }
 
     function removeListenersAndResolve(wasRemoved: boolean) {
+      removeListeners();
+      resolve(wasRemoved);
+    }
+
+    function removeListenersAndReject(error: any) {
+      removeListeners();
+      reject(error);
+    }
+
+    function removeListeners() {
       chrome.tabs.onUpdated.removeListener(onUpdated);
       chrome.tabs.onRemoved.removeListener(onRemoved);
-      resolve(wasRemoved);
     }
 
     function onUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo) {
