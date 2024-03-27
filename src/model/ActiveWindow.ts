@@ -18,6 +18,10 @@ import { ActiveWindow } from ".";
 
 const logger = Logger.getLogger("ActiveWindow", { color: "#b603fc" });
 
+let windowsBeingActivated: ChromeWindowId[] = [];
+let activatingAllWindows = false;
+let reactivatingAllWindows = false;
+
 export async function getOrThrow(
   id: Types.ActiveWindow["windowId"],
   _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly" | "readwrite">
@@ -113,25 +117,77 @@ export async function update(
   }
 }
 
-export async function reactivateAllWindows() {
-  const allObjectStores: Array<"activeWindows" | "activeTabGroups"> = ["activeWindows", "activeTabGroups"];
-  const transaction = await Database.createTransaction<Types.ModelDataBase, typeof allObjectStores, "readwrite">(
-    "model",
-    allObjectStores,
-    "readwrite"
-  );
-  await Promise.all(allObjectStores.map((store) => transaction.objectStore(store).clear()));
-  await transaction.done;
+export function isActivatingAllWindows() {
+  return activatingAllWindows;
+}
 
-  await activateAllWindows();
+export function isReactivatingAllWindows() {
+  return reactivatingAllWindows;
+}
+
+export function isActivatingOrReactivatingAllWindows() {
+  return isActivatingAllWindows() || isReactivatingAllWindows();
+}
+
+export function isActivatingWindow(windowId: ChromeWindowId) {
+  return isActivatingAllWindows() || windowIsBeingActivated(windowId);
+}
+
+export function isActivatingAnyWindow() {
+  return isActivatingAllWindows() || windowsBeingActivated.length > 0;
+}
+
+export function windowIsBeingActivated(windowId: ChromeWindowId) {
+  return windowsBeingActivated.includes(windowId);
+}
+
+export function getWindowsBeingActivated() {
+  return windowsBeingActivated;
+}
+
+export async function reactivateAllWindows() {
+  if (isReactivatingAllWindows() || isActivatingAnyWindow()) {
+    throw new Error("reactivateAllWindows::already re-activating all windows, or another window is being activated");
+  }
+
+  reactivatingAllWindows = true;
+
+  try {
+    const allObjectStores: Array<"activeWindows" | "activeTabGroups"> = ["activeWindows", "activeTabGroups"];
+    const transaction = await Database.createTransaction<Types.ModelDataBase, typeof allObjectStores, "readwrite">(
+      "model",
+      allObjectStores,
+      "readwrite"
+    );
+    await Promise.all(allObjectStores.map((store) => transaction.objectStore(store).clear()));
+    await transaction.done;
+
+    await activateAllWindows();
+  } catch (error) {
+    throw new Error(`reactivateAllWindows::${error}`);
+  } finally {
+    reactivatingAllWindows = false;
+  }
 }
 
 export async function activateAllWindows() {
-  const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
-  await Promise.all(windows.map((window) => activateWindow(window.id)));
+  if (isActivatingAnyWindow()) {
+    throw new Error("activateAllWindows::a window is already being activated");
+  }
+
+  activatingAllWindows = true;
+
+  try {
+    const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
+    await Promise.all(windows.map((window) => activateWindowInternal(window.id)));
+  } catch (error) {
+    throw new Error(`activateAllWindows::${error}`);
+  } finally {
+    activatingAllWindows = false;
+  }
 }
 
-export async function activateWindow(windowId: ChromeWindowId) {
+async function activateWindowInternal(windowId: ChromeWindowId) {
   const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
   if (!window) {
     throw new Error(`activateWindow::window with id ${window} not found`);
@@ -198,7 +254,26 @@ export async function activateWindow(windowId: ChromeWindowId) {
   return tabGroups;
 }
 
+export async function activateWindow(windowId: ChromeWindowId) {
+  if (isActivatingWindow(windowId)) {
+    throw new Error(`activateWindow::windowId ${windowId} is already being activated`);
+  }
+
+  windowsBeingActivated.push(windowId);
+
+  try {
+    await activateWindowInternal(windowId);
+  } catch (error) {
+    throw new Error(`activateWindow::${error}`);
+  } finally {
+    windowsBeingActivated = windowsBeingActivated.filter((id) => id !== windowId);
+  }
+}
+
 export async function deactivateWindow(windowId: ChromeWindowId) {
+  if (isActivatingWindow(windowId)) {
+    throw new Error(`deactivateWindow::windowId ${windowId} is being activated`);
+  }
   const activeWindow = await get(windowId);
   if (!activeWindow) {
     throw new Error(`deactivateWindow::windowId ${windowId} not found`);
