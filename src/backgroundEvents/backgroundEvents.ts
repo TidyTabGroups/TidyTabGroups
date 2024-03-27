@@ -283,7 +283,11 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
       tab.groupId = updatedTabGroupId;
     }
 
-    if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && previousLastActiveTabInfo.tabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+    if (
+      !tab.pinned &&
+      tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
+      previousLastActiveTabInfo.tabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE
+    ) {
       myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${previousLastActiveTabInfo.title}'`);
       const tabGroupId = await chrome.tabs.group({ tabIds: tab.id, groupId: previousLastActiveTabInfo.tabGroupId });
       resultingCreatedTabGroupingOperationInfo = { tabId: tab.id, tabGroupId };
