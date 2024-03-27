@@ -87,6 +87,10 @@ export async function onWindowCreated(window: chrome.windows.Window) {
     return;
   }
   logger.log(`onWindowCreated::window:`, window);
+
+  // When a populated chrome window from a previous session is created, it can trigger many
+  //   succussive tab edit events that we don't want the window activation process to interfere with.
+  await ChromeWindowHelper.waitForSuccussiveTabEditEventsToFinish(window.id);
   const newActiveWindow = await ActiveWindow.activateWindow(window.id);
   logger.log(`onWindowCreated::newActiveWindow:`, newActiveWindow);
 }
