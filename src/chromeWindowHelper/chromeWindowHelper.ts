@@ -256,3 +256,61 @@ export async function isTabScriptable(tabId: ChromeTabId) {
     });
   });
 }
+
+export async function waitForSuccussiveTabEditEventsToFinish(windowId: ChromeWindowId) {
+  return new Promise<void>((resolve, reject) => {
+    try {
+      let succussiveTabEditEventsFinishedTimeoutId: number | null = null;
+      setSuccussiveTabEditEventsFinishedTimeout();
+      addTabEditEventListeners();
+
+      function addTabEditEventListeners() {
+        chrome.tabs.onCreated.addListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onRemoved.addListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onActivated.addListener(setSuccussiveTabEditEventsFinishedTimeout);
+        // onUpdated needs to check for groupId changes only
+        chrome.tabs.onUpdated.addListener(onTabUpdate);
+        chrome.tabs.onMoved.addListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onDetached.addListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onAttached.addListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onReplaced.addListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabGroups.onUpdated.addListener(setSuccussiveTabEditEventsFinishedTimeout);
+      }
+
+      function removeTabEditEventListeners() {
+        chrome.tabs.onCreated.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onRemoved.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onActivated.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onUpdated.removeListener(onTabUpdate);
+        chrome.tabs.onMoved.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onDetached.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onAttached.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabs.onReplaced.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabGroups.onCreated.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabGroups.onRemoved.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabGroups.onUpdated.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+        chrome.tabGroups.onMoved.removeListener(setSuccussiveTabEditEventsFinishedTimeout);
+      }
+
+      function setSuccussiveTabEditEventsFinishedTimeout() {
+        if (succussiveTabEditEventsFinishedTimeoutId !== null) {
+          self.clearTimeout(succussiveTabEditEventsFinishedTimeoutId);
+        }
+        succussiveTabEditEventsFinishedTimeoutId = self.setTimeout(onSuccussiveTabEditEventsFinishedTimeout, 100);
+      }
+
+      function onSuccussiveTabEditEventsFinishedTimeout() {
+        removeTabEditEventListeners();
+        resolve();
+      }
+
+      function onTabUpdate(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) {
+        if (tab.windowId === windowId && changeInfo.groupId !== undefined) {
+          setSuccussiveTabEditEventsFinishedTimeout();
+        }
+      }
+    } catch (error) {
+      reject(`waitForSuccussiveTabEditEventsToFinish::error: ${error}`);
+    }
+  });
+}
