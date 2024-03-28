@@ -8,6 +8,7 @@ import {
   LastActiveTabInfo,
   PrimaryTabActivationTimeoutInfo,
   LastGroupedTabInfo,
+  ChromeWindowWithId,
 } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Misc from "../misc";
@@ -27,7 +28,12 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.windows.onCreated.addListener((window: chrome.windows.Window) => {
-    queueOperation(() => onWindowCreated(window), true);
+    if (!window.id || window.type !== "normal") {
+      logger.warn("onWindowCreated::window is not valid:", window);
+      return;
+    }
+
+    queueOperation(() => onWindowCreated(window as ChromeWindowWithId), true);
   });
 
   chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
@@ -109,11 +115,12 @@ export async function initialize(onError: () => void) {
           logger.warn("queueOperationIfWindowIsActive::activeWindow not found, ignoring operation");
           return;
         }
-        // TODO: pass in the activeWindowAfterQueueStart to the operation
-        await operation();
       } catch (error) {
-        throw new Error(`queueOperationIfWindowIsActive::ignoring operation due to error:${error}`);
+        throw new Error(`queueOperationIfWindowIsActive::error trying to get active window for operation:${error}`);
       }
+
+      // TODO: pass in the activeWindowAfterQueueStart to the operation
+      await operation();
     }, queueNext);
   }
 
@@ -220,10 +227,7 @@ export async function onMessage(message: any, sender: chrome.runtime.MessageSend
   }
 }
 
-export async function onWindowCreated(window: chrome.windows.Window) {
-  if (window.type !== "normal" || !window.id) {
-    return;
-  }
+export async function onWindowCreated(window: ChromeWindowWithId) {
   logger.log(`onWindowCreated::window:`, window);
 
   try {
