@@ -2,7 +2,7 @@
   "manifest_version": 3,
 
   "name": "Tidy Tabs",
-  "description": "Streamline your focus by auto-repositioning active tabs to the end and eliminate tab clutter by auto-collapsing tab groups.",
+  "description": "Keep your most focused tabs positioned to the end. Keep your non-focused tab groups collapsed. Keep Tidy Tabs.",
   "version": "1.0",
   "options_ui": {
     "page": "options.html"
