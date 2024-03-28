@@ -22,73 +22,89 @@ function justWokeUp() {
 }
 
 export async function initialize(onError: () => void) {
-  chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {
-    queueOperation(() => onInstalled(details), true);
-  });
+  // Throttle Tab Edit Events
+  //  1. tabs.onCreated
+  //  2. tabs.onUpdated (when the groupId property is updated)
+  //  3. tabs.onRemoved
+  //  4. tabs.onMoved
+  //  5. tabs.onReplaced ?
+  //  6. tabGroups.onUpdated
+  //  7. tabGroups.onCreated
+  //  8. tabGroups.onRemoved
+  //  9. tabGroups.onMoved
+  type WindowIdAndEventNameKey = string;
+  let lastTabEditEventTimestamps: { [windowId_eventName: WindowIdAndEventNameKey]: number } = {};
+  let throttledEvents: {
+    [windowId_eventName: WindowIdAndEventNameKey]: {
+      timeoutId: number;
+      resolve: (shouldIgnoreEvent: boolean) => void;
+      waitForNextEventOrTimeout: Promise<boolean>;
+    };
+  } = {};
 
-  chrome.windows.onCreated.addListener((window: chrome.windows.Window) => {
-    if (!window.id || window.type !== "normal") {
-      logger.warn("onWindowCreated::window is not valid:", window);
-      return;
-    }
-
-    queueOperation(() => onWindowCreated(window as ChromeWindowWithId), true);
-  });
-
-  chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
-    queueOperationIfWindowIsActive(() => onWindowRemoved(windowId), windowId, true);
-  });
-
-  chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-    if (!sender.tab) {
-      logger.warn("onMessage::sender.tab is not valid:", sender);
-      return;
-    }
-    queueOperationIfWindowIsActive(() => onMessage(message, sender, sendResponse), sender.tab.windowId, false);
-  });
-
-  chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
-    queueOperationIfWindowIsActive(() => onTabCreated(tab), tab.windowId, false);
-  });
-
-  chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
-    queueOperationIfWindowIsActive(() => onTabActivated(activeInfo), activeInfo.windowId, false);
-  });
-
-  chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-    queueOperationIfWindowIsActive(() => onTabUpdated(tabId, changeInfo, tab), tab.windowId, false);
-  });
-
-  chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
-    queueOperationIfWindowIsActive(() => onTabRemoved(tabId, removeInfo), removeInfo.windowId, false);
-  });
-
-  chrome.tabs.onMoved.addListener((tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) => {
-    queueOperationIfWindowIsActive(() => onTabMoved(tabId, moveInfo), moveInfo.windowId, false);
-  });
-
-  chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
-    queueOperationIfWindowIsActive(
-      () => onTabReplaced(addedTabId, removedTabId),
-      new Promise(async (resolve, reject) => {
-        const addedTab = await ChromeWindowHelper.getIfTabExists(addedTabId);
-        if (addedTab?.id !== undefined) {
-          resolve(addedTab.windowId);
-        } else {
-          reject(`onTabReplaced::addedTab not found for addedTabId: ${addedTabId}`);
-        }
-      }),
-      false
-    );
-  });
-
-  chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
-    queueOperationIfWindowIsActive(() => onTabGroupsUpdated(tabGroup), tabGroup.windowId, false);
-  });
-
+  // Operation Queue
   type AsyncOperation = () => Promise<void>;
   let operationQueue: AsyncOperation[] = [];
   let isProcessingQueue = false;
+
+  addListeners();
+
+  // function stampTabEditEvent(windowId: ChromeWindowId, eventName: string) {
+  //   const key = getTabEditEventTimestampKey(windowId, eventName);
+  //   const [currentTime, lastEditTime] = [new Date().getTime(), lastTabEditEventTimestamps[key]] as [number, number | undefined];
+  //   lastTabEditEventTimestamps[key] = currentTime;
+  //   return [currentTime, lastEditTime] as const;
+  // }
+
+  // function stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(windowId: ChromeWindowId, eventName: string) {
+  //   const [currentTime, lastEditTime] = stampTabEditEvent(windowId, eventName);
+  //   if (!lastEditTime) {
+  //     return false;
+  //   }
+
+  //   const timeSinceLastTabEditEvent = currentTime - lastEditTime;
+  //   const shouldThrottle = timeSinceLastTabEditEvent < 100;
+  //   if (shouldThrottle && !isEventThrottled(windowId, eventName)) {
+  //     logger.warn(`stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent::throttling tab edit event:`, windowId, eventName);
+  //     throttledEvents.push(getTabEditEventTimestampKey(windowId, eventName));
+  //   }
+  //   return shouldThrottle;
+  // }
+
+  async function stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(windowId: ChromeWindowId, eventName: string) {
+    const key = getTabEditEventTimestampKey(windowId, eventName);
+    const previousThrottledEvent = throttledEvents[key];
+
+    if (previousThrottledEvent) {
+      self.clearTimeout(previousThrottledEvent.timeoutId);
+      previousThrottledEvent.resolve(true);
+    }
+
+    const onTimeoutExpiredNonRejectablePromise = new Misc.NonRejectablePromise<boolean>();
+    const onTimeoutExpiredPromise = onTimeoutExpiredNonRejectablePromise.getPromise();
+
+    const timeoutId = self.setTimeout(() => {
+      logger.warn(`stampTabEditEvent::timeout expired for event:`, windowId, eventName);
+      onTimeoutExpiredNonRejectablePromise.resolve(false);
+      delete throttledEvents[key];
+    }, 100);
+    throttledEvents[key] = {
+      timeoutId,
+      resolve: (shouldIgnore: boolean) => onTimeoutExpiredNonRejectablePromise.resolve(shouldIgnore),
+      waitForNextEventOrTimeout: onTimeoutExpiredPromise,
+    };
+
+    let shouldIgnore = false;
+    if (previousThrottledEvent) {
+      shouldIgnore = await previousThrottledEvent.waitForNextEventOrTimeout;
+    }
+
+    return shouldIgnore;
+  }
+
+  function getTabEditEventTimestampKey(windowId: ChromeWindowId, eventName: string) {
+    return `${windowId}_${eventName}`;
+  }
 
   function queueOperationIfWindowIsActive(
     operation: AsyncOperation,
@@ -165,6 +181,99 @@ export async function initialize(onError: () => void) {
       logger.error("onError::error reactivating all windows:", error);
       onError();
     }
+  }
+
+  function addListeners() {
+    chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {
+      queueOperation(() => onInstalled(details), true);
+    });
+
+    chrome.windows.onCreated.addListener((window: chrome.windows.Window) => {
+      if (!window.id || window.type !== "normal") {
+        logger.warn("onWindowCreated::window is not valid:", window);
+        return;
+      }
+
+      const myShouldIgnoreTabEditEventPromise = stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(window.id, "onWindowCreated");
+      queueOperation(async () => {
+        if (await myShouldIgnoreTabEditEventPromise) {
+          logger.warn("onWindowCreated::ignoring window creation event:", window.id);
+          return;
+        }
+        onWindowCreated(window as ChromeWindowWithId);
+      }, true);
+    });
+
+    chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
+      queueOperationIfWindowIsActive(() => onWindowRemoved(windowId), windowId, true);
+    });
+
+    chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+      if (!sender.tab) {
+        logger.warn("onMessage::sender.tab is not valid:", sender);
+        return;
+      }
+      queueOperationIfWindowIsActive(() => onMessage(message, sender, sendResponse), sender.tab.windowId, false);
+    });
+
+    chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
+      stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(tab.windowId, "onTabCreated");
+      queueOperationIfWindowIsActive(() => onTabCreated(tab), tab.windowId, false);
+    });
+
+    chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
+      stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(activeInfo.windowId, "onTabActivated");
+      queueOperationIfWindowIsActive(() => onTabActivated(activeInfo), activeInfo.windowId, false);
+    });
+
+    chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+      if (changeInfo.groupId !== undefined) {
+        stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(tab.windowId, "onTabUpdated_groupId");
+      }
+      queueOperationIfWindowIsActive(() => onTabUpdated(tabId, changeInfo, tab), tab.windowId, false);
+    });
+
+    chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
+      stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(removeInfo.windowId, "onTabRemoved");
+      queueOperationIfWindowIsActive(() => onTabRemoved(tabId, removeInfo), removeInfo.windowId, false);
+    });
+
+    chrome.tabs.onMoved.addListener((tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) => {
+      stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(moveInfo.windowId, "onTabMoved");
+      queueOperationIfWindowIsActive(() => onTabMoved(tabId, moveInfo), moveInfo.windowId, false);
+    });
+
+    chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
+      queueOperationIfWindowIsActive(
+        () => onTabReplaced(addedTabId, removedTabId),
+        new Promise(async (resolve, reject) => {
+          const addedTab = await ChromeWindowHelper.getIfTabExists(addedTabId);
+          if (addedTab?.id !== undefined) {
+            resolve(addedTab.windowId);
+          } else {
+            reject(`onTabReplaced::addedTab not found for addedTabId: ${addedTabId}`);
+          }
+        }),
+        false
+      );
+    });
+
+    chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
+      stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(tabGroup.windowId, "onTabGroupsUpdated");
+      queueOperationIfWindowIsActive(() => onTabGroupsUpdated(tabGroup), tabGroup.windowId, false);
+    });
+
+    chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
+      stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(tabGroup.windowId, "onTabGroupsCreated");
+    });
+
+    chrome.tabGroups.onRemoved.addListener((tabGroup: ChromeTabGroupWithId) => {
+      stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(tabGroup.windowId, "onTabGroupsRemoved");
+    });
+
+    chrome.tabGroups.onMoved.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
+      stampAndThrottleAndCheckIfShouldIgnoreTabEditEvent(tabGroup.windowId, "onTabGroupsMoved");
+    });
   }
 }
 
