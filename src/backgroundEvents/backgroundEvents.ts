@@ -259,8 +259,10 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
   const myLogger = logger.getNestedLogger("onTabGroupsUpdated");
   // 1. adjust the window's primary tab activation for this event
   // 2. if the tab group is uncollapsed:
-  //   a. collapse all other tab groups
-  //   b. if the active tab isnt already in this group, activate the last tab in the group
+  //   a. collapse and and un-highlight other tab groups
+  //   if the active tab isnt already in this group:
+  //      b. activate the last tab in the group
+  //      c. highlight the un-collapsed tab group
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed);
   try {
     // This is a workaround for when Chrome restores a window and fires a bunch of tabGroup.onUpdated events with these "psuedo" tab groups.
@@ -277,13 +279,24 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
 
     if (!tabGroup.collapsed) {
       // 2.a
-      const tabGroups = (await chrome.tabGroups.query({ windowId: tabGroup.windowId, collapsed: false })) as ChromeTabGroupWithId[];
+      const tabGroups = (await chrome.tabGroups.query({ windowId: tabGroup.windowId })) as ChromeTabGroupWithId[];
       const otherTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.id !== tabGroup.id);
       if (otherTabGroups.length > 0) {
-        myLogger.log(`collapsing all other tab groups`);
+        myLogger.log(`collapsing all other tab groups:`, otherTabGroups.map((otherTabGroup) => otherTabGroup.title).join(", "));
         await Promise.all(
           otherTabGroups.map(async (otherTabGroup) => {
-            await ChromeWindowHelper.updateTabGroupAndWait(otherTabGroup.id, { collapsed: true });
+            const updateProps: chrome.tabGroups.UpdateProperties = {};
+            if (otherTabGroup.collapsed === false) {
+              updateProps.collapsed = true;
+            }
+
+            if (otherTabGroup.color !== "grey") {
+              updateProps.color = "grey";
+            }
+
+            if (Object.keys(updateProps).length > 0) {
+              await ChromeWindowHelper.updateTabGroupAndWait(otherTabGroup.id, updateProps);
+            }
           })
         );
       }
@@ -303,6 +316,9 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
         const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
         await Misc.waitMs(timeToWaitBeforeActivation);
         await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
+
+        // 2.c
+        await chrome.tabGroups.update(tabGroup.id, { color: "pink" });
       }
     }
   } catch (error) {
