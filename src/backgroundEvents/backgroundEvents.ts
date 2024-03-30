@@ -12,6 +12,7 @@ import {
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Misc from "../misc";
 import Logger from "../logger";
+import Types from "../types";
 
 const logger = Logger.getLogger("backgroundEvents", { color: "#fcba03" });
 
@@ -22,54 +23,106 @@ function justWokeUp() {
 
 export async function initialize(onError: () => void) {
   chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {
-    queueOperation(() => onInstalled(details));
-  });
-  chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-    queueOperation(() => onMessage(message, sender, sendResponse));
+    queueOperation(() => onInstalled(details), true);
   });
 
   chrome.windows.onCreated.addListener((window: chrome.windows.Window) => {
-    queueOperation(() => onWindowCreated(window));
+    queueOperation(() => onWindowCreated(window), true);
   });
 
   chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
-    queueOperation(() => onWindowRemoved(windowId));
+    queueOperationIfWindowIsActive(() => onWindowRemoved(windowId), windowId, true);
+  });
+
+  chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+    if (!sender.tab) {
+      logger.warn("onMessage::sender.tab is not valid:", sender);
+      return;
+    }
+    queueOperationIfWindowIsActive(() => onMessage(message, sender, sendResponse), sender.tab.windowId, false);
   });
 
   chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
-    queueOperation(() => onTabCreated(tab));
+    queueOperationIfWindowIsActive(() => onTabCreated(tab), tab.windowId, false);
   });
 
   chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
-    queueOperation(() => onTabActivated(activeInfo));
+    queueOperationIfWindowIsActive(() => onTabActivated(activeInfo), activeInfo.windowId, false);
   });
 
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-    queueOperation(() => onTabUpdated(tabId, changeInfo, tab));
+    queueOperationIfWindowIsActive(() => onTabUpdated(tabId, changeInfo, tab), tab.windowId, false);
   });
 
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
-    queueOperation(() => onTabRemoved(tabId, removeInfo));
+    queueOperationIfWindowIsActive(() => onTabRemoved(tabId, removeInfo), removeInfo.windowId, false);
   });
 
   chrome.tabs.onMoved.addListener((tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) => {
-    queueOperation(() => onTabMoved(tabId, moveInfo));
+    queueOperationIfWindowIsActive(() => onTabMoved(tabId, moveInfo), moveInfo.windowId, false);
   });
 
   chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
-    queueOperation(() => onTabReplaced(addedTabId, removedTabId));
+    queueOperationIfWindowIsActive(
+      () => onTabReplaced(addedTabId, removedTabId),
+      new Promise(async (resolve, reject) => {
+        const addedTab = await ChromeWindowHelper.getIfTabExists(addedTabId);
+        if (addedTab?.id !== undefined) {
+          resolve(addedTab.windowId);
+        } else {
+          reject(`onTabReplaced::addedTab not found for addedTabId: ${addedTabId}`);
+        }
+      }),
+      false
+    );
   });
 
   chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
-    queueOperation(() => onTabGroupsUpdated(tabGroup));
+    queueOperationIfWindowIsActive(() => onTabGroupsUpdated(tabGroup), tabGroup.windowId, false);
   });
 
   type AsyncOperation = () => Promise<void>;
   let operationQueue: AsyncOperation[] = [];
   let isProcessingQueue = false;
 
-  function queueOperation(operation: AsyncOperation): void {
-    operationQueue.push(operation);
+  function queueOperationIfWindowIsActive(
+    operation: AsyncOperation,
+    windowIdOrPromisedWindowId: ChromeWindowId | Promise<ChromeWindowId>,
+    queueNext: boolean
+  ) {
+    // capture the active window state promise now because it could change by the time the operation is executed
+    const getActiveWindowPromise = new Promise<Types.ActiveWindow | undefined>(async (resolve, reject) => {
+      try {
+        const windowId = await windowIdOrPromisedWindowId;
+        const activeWindow = await ActiveWindow.get(windowId);
+        resolve(activeWindow);
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    queueOperation(async () => {
+      try {
+        const windowId = await windowIdOrPromisedWindowId;
+        const [activeWindowBeforeQueueStart, activeWindowAfterQueueStart] = await Promise.all([getActiveWindowPromise, ActiveWindow.get(windowId)]);
+        if (!activeWindowBeforeQueueStart || !activeWindowAfterQueueStart) {
+          logger.warn("queueOperationIfWindowIsActive::activeWindow not found, ignoring operation");
+          return;
+        }
+        // TODO: pass in the activeWindowAfterQueueStart to the operation
+        await operation();
+      } catch (error) {
+        throw new Error(`queueOperationIfWindowIsActive::ignoring operation due to error:${error}`);
+      }
+    }, queueNext);
+  }
+
+  function queueOperation(operation: AsyncOperation, queueNext: boolean) {
+    if (queueNext) {
+      operationQueue.unshift(operation);
+    } else {
+      operationQueue.push(operation);
+    }
     if (!isProcessingQueue) {
       processQueue();
     }
@@ -153,15 +206,10 @@ export async function onMessage(message: any, sender: chrome.runtime.MessageSend
         return;
       }
 
-      const activeWindow = await ActiveWindow.get(tab.windowId);
-      if (!activeWindow) {
-        myLogger.warn("pageFocused::activeWindow not found:", tab.windowId);
-        return;
-      }
-
+      const activeWindow = await ActiveWindow.getOrThrow(tab.windowId);
       if (activeWindow.primaryTabActivationInfo) {
         if (activeWindow.primaryTabActivationInfo.tabId === tab.id) {
-          await ActiveWindow.triggerPrimaryTabActivation(activeWindow.windowId, tab.id);
+          await ActiveWindow.triggerPrimaryTabActivation(tab.windowId, tab.id);
         } else {
           myLogger.warn("pageFocused::tab is not the primary tab:", tab, activeWindow.primaryTabActivationInfo);
         }
@@ -189,11 +237,6 @@ export async function onWindowCreated(window: chrome.windows.Window) {
 export async function onWindowRemoved(windowId: ChromeWindowId) {
   logger.log(`onWindowRemoved::windowId:`, windowId);
   try {
-    if (!(await ActiveWindow.get(windowId))) {
-      logger.warn(`onWindowRemoved::activeWindow not found for windowId:`, windowId);
-      return;
-    }
-
     await ActiveWindow.deactivateWindow(windowId);
     logger.log(`onWindowRemoved::deactivated window:`, windowId);
   } catch (error) {
@@ -209,12 +252,6 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
   //   b. if the active tab isnt already in this group, activate the last tab in the group
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed);
   try {
-    const activeWindow = await ActiveWindow.get(tabGroup.windowId);
-    if (!activeWindow) {
-      myLogger.warn(`activeWindow not found for windowId:`, tabGroup.windowId);
-      return;
-    }
-
     // This is a workaround for when Chrome restores a window and fires a bunch of tabGroup.onUpdated events with these "psuedo" tab groups.
     // Note, for this to work, it relies on the fact that this is code path is async.
     const tabGroupsWithSameTitle = await chrome.tabGroups.query({ windowId: tabGroup.windowId, title: tabGroup.title });
@@ -271,12 +308,6 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   myLogger.log(``, activeInfo.tabId);
 
   try {
-    const activeWindow = await ActiveWindow.get(activeInfo.windowId);
-    if (!activeWindow) {
-      myLogger.warn(`activeWindow not found for windowId:`, activeInfo.windowId);
-      return;
-    }
-
     const tab = await ChromeWindowHelper.getIfTabExists(activeInfo.tabId);
     if (!tab || !tab.id) {
       myLogger.warn(`tab not found for tabId:`, activeInfo.tabId);
@@ -289,7 +320,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
     await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(tab.windowId, tab.id, tab.active, tab.pinned, false);
 
     // 2
-    await ActiveWindow.update(activeWindow.windowId, { lastActiveTabInfo: { tabId: tab.id, tabGroupId: tab.groupId, title: tab.title } });
+    await ActiveWindow.update(tab.windowId, { lastActiveTabInfo: { tabId: tab.id, tabGroupId: tab.groupId, title: tab.title } });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -307,13 +338,9 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
   }
 
   try {
-    const activeWindow = await ActiveWindow.get(tab.windowId);
-    if (!activeWindow) {
-      myLogger.warn(`activeWindow not found for windowId:`, tab.windowId);
-      return;
-    }
-
+    const activeWindow = await ActiveWindow.getOrThrow(tab.windowId);
     let { lastActiveTabInfo: previousLastActiveTabInfo, primaryTabActivationInfo } = activeWindow;
+
     // Since this code path is async, the primary tab activation tab could have been removed by now, so check if the tab still exists
     const primaryTabActivationTab = primaryTabActivationInfo ? await ChromeWindowHelper.getIfTabExists(primaryTabActivationInfo.tabId) : undefined;
     if (primaryTabActivationInfo && !primaryTabActivationTab) {
@@ -368,12 +395,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
   try {
-    const activeWindow = await ActiveWindow.get(tab.windowId);
-    if (!activeWindow) {
-      myLogger.warn(`onTabsUpdated::activeWindow not found for windowId:`, tab.windowId);
-      return;
-    }
-
+    const activeWindow = await ActiveWindow.getOrThrow(tab.windowId);
     const previousLastActiveTabInfo = activeWindow.lastActiveTabInfo;
 
     // 1
