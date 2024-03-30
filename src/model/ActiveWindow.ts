@@ -1,127 +1,176 @@
-import { IDBPTransaction, IndexKey, IndexNames, StoreNames } from "idb";
 import Database from "../database";
 import Types from "../types";
-import {
-  ChromeWindowWithId,
-  ChromeWindowId,
-  ChromeTabWithId,
-  ChromeTabGroupWithId,
-  ChromeTabGroupId,
-  ChromeTabId,
-  YesOrNoOrNA,
-} from "../types/types";
-import * as ActiveTabGroup from "./ActiveTabGroup";
+import { ChromeWindowWithId, ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabId, ActiveWindow } from "../types/types";
 import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
-import { ActiveWindow } from ".";
+import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
+import { act } from "react-dom/test-utils";
 
 const logger = Logger.getLogger("ActiveWindow", { color: "#b603fc" });
 
-export async function getOrThrow(
-  id: Types.ActiveWindow["windowId"],
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly" | "readwrite">
-) {
-  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
-  const activeWindow = await transaction.objectStore("activeWindows").get(id);
+let activeWindows: Types.ActiveWindow[] = [];
+
+let hasSyncedDatabase = false;
+let isSyncingDatabase = false;
+const startingWindowSyncing = new Misc.NonRejectablePromise<ChromeWindowId | null>();
+const startingWindowSyncingPromise = startingWindowSyncing.getPromise();
+const remainingWindowsSyncing = new Misc.NonRejectablePromise<void>();
+const remainingWindowsSyncingPromise = remainingWindowsSyncing.getPromise();
+
+async function waitForSync(startingWindowId?: ChromeWindowId) {
+  if (hasSyncedDatabase) {
+    return;
+  }
+
+  if (isSyncingDatabase) {
+    const startingWindowSyncedId = await startingWindowSyncingPromise;
+    if (startingWindowId === startingWindowSyncedId) {
+      return;
+    }
+
+    await remainingWindowsSyncingPromise;
+    return;
+  }
+
+  isSyncingDatabase = true;
+
+  // match and sync the starting active window
+  let startingWindowSyncedId: Types.ActiveWindow["windowId"] | null = null;
+  if (startingWindowId !== undefined) {
+    const startingPreviousActiveWindow = await ActiveWindowDatabase.get(startingWindowId);
+    if (startingPreviousActiveWindow) {
+      const startingWindowSynced = {
+        windowId: startingWindowId,
+        lastActiveTabInfo: startingPreviousActiveWindow?.lastActiveTabInfo ?? null,
+        primaryTabActivationInfo: null,
+      } as Types.ActiveWindow;
+      activeWindows.push(startingWindowSynced);
+      startingWindowSyncedId = startingWindowSynced.windowId;
+    } else {
+      logger.warn(`waitForSync::startingWindowId ${startingWindowId} not found in database`);
+    }
+  }
+  startingWindowSyncing.resolve(startingWindowSyncedId);
+
+  // match and sync the remaining active windows
+  const [windows, previousActiveWindows] = await Promise.all([chrome.windows.getAll({ windowTypes: ["normal"] }), ActiveWindowDatabase.getAll()]);
+  const remainingPreviousActiveWindows =
+    startingWindowId !== undefined
+      ? previousActiveWindows.filter((activeWindow) => activeWindow.windowId !== startingWindowId)
+      : previousActiveWindows;
+  const remainingWindows = startingWindowId !== undefined ? windows.filter((window) => window.id !== startingWindowId) : windows;
+  const remainingWindowsIds = remainingWindows.map((window) => window.id);
+
+  const nonMatchingActiveWindowIds: Types.ModelDataBaseActiveWindow["windowId"][] = [];
+  remainingPreviousActiveWindows.forEach((activeWindow) => {
+    if (remainingWindowsIds.includes(activeWindow.windowId)) {
+      const activeWindowSynced = {
+        windowId: activeWindow.windowId,
+        lastActiveTabInfo: activeWindow.lastActiveTabInfo,
+        primaryTabActivationInfo: null,
+      } as Types.ActiveWindow;
+      activeWindows.push(activeWindowSynced);
+    } else {
+      nonMatchingActiveWindowIds.push(activeWindow.windowId);
+    }
+  });
+  remainingWindowsSyncing.resolve();
+
+  if (nonMatchingActiveWindowIds.length > 0) {
+    logger.warn(`waitForSync::nonMatchingActiveWindows:`, nonMatchingActiveWindowIds);
+  }
+
+  isSyncingDatabase = false;
+  hasSyncedDatabase = true;
+}
+
+function throwIfNotSynced() {
+  if (!hasSyncedDatabase) {
+    throw new Error(`ActiveWindow::a read or write operation to the database copy has been made before it finished syncing`);
+  }
+}
+
+function getOrThrowInternal(id: Types.ActiveWindow["windowId"]) {
+  throwIfNotSynced();
+  const activeWindow = getInternal(id);
   if (!activeWindow) {
-    throw new Error(`ActiveWindow::getOrThrow with id ${id} not found`);
+    throw new Error(`ActiveWindow::getOrThrowInternal with id ${id} not found`);
   }
 
   return activeWindow;
 }
 
-export async function get(
-  id: Types.ActiveWindow["windowId"],
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
-) {
-  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
-  return await transaction.objectStore("activeWindows").get(id);
+function getInternal(id: Types.ActiveWindow["windowId"]) {
+  throwIfNotSynced();
+  return activeWindows.find((activeWindow) => activeWindow.windowId === id);
 }
 
-export async function getKey(
-  id: Types.ActiveWindow["windowId"],
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
-) {
-  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
-  return await transaction.objectStore("activeWindows").getKey(id);
+function addInternal(activeWindow: Types.ActiveWindow) {
+  throwIfNotSynced();
+  const index = activeWindows.findIndex((exisitingActiveWindow) => exisitingActiveWindow.windowId === activeWindow.windowId);
+  if (index !== -1) {
+    throw new Error(`ActiveWindow::active window with id ${activeWindow.windowId} already exists`);
+  }
+  activeWindows.push(activeWindow);
+  ActiveWindowDatabase.add({ windowId: activeWindow.windowId, lastActiveTabInfo: activeWindow.lastActiveTabInfo }).catch((error) => {
+    // TODO: bubble error up to global level
+  });
 }
 
-export async function getKeyByIndex<ActiveWindowIndexName extends IndexNames<Types.ModelDataBase, "activeWindows">>(
-  indexName: ActiveWindowIndexName,
-  indexValue: IndexKey<Types.ModelDataBase, "activeWindows", ActiveWindowIndexName>,
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
-) {
-  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
-  return await transaction.objectStore("activeWindows").index(indexName).getKey(indexValue);
-}
-
-export async function getByIndex<ActiveWindowIndexName extends IndexNames<Types.ModelDataBase, "activeWindows">>(
-  indexName: ActiveWindowIndexName,
-  indexValue: IndexKey<Types.ModelDataBase, "activeWindows", ActiveWindowIndexName>,
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
-) {
-  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
-  return await transaction.objectStore("activeWindows").index(indexName).get(indexValue);
-}
-
-export async function add(
-  activeWindow: Types.ActiveWindow,
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readwrite">
-) {
-  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readwrite");
-  await transaction.objectStore("activeWindows").add(activeWindow);
-
-  if (!didProvideTransaction) {
-    await transaction.done;
+function removeInternal(id: Types.ActiveWindow["windowId"]) {
+  throwIfNotSynced();
+  const index = activeWindows.findIndex((activeWindow) => activeWindow.windowId === id);
+  if (index === -1) {
+    throw new Error(`ActiveWindow::removeInternal with id ${id} not found`);
   }
 
-  return activeWindow;
+  activeWindows.splice(index, 1);
+  ActiveWindowDatabase.remove(id).catch((error) => {
+    // TODO: bubble error up to global level
+  });
 }
 
-export async function remove(
-  id: Types.ActiveWindow["windowId"],
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readwrite">
-) {
-  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readwrite");
-
-  const key = await transaction.objectStore("activeWindows").getKey(id);
-  if (!key) {
-    throw new Error(`ActiveWindow::remove with id ${id} not found`);
-  }
-
-  await transaction.objectStore("activeWindows").delete(id);
-
-  if (!didProvideTransaction) {
-    await transaction.done;
-  }
+function updateInternal(id: Types.ActiveWindow["windowId"], updatedProperties: Partial<Types.ActiveWindow>) {
+  throwIfNotSynced();
+  const activeWindow = getOrThrowInternal(id);
+  Object.assign(activeWindow, updatedProperties);
+  ActiveWindowDatabase.update(id, updatedProperties).catch((error) => {
+    // TODO: bubble error up to global level
+  });
 }
 
-export async function update(
-  id: Types.ActiveWindow["windowId"],
-  updatedProperties: Partial<Types.ActiveWindow>,
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readwrite">
-) {
-  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readwrite");
+export async function getOrThrow(id: Types.ActiveWindow["windowId"]) {
+  await waitForSync(id);
+  return getOrThrowInternal(id);
+}
 
-  const activeWindow = await getOrThrow(id, transaction);
+export async function get(id: Types.ActiveWindow["windowId"]) {
+  await waitForSync(id);
+  return getInternal(id);
+}
 
-  await transaction.objectStore("activeWindows").put({ ...activeWindow, ...updatedProperties });
+export async function add(activeWindow: Types.ActiveWindow) {
+  await waitForSync(activeWindow.windowId);
+  return addInternal(activeWindow);
+}
 
-  if (!didProvideTransaction) {
-    await transaction.done;
-  }
+export async function remove(id: Types.ActiveWindow["windowId"]) {
+  await waitForSync(id);
+  return removeInternal(id);
+}
+
+export async function update(id: Types.ActiveWindow["windowId"], updatedProperties: Partial<Types.ActiveWindow>) {
+  await waitForSync(id);
+  return updateInternal(id, updatedProperties);
 }
 
 export async function reactivateAllWindows() {
-  const allObjectStores: Array<"activeWindows" | "activeTabGroups"> = ["activeWindows", "activeTabGroups"];
-  const transaction = await Database.createTransaction<Types.ModelDataBase, typeof allObjectStores, "readwrite">(
-    "model",
-    allObjectStores,
-    "readwrite"
-  );
-  await Promise.all(allObjectStores.map((store) => transaction.objectStore(store).clear()));
+  const transaction = await Database.createTransaction<Types.ModelDataBase, ["activeWindows"], "readwrite">("model", ["activeWindows"], "readwrite");
+  await transaction.objectStore("activeWindows").clear();
   await transaction.done;
+
+  activeWindows = [];
 
   await activateAllWindows();
 }
@@ -174,24 +223,12 @@ export async function activateWindow(windowId: ChromeWindowId) {
     await ChromeWindowHelper.updateTabGroupAndWait(selectedTabGroup.id, { collapsed: false });
   }
 
-  const transaction = await Database.createTransaction<Types.ModelDataBase, ["activeWindows", "activeTabGroups"], "readwrite">(
-    "model",
-    ["activeWindows", "activeTabGroups"],
-    "readwrite"
-  );
-  await add(
-    {
-      windowId,
-      lastActiveTabInfo: { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title },
-      primaryTabActivationInfo: null,
-    },
-    transaction
-  );
-  await Promise.all(
-    tabGroups.map((tabGroup) => {
-      ActiveTabGroup.add(tabGroup, transaction);
-    })
-  );
+  const newLastActiveTabInfo = { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title };
+  await add({
+    windowId,
+    lastActiveTabInfo: newLastActiveTabInfo,
+    primaryTabActivationInfo: null,
+  });
 
   await startPrimaryTabActivation(selectedTab.windowId, selectedTab.id);
 
@@ -307,7 +344,7 @@ export async function clearPrimaryTabActivation(windowId: ChromeWindowId) {
   }
 
   self.clearTimeout(primaryTabActivationInfo.timeoutId);
-  await ActiveWindow.update(windowId, { primaryTabActivationInfo: null });
+  await update(windowId, { primaryTabActivationInfo: null });
 }
 
 export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowId) {
@@ -348,7 +385,7 @@ async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId:
   }, timeoutPeriod);
 
   try {
-    await ActiveWindow.update(windowId, { primaryTabActivationInfo: { tabId: tabId, timeoutId: primaryTabActivationTimeoutId, timeoutPeriod } });
+    await update(windowId, { primaryTabActivationInfo: { tabId: tabId, timeoutId: primaryTabActivationTimeoutId, timeoutPeriod } });
   } catch (error) {
     self.clearTimeout(primaryTabActivationTimeoutId);
     throw new Error(`startPrimaryTabActivationTimeout::${error}`);
@@ -392,7 +429,7 @@ export async function clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(
     await startPrimaryTabActivation(activeWindowId, tabId);
   } else if (primaryTabActivationInfo !== null) {
     if (tabIsRemoved) {
-      await ActiveWindow.clearPrimaryTabActivation(activeWindowId);
+      await clearPrimaryTabActivation(activeWindowId);
     } else {
       await restartPrimaryTabActivationTimeout(activeWindowId);
     }
