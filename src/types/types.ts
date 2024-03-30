@@ -2,14 +2,14 @@ import { DBSchema } from "idb";
 
 export interface ModelDataBase extends DBSchema {
   activeWindows: {
-    value: ActiveWindow;
-    key: ChromeWindowId;
-    indexes: { lastActiveTabId: LastActiveTabInfo["tabId"] };
+    value: ModelDataBaseActiveWindow;
+    key: ModelDataBaseActiveWindow["windowId"];
   };
-  activeTabGroups: {
-    value: ActiveTabGroup;
-    key: ChromeTabGroupId;
-  };
+}
+
+export interface ModelDataBaseActiveWindow {
+  windowId: ActiveWindow["windowId"];
+  lastActiveTabInfo: ActiveWindow["lastActiveTabInfo"];
 }
 
 export interface ActiveWindow {
@@ -17,8 +17,6 @@ export interface ActiveWindow {
   lastActiveTabInfo: LastActiveTabInfo;
   primaryTabActivationInfo: PrimaryTabActivationTimeoutInfo | null;
 }
-
-export type ActiveTabGroup = chrome.tabGroups.TabGroup;
 
 export type ChromeId = number;
 export type ChromeWindowId = ChromeId;

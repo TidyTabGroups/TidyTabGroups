@@ -30,12 +30,6 @@ const schemas = {
         },
         indexes: [{ name: "lastActiveTabId", keyPath: "lastActiveTabInfo.tabId", options: { unique: true } }],
       },
-      {
-        name: "activeTabGroups",
-        options: {
-          keyPath: "id",
-        },
-      },
     ] as StoreDescription<ModelDataBase, StoreNames<ModelDataBase>>[],
   },
 };
