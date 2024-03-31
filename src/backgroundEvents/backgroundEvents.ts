@@ -359,13 +359,13 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
     }
 
     // 2
-    // By now, the the tab's group could have been updated.
-    // Note, for this to work, it relies on the fact that this is code path is async
-    tab = (await chrome.tabs.get(tab.id)) as ChromeTabWithId;
-    if (!tab.id) {
-      myLogger.warn(`tabId not found for tab:`, tab);
+    // check if the the tab was updated or removed
+    const latestTab = await ChromeWindowHelper.getIfTabExists(tab.id);
+    if (!latestTab || !latestTab.id) {
+      myLogger.warn(`latestTab not found for tabId:`, tab.id);
       return;
     }
+    tab = latestTab;
 
     if (
       !tab.pinned &&
