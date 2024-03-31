@@ -37,7 +37,7 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
-    queueOperationIfWindowIsActive(() => onWindowRemoved(windowId), windowId, true);
+    queueOperationIfWindowIsActive(onWindowRemoved, windowId, true);
   });
 
   chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
@@ -45,32 +45,32 @@ export async function initialize(onError: () => void) {
       logger.warn("onMessage::sender.tab is not valid:", sender);
       return;
     }
-    queueOperationIfWindowIsActive(() => onMessage(message, sender, sendResponse), sender.tab.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onMessage(activeWindow, message, sender, sendResponse), sender.tab.windowId, false);
   });
 
   chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
-    queueOperationIfWindowIsActive(() => onTabCreated(tab), tab.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabCreated(activeWindow, tab), tab.windowId, false);
   });
 
   chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
-    queueOperationIfWindowIsActive(() => onTabActivated(activeInfo), activeInfo.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabActivated(activeWindow, activeInfo), activeInfo.windowId, false);
   });
 
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-    queueOperationIfWindowIsActive(() => onTabUpdated(tabId, changeInfo, tab), tab.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabUpdated(activeWindow, tabId, changeInfo, tab), tab.windowId, false);
   });
 
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
-    queueOperationIfWindowIsActive(() => onTabRemoved(tabId, removeInfo), removeInfo.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabRemoved(activeWindow, tabId, removeInfo), removeInfo.windowId, false);
   });
 
   chrome.tabs.onMoved.addListener((tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) => {
-    queueOperationIfWindowIsActive(() => onTabMoved(tabId, moveInfo), moveInfo.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabMoved(activeWindow, tabId, moveInfo), moveInfo.windowId, false);
   });
 
   chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
     queueOperationIfWindowIsActive(
-      () => onTabReplaced(addedTabId, removedTabId),
+      (activeWindow) => onTabReplaced(activeWindow, addedTabId, removedTabId),
       new Promise(async (resolve, reject) => {
         const addedTab = await ChromeWindowHelper.getIfTabExists(addedTabId);
         if (addedTab?.id !== undefined) {
@@ -84,15 +84,16 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
-    queueOperationIfWindowIsActive(() => onTabGroupsUpdated(tabGroup), tabGroup.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabGroupsUpdated(activeWindow, tabGroup), tabGroup.windowId, false);
   });
 
-  type AsyncOperation = () => Promise<void>;
-  let operationQueue: AsyncOperation[] = [];
+  type ActiveWindowQueuedEventOperation = (activeWindow: Types.ActiveWindow) => Promise<void>;
+  type QueuedEventOperation = () => Promise<void>;
+  let operationQueue: QueuedEventOperation[] = [];
   let isProcessingQueue = false;
 
   function queueOperationIfWindowIsActive(
-    operation: AsyncOperation,
+    operation: ActiveWindowQueuedEventOperation,
     windowIdOrPromisedWindowId: ChromeWindowId | Promise<ChromeWindowId>,
     queueNext: boolean
   ) {
@@ -108,6 +109,7 @@ export async function initialize(onError: () => void) {
     });
 
     queueOperation(async () => {
+      let myActiveWindowAfterQueueStart: Types.ActiveWindow;
       try {
         const windowId = await windowIdOrPromisedWindowId;
         const [activeWindowBeforeQueueStart, activeWindowAfterQueueStart] = await Promise.all([getActiveWindowPromise, ActiveWindow.get(windowId)]);
@@ -115,16 +117,16 @@ export async function initialize(onError: () => void) {
           logger.warn("queueOperationIfWindowIsActive::activeWindow not found, ignoring operation");
           return;
         }
+        myActiveWindowAfterQueueStart = activeWindowAfterQueueStart;
       } catch (error) {
         throw new Error(`queueOperationIfWindowIsActive::error trying to get active window for operation:${error}`);
       }
 
-      // TODO: pass in the activeWindowAfterQueueStart to the operation
-      await operation();
+      await operation(myActiveWindowAfterQueueStart);
     }, queueNext);
   }
 
-  function queueOperation(operation: AsyncOperation, queueNext: boolean) {
+  function queueOperation(operation: QueuedEventOperation, queueNext: boolean) {
     if (queueNext) {
       operationQueue.unshift(operation);
     } else {
@@ -189,7 +191,12 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   // Misc.openDummyTab();
 }
 
-export async function onMessage(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
+export async function onMessage(
+  activeWindow: Types.ActiveWindow,
+  message: any,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: any) => void
+) {
   const myLogger = logger.getNestedLogger("onMessage");
   if (!message || !message.type) {
     myLogger.warn("message is not valid:", message);
@@ -213,7 +220,6 @@ export async function onMessage(message: any, sender: chrome.runtime.MessageSend
         return;
       }
 
-      const activeWindow = await ActiveWindow.getOrThrow(tab.windowId);
       if (activeWindow.primaryTabActivationInfo) {
         if (activeWindow.primaryTabActivationInfo.tabId === tab.id) {
           await ActiveWindow.triggerPrimaryTabActivation(tab.windowId, tab.id);
@@ -238,7 +244,8 @@ export async function onWindowCreated(window: ChromeWindowWithId) {
   }
 }
 
-export async function onWindowRemoved(windowId: ChromeWindowId) {
+export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
+  const { windowId } = activeWindow;
   logger.log(`onWindowRemoved::windowId:`, windowId);
   try {
     await ActiveWindow.deactivateWindow(windowId);
@@ -248,7 +255,7 @@ export async function onWindowRemoved(windowId: ChromeWindowId) {
   }
 }
 
-export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
+export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
   const myLogger = logger.getNestedLogger("onTabGroupsUpdated");
   // 1. adjust the window's primary tab activation for this event
   // 2. if the tab group is uncollapsed:
@@ -304,7 +311,7 @@ export async function onTabGroupsUpdated(tabGroup: chrome.tabGroups.TabGroup) {
 }
 
 // FIXME: this needs to handle the case where the active tab is being dragged
-export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
+export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInfo: chrome.tabs.TabActiveInfo) {
   const myLogger = logger.getNestedLogger("onTabActivated");
   // 1. adjust the window's primary tab activation for this event
   // 2. update the activeWindow's lastActiveTabInfo
@@ -330,7 +337,7 @@ export async function onTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
   }
 }
 
-export async function onTabCreated(tab: chrome.tabs.Tab) {
+export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome.tabs.Tab) {
   const myLogger = logger.getNestedLogger("onTabCreated");
   // 1. if the tab isnt active and it's position is after the tab awaiting a primary tab activation, cancel the primary tab activation
   // 2. if the tab is not in a group, and the last active tab was in a group, add the tab to the last active tab group
@@ -342,10 +349,7 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
   }
 
   try {
-    const activeWindow = await ActiveWindow.getOrThrow(tab.windowId);
     let { lastActiveTabInfo: previousLastActiveTabInfo, primaryTabActivationInfo } = activeWindow;
-
-    // Since this code path is async, the primary tab activation tab could have been removed by now, so check if the tab still exists
     const primaryTabActivationTab = primaryTabActivationInfo ? await ChromeWindowHelper.getIfTabExists(primaryTabActivationInfo.tabId) : undefined;
     if (primaryTabActivationInfo && !primaryTabActivationTab) {
       myLogger.warn(`primaryTabActivationTab not found. Tab id:`, primaryTabActivationInfo.tabId);
@@ -380,7 +384,12 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
   }
 }
 
-export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) {
+export async function onTabUpdated(
+  activeWindow: Types.ActiveWindow,
+  tabId: ChromeTabId,
+  changeInfo: chrome.tabs.TabChangeInfo,
+  tab: chrome.tabs.Tab
+) {
   const myLogger = logger.getNestedLogger("onTabUpdated");
   if (!tab.id) {
     myLogger.warn(`tabId not found for tab:`, tab);
@@ -399,7 +408,6 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
   try {
-    const activeWindow = await ActiveWindow.getOrThrow(tab.windowId);
     const previousLastActiveTabInfo = activeWindow.lastActiveTabInfo;
 
     // 1
@@ -419,7 +427,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
   }
 }
 
-export async function onTabRemoved(tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
+export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
   const myLogger = logger.getNestedLogger("onTabRemoved");
   // 1. adjust the window's primary tab activation for this event
   myLogger.log(`tabId:`, tabId, removeInfo);
@@ -435,7 +443,7 @@ export async function onTabRemoved(tabId: ChromeTabId, removeInfo: chrome.tabs.T
   }
 }
 
-export async function onTabMoved(tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) {
+export async function onTabMoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) {
   const myLogger = logger.getNestedLogger("onTabMoved");
   // 1. adjust the window's primary tab activation for this event
   myLogger.log(`tabId and moveInfo:`, tabId, moveInfo);
@@ -456,7 +464,7 @@ export async function onTabMoved(tabId: ChromeTabId, moveInfo: chrome.tabs.TabMo
   }
 }
 
-export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: ChromeTabId) {
+export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId: ChromeTabId, removedTabId: ChromeTabId) {
   const myLogger = logger.getNestedLogger("onTabReplaced");
   // 1. update the activeWindow's primaryTabActivationInfo's tabId property
   // 2. update the activeWindow's lastActiveTabInfo's tabId property
@@ -469,7 +477,6 @@ export async function onTabReplaced(addedTabId: ChromeTabId, removedTabId: Chrom
       return;
     }
 
-    const activeWindow = await ActiveWindow.getOrThrow(addedTab.windowId);
     const { lastActiveTabInfo: previousLastActiveTabInfo, primaryTabActivationInfo } = activeWindow;
 
     const updateProps: { lastActiveTabInfo?: LastActiveTabInfo; primaryTabActivationInfo?: PrimaryTabActivationTimeoutInfo } = {};
