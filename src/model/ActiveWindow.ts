@@ -92,6 +92,7 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
       remainingWindowsSyncing.resolve();
 
       if (nonMatchingActiveWindowIds.length > 0) {
+        // FIXME: should the non-matching active windows be removed from the database?
         logger.warn(`waitForSync::nonMatchingActiveWindows:`, nonMatchingActiveWindowIds);
       }
 
