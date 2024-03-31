@@ -396,17 +396,57 @@ export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrT
     return;
   }
 
-  if (tab.status !== "unloaded") {
-    const wasRemoved = await ChromeWindowHelper.waitForTabToLoad(tab);
-    if (wasRemoved) {
-      logger.warn(`startPrimaryTabActivation::tabId ${tabId} was removed before it could load: ${wasRemoved}`);
-      return;
-    }
-  }
+  const primaryTabActivationTimeoutPeriods = {
+    NON_SCRIPTABLE_TAB: 6500,
+    SCRIPTABLE_TAB: 15000,
+  };
 
-  const isTabScriptable = await ChromeWindowHelper.isTabScriptable(tab.id);
-  const timeoutPeriod = isTabScriptable ? 15000 : 6500;
-  await startPrimaryTabActivationTimeout(windowId, tab.id, timeoutPeriod);
+  // Start the primary tab activation timeout now, defaulting to the non-scriptable timeout period.
+  //  Then, once we know if the tab is scriptable, update the timeout period accordingly.
+  //  We do this asyncronously because waiting for a tab to load can take a while.
+  const dateTimeBeforeTabLoad = new Date().getTime();
+  await startPrimaryTabActivationTimeout(windowId, tab.id, primaryTabActivationTimeoutPeriods.NON_SCRIPTABLE_TAB);
+  Misc.callAsync(async () => {
+    try {
+      if (tab.status !== "unloaded") {
+        const wasRemoved = await ChromeWindowHelper.waitForTabToLoad(tab);
+        if (wasRemoved) {
+          logger.warn(`startPrimaryTabActivation::callAsync::tabId ${tabId} was removed before it could load: ${wasRemoved}`);
+          return;
+        }
+      }
+
+      const latestActiveWindow = await get(windowId);
+      if (!latestActiveWindow) {
+        logger.warn(`startPrimaryTabActivation::callAsync::windowId ${windowId} no longer exists.`);
+        return;
+      }
+
+      const { primaryTabActivationInfo } = latestActiveWindow;
+      if (!primaryTabActivationInfo || primaryTabActivationInfo.tabId !== tabId) {
+        logger.warn(`startPrimaryTabActivation::callAsync::tabId ${tabId} is no longer the primary tab.`);
+        return;
+      }
+
+      const isTabScriptable = await ChromeWindowHelper.isTabScriptable(tab.id);
+
+      const dateTimeAfterTabLoad = new Date().getTime();
+      const deltaTime = dateTimeAfterTabLoad - dateTimeBeforeTabLoad;
+      const timeoutPeriod =
+        (isTabScriptable ? primaryTabActivationTimeoutPeriods.SCRIPTABLE_TAB : primaryTabActivationTimeoutPeriods.NON_SCRIPTABLE_TAB) - deltaTime;
+
+      if (timeoutPeriod < 0) {
+        logger.warn(`startPrimaryTabActivation::callAsync::tabId ${tabId} took longer to load than the timeout period.`);
+        return;
+      }
+
+      logger.log(`startPrimaryTabActivation::callAsync::will restart primary tab activation timeout with timeoutPeriod: ${timeoutPeriod}`);
+      await restartPrimaryTabActivationTimeout(windowId, timeoutPeriod);
+    } catch (error) {
+      // TODO: bubble error up to global level
+      logger.error(`startPrimaryTabActivation::callAsync::${error}`);
+    }
+  });
 }
 
 export async function triggerPrimaryTabActivation(windowId: ChromeWindowId, tabId: ChromeTabId) {
@@ -440,7 +480,7 @@ export async function clearPrimaryTabActivation(windowId: ChromeWindowId) {
   await update(windowId, { primaryTabActivationInfo: null });
 }
 
-export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowId) {
+export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowId, timeoutPeriod?: number) {
   logger.log(`restartPrimaryTabActivationTimeout::windowId: ${windowId}`);
   const activeWindow = await getOrThrow(windowId);
   const { primaryTabActivationInfo } = activeWindow;
@@ -450,7 +490,8 @@ export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowI
   }
 
   self.clearTimeout(primaryTabActivationInfo.timeoutId);
-  await startPrimaryTabActivationTimeout(windowId, primaryTabActivationInfo.tabId, primaryTabActivationInfo.timeoutPeriod);
+  const newTimeoutPeriod = timeoutPeriod ?? primaryTabActivationInfo.timeoutPeriod;
+  await startPrimaryTabActivationTimeout(windowId, primaryTabActivationInfo.tabId, newTimeoutPeriod);
 }
 
 async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId: ChromeTabId, timeoutPeriod: number) {
