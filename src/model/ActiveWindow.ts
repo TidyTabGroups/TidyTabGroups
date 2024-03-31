@@ -135,6 +135,7 @@ function addInternal(activeWindow: Types.ActiveWindow) {
   activeWindows.push(activeWindow);
   ActiveWindowDatabase.add({ windowId: activeWindow.windowId, lastActiveTabInfo: activeWindow.lastActiveTabInfo }).catch((error) => {
     // TODO: bubble error up to global level
+    logger.error(`addInternal::failed to add active window with id ${activeWindow.windowId} to database: ${error}`);
   });
 }
 
@@ -148,6 +149,7 @@ function removeInternal(id: Types.ActiveWindow["windowId"]) {
   activeWindows.splice(index, 1);
   ActiveWindowDatabase.remove(id).catch((error) => {
     // TODO: bubble error up to global level
+    logger.error(`removeInternal::failed to remove active window with id ${id} from database: ${error}`);
   });
 }
 
@@ -157,6 +159,7 @@ function updateInternal(id: Types.ActiveWindow["windowId"], updatedProperties: P
   Object.assign(activeWindow, updatedProperties);
   ActiveWindowDatabase.update(id, updatedProperties).catch((error) => {
     // TODO: bubble error up to global level
+    logger.error(`updateInternal::failed to update active window with id ${id} in database: ${error}`);
   });
 }
 
@@ -222,6 +225,7 @@ export async function reactivateAllWindows() {
   activeWindows = [];
   ActiveWindowDatabase.clear().catch((error) => {
     // TODO: bubble error up to global level
+    logger.error(`reactivateAllWindows::failed to clear database: ${error}`);
   });
 
   try {
