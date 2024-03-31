@@ -348,7 +348,7 @@ export async function onTabCreated(tab: chrome.tabs.Tab) {
     // Since this code path is async, the primary tab activation tab could have been removed by now, so check if the tab still exists
     const primaryTabActivationTab = primaryTabActivationInfo ? await ChromeWindowHelper.getIfTabExists(primaryTabActivationInfo.tabId) : undefined;
     if (primaryTabActivationInfo && !primaryTabActivationTab) {
-      logger.warn(`primaryTabActivationTab not found. Tab id:`, primaryTabActivationInfo.tabId);
+      myLogger.warn(`primaryTabActivationTab not found. Tab id:`, primaryTabActivationInfo.tabId);
       primaryTabActivationInfo = null;
     }
 
