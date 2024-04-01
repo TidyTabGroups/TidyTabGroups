@@ -158,6 +158,7 @@ function updateInternal(id: Types.ActiveWindow["windowId"], updatedProperties: P
   throwIfNotSynced("updateInternal", id);
   const activeWindow = getOrThrowInternal(id);
   Object.assign(activeWindow, updatedProperties);
+  // FIXME: pass in Partial<Types.ModelDataBaseActiveWindow> instead of Partial<Types.ActiveWindow>
   ActiveWindowDatabase.update(id, updatedProperties).catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`updateInternal::failed to update active window with id ${id} in database: ${error}`);

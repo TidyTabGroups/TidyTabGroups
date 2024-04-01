@@ -71,6 +71,7 @@ export async function remove(
 
 export async function update(
   id: Types.ActiveWindow["windowId"],
+  // FIXME: use Partial<Types.ModelDataBaseActiveWindow> instead of Partial<Types.ActiveWindow>
   updatedProperties: Partial<Types.ActiveWindow>,
   _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readwrite">
 ) {
