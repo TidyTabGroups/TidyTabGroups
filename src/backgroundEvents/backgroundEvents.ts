@@ -283,7 +283,7 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
         myLogger.log(`collapsing all other tab groups`);
         await Promise.all(
           otherTabGroups.map(async (otherTabGroup) => {
-            await ChromeWindowHelper.updateTabGroupAndWait(otherTabGroup.id, { collapsed: true });
+            await ChromeWindowHelper.updateTabGroup(otherTabGroup.id, { collapsed: true });
           })
         );
       }
@@ -302,7 +302,7 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
         // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
         const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
         await Misc.waitMs(timeToWaitBeforeActivation);
-        await ChromeWindowHelper.activateTabAndWait(lastTabInGroup.id);
+        await ChromeWindowHelper.activateTab(lastTabInGroup.id);
       }
     }
   } catch (error) {

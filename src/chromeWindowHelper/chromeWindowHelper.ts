@@ -25,80 +25,20 @@ export async function getTabGroupsOrdered(
   return orderedTabGroups;
 }
 
-export async function updateTabAndWait(tabId: ChromeTabId, updatedProperties: chrome.tabs.UpdateProperties) {
-  const onUpdatedPromise = new Promise<ChromeTabWithId>((resolve, reject) => {
-    chrome.tabs.onUpdated.addListener(async function onUpdated(updatedTabId: ChromeTabId, changeInfo: any, tab: chrome.tabs.Tab) {
-      if (updatedTabId === tabId) {
-        chrome.tabs.onUpdated.removeListener(onUpdated);
-        resolve(tab as ChromeTabWithId);
-      }
-    });
-  });
-
-  const updatePromise = waitForUserTabDraggingUsingCall(() => chrome.tabs.update(tabId, updatedProperties));
-  const [updatedTab] = await Promise.all([onUpdatedPromise, updatePromise]);
-  return updatedTab;
-}
-
-export async function activateTabAndWait(tabId: ChromeTabId) {
-  const onActivatedPromise = new Promise<void>((resolve, reject) => {
-    chrome.tabs.onActivated.addListener(async function onActivated(activeInfo: chrome.tabs.TabActiveInfo) {
-      if (activeInfo.tabId === tabId) {
-        chrome.tabs.onActivated.removeListener(onActivated);
-        resolve();
-      }
-    });
-  });
-
-  const updatePromise = waitForUserTabDraggingUsingCall(() => chrome.tabs.update(tabId, { active: true }));
-  return await Promise.all([onActivatedPromise, updatePromise]);
-}
-
-export async function updateTabGroupAndWait(tabGroupId: ChromeTabGroupId, updatedProperties: chrome.tabGroups.UpdateProperties) {
-  const onUpdatedPromise = new Promise<ChromeTabGroupWithId>((resolve, reject) => {
-    chrome.tabGroups.onUpdated.addListener(async function onUpdated(updatedTabGroup: chrome.tabGroups.TabGroup) {
-      if (updatedTabGroup.id === tabGroupId) {
-        chrome.tabGroups.onUpdated.removeListener(onUpdated);
-        resolve(updatedTabGroup);
-      }
-    });
-  });
-
-  const updatePromise = updateTabGroup(tabGroupId, updatedProperties);
-  const [updatedTabGroup] = await Promise.all([onUpdatedPromise, updatePromise]);
-  return updatedTabGroup;
+export async function activateTab(tabId: ChromeTabId) {
+  return waitForUserTabDraggingUsingCall(() => chrome.tabs.update(tabId, { active: true }));
 }
 
 export async function updateTabGroup(tabGroupId: ChromeTabGroupId, updatedProperties: chrome.tabGroups.UpdateProperties) {
   return waitForUserTabDraggingUsingCall(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
 }
 
-export async function moveTabAndWait(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
-  const onMovedPromise = new Promise<void>((resolve, reject) => {
-    chrome.tabs.onMoved.addListener(async function onMoved(movedTabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) {
-      if (movedTabId === tabId) {
-        chrome.tabs.onMoved.removeListener(onMoved);
-        resolve();
-      }
-    });
-  });
-
-  const movePromise = waitForUserTabDraggingUsingCall(() => chrome.tabs.move(tabId, moveProperties));
-  return await Promise.all([onMovedPromise, movePromise]);
+export async function moveTab(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
+  return waitForUserTabDraggingUsingCall(() => chrome.tabs.move(tabId, moveProperties));
 }
 
-export async function moveTabGroupAndWait(tabGroupId: ChromeTabGroupId, moveProperties: chrome.tabGroups.MoveProperties) {
-  const onMovedPromise = new Promise<void>((resolve, reject) => {
-    chrome.tabGroups.onMoved.addListener(async function onMoved(movedTabGroup: chrome.tabGroups.TabGroup) {
-      if (movedTabGroup.id === tabGroupId) {
-        chrome.tabGroups.onMoved.removeListener(onMoved);
-        resolve();
-      }
-    });
-  });
-
-  const movePromise = waitForUserTabDraggingUsingCall(() => chrome.tabGroups.move(tabGroupId, moveProperties));
-  return await Promise.all([onMovedPromise, movePromise]);
+export async function moveTabGroup(tabGroupId: ChromeTabGroupId, moveProperties: chrome.tabGroups.MoveProperties) {
+  return waitForUserTabDraggingUsingCall(() => chrome.tabGroups.move(tabGroupId, moveProperties));
 }
 
 export async function waitForUserTabDraggingUsingCall<T>(fn: () => Promise<T>): Promise<T> {

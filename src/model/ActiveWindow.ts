@@ -286,7 +286,7 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
     }
 
     if (!tabGroup.collapsed) {
-      await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
+      await ChromeWindowHelper.updateTabGroup(tabGroup.id, { collapsed: true });
     }
     await collapseNextTabGroup();
   };
@@ -296,7 +296,7 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   // 2
   const selectedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === selectedTab.groupId);
   if (selectedTabGroup && selectedTabGroup.collapsed) {
-    await ChromeWindowHelper.updateTabGroupAndWait(selectedTabGroup.id, { collapsed: false });
+    await ChromeWindowHelper.updateTabGroup(selectedTabGroup.id, { collapsed: false });
   }
 
   const newLastActiveTabInfo = { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title };
@@ -358,7 +358,7 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
       const tabsInGroup = tabs.filter((otherTab) => otherTab.groupId === tab.groupId);
       const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
       if (lastTabInGroup.index < tabs[tabs.length - 1].index) {
-        await ChromeWindowHelper.moveTabGroupAndWait(tab.groupId, { index: -1 });
+        await ChromeWindowHelper.moveTabGroup(tab.groupId, { index: -1 });
       }
 
       if (tab.index < lastTabInGroup.index) {
@@ -370,13 +370,13 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
   }
 
   if (shouldMoveTab) {
-    await ChromeWindowHelper.moveTabAndWait(tabId, { index: -1 });
+    await ChromeWindowHelper.moveTab(tabId, { index: -1 });
   }
 
   const uncollapsedTabGroups = (await chrome.tabGroups.query({ windowId, collapsed: false })) as ChromeTabGroupWithId[];
   uncollapsedTabGroups.forEach(async (tabGroup) => {
     if (tabGroup.id !== tab.groupId) {
-      await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
+      await ChromeWindowHelper.updateTabGroup(tabGroup.id, { collapsed: true });
     }
   });
 }
