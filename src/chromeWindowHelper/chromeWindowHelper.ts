@@ -64,9 +64,13 @@ export async function updateTabGroupAndWait(tabGroupId: ChromeTabGroupId, update
     });
   });
 
-  const updatePromise = waitForUserTabDraggingUsingCall(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
+  const updatePromise = updateTabGroup(tabGroupId, updatedProperties);
   const [updatedTabGroup] = await Promise.all([onUpdatedPromise, updatePromise]);
   return updatedTabGroup;
+}
+
+export async function updateTabGroup(tabGroupId: ChromeTabGroupId, updatedProperties: chrome.tabGroups.UpdateProperties) {
+  return waitForUserTabDraggingUsingCall(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
 }
 
 export async function moveTabAndWait(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
