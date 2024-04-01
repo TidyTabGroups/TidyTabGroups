@@ -30,7 +30,18 @@ export async function activateTab(tabId: ChromeTabId) {
 }
 
 export async function updateTabGroup(tabGroupId: ChromeTabGroupId, updatedProperties: chrome.tabGroups.UpdateProperties) {
-  return waitForUserTabDraggingUsingCall(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
+  try {
+    return await waitForUserTabDraggingUsingCall(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
+  } catch (error) {
+    // FIXME: remove this once saved tab groups are editable
+    // @ts-ignore
+    if (error?.message.toLowerCase().includes("saved groups are not editable")) {
+      console.warn(`updateTabGroup::saved tab group with id ${tabGroupId} is not editable: `, error);
+      return await chrome.tabGroups.get(tabGroupId);
+    } else {
+      throw error;
+    }
+  }
 }
 
 export async function moveTab(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
