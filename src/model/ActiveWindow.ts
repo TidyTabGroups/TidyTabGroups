@@ -1,6 +1,14 @@
 import Database from "../database";
 import Types from "../types";
-import { ChromeWindowWithId, ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabId, ActiveWindow } from "../types/types";
+import {
+  ChromeWindowWithId,
+  ChromeWindowId,
+  ChromeTabWithId,
+  ChromeTabGroupWithId,
+  ChromeTabId,
+  ActiveWindow,
+  ChromeTabGroupId,
+} from "../types/types";
 import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
@@ -274,29 +282,15 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
 
   // adjust the "shape" of the new active window, using the following adjustments:
-  // 1. collapse all but the selected tab group
-  // 2. un-collapse the selected tab group
+  // 1. blur all but the selected tab group
+  // 2. expand and highlight the selected tab group
 
   // 1
-  const remaingTabGroupsToCollapse = tabGroups.filter((tabGroup) => tabGroup.id !== selectedTab.groupId);
-  const collapseNextTabGroup = async () => {
-    const tabGroup = remaingTabGroupsToCollapse.pop();
-    if (!tabGroup) {
-      return;
-    }
+  await blurAllTabGroupsExcept(windowId, selectedTab.groupId, tabGroups);
 
-    if (!tabGroup.collapsed) {
-      await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
-    }
-    await collapseNextTabGroup();
-  };
-
-  await collapseNextTabGroup();
-
-  // 2
   const selectedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === selectedTab.groupId);
-  if (selectedTabGroup && selectedTabGroup.collapsed) {
-    await ChromeWindowHelper.updateTabGroupAndWait(selectedTabGroup.id, { collapsed: false });
+  if (selectedTabGroup) {
+    await expandAndHighlightTabGroup(selectedTabGroup);
   }
 
   const newLastActiveTabInfo = { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title };
@@ -373,12 +367,7 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
     await ChromeWindowHelper.moveTabAndWait(tabId, { index: -1 });
   }
 
-  const uncollapsedTabGroups = (await chrome.tabGroups.query({ windowId, collapsed: false })) as ChromeTabGroupWithId[];
-  uncollapsedTabGroups.forEach(async (tabGroup) => {
-    if (tabGroup.id !== tab.groupId) {
-      await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, { collapsed: true });
-    }
-  });
+  await blurAllTabGroupsExcept(windowId, tab.groupId);
 }
 
 export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrTabId: ChromeTabId | ChromeTabWithId) {
@@ -569,5 +558,56 @@ export async function clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(
     } else {
       await restartPrimaryTabActivationTimeout(activeWindowId);
     }
+  }
+}
+
+export async function blurAllTabGroupsExcept(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId, tabGroups?: ChromeTabGroupWithId[]) {
+  if (!tabGroups) {
+    tabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
+  }
+  await Promise.all(
+    tabGroups.map(async (tabGroup) => {
+      if (tabGroup.id === tabGroupId) {
+        return;
+      }
+
+      const updateProps: chrome.tabGroups.UpdateProperties = {};
+
+      if (!tabGroup.collapsed) {
+        updateProps.collapsed = true;
+      }
+
+      if (tabGroup.color !== "grey") {
+        updateProps.color = "grey";
+      }
+
+      if (Object.keys(updateProps).length > 0) {
+        await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, updateProps);
+      }
+    })
+  );
+}
+
+export async function expandAndHighlightTabGroup(tabGroupOrTabGroupId: ChromeTabGroupId | ChromeTabGroupWithId) {
+  const tabGroupId = typeof tabGroupOrTabGroupId === "number" ? tabGroupOrTabGroupId : tabGroupOrTabGroupId.id;
+  const tabGroup = typeof tabGroupOrTabGroupId === "number" ? await ChromeWindowHelper.getIfTabGroupExists(tabGroupId) : tabGroupOrTabGroupId;
+  if (!tabGroup) {
+    // FIXME: should this throw an error?
+    logger.warn(`highlightTabGroup::tabGroupId ${tabGroupId} not found`);
+    return;
+  }
+
+  const updateProps: chrome.tabGroups.UpdateProperties = {};
+
+  if (tabGroup.collapsed) {
+    updateProps.collapsed = false;
+  }
+
+  if (tabGroup.color !== "pink") {
+    updateProps.color = "pink";
+  }
+
+  if (Object.keys(updateProps).length > 0) {
+    await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, updateProps);
   }
 }
