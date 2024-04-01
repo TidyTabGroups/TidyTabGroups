@@ -2,7 +2,7 @@
   "manifest_version": 3,
 
   "name": "Tidy Tabs",
-  "description": "Keep your most focused tabs positioned to the end. Keep your non-focused tab groups collapsed. Keep Tidy Tabs.",
+  "description": "Keep your most used tabs positioned to the end. Keep your non-used tab groups collapsed. Keep your tabs tidy.",
   "version": "1.0",
   "options_ui": {
     "page": "options.html"
