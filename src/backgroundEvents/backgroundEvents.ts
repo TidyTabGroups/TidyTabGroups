@@ -258,12 +258,14 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
 export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
   const myLogger = logger.getNestedLogger("onTabGroupsUpdated");
   // 1. adjust the window's primary tab activation for this event
-  // 2. if the tab group is uncollapsed:
-  //   a. blur all other tab groups
+  // if the tab group is collapsed:
+  //   2. update the active window's non-primary tab group color
+  // if the tab group is uncollapsed:
+  //   3. update the active window's primary tab group color
+  //   4. focus the tab group
   //   if the active tab isnt already in this group:
-  //      b. highlight the un-collapsed tab group
-  //      c. activate the last tab in the group
-  myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed);
+  //     5. activate the last tab in the group
+  myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
     // This is a workaround for when Chrome restores a window and fires a bunch of tabGroup.onUpdated events with these "psuedo" tab groups.
     // Note, for this to work, it relies on the fact that this is code path is async.
@@ -277,21 +279,36 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
     // 1
     await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(tabGroup.windowId, -1, false, false, false);
 
-    if (!tabGroup.collapsed) {
-      // 2.a
-      await ActiveWindow.blurAllTabGroupsExcept(tabGroup.windowId, tabGroup.id);
+    const { tabGroupHighlightColors } = activeWindow;
+    if (tabGroup.collapsed) {
+      // 2
+      if (tabGroupHighlightColors && tabGroupHighlightColors.nonPrimary !== tabGroup.color) {
+        Logger.attentionLogger.log(tabGroupHighlightColors.nonPrimary, tabGroup.color);
+        await ActiveWindow.update(tabGroup.windowId, { tabGroupHighlightColors: { ...tabGroupHighlightColors, nonPrimary: tabGroup.color } });
+        // update the color of all other non-primary tab groups
+        const tabGroups = await chrome.tabGroups.query({ windowId: tabGroup.windowId, collapsed: true });
+        const otherTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.id !== tabGroup.id);
+        await Promise.all(otherTabGroups.map((otherTabGroup) => ChromeWindowHelper.updateTabGroup(otherTabGroup.id, { color: tabGroup.color })));
+      }
+    } else {
+      // 3
+      if (tabGroupHighlightColors) {
+        if (tabGroupHighlightColors.nonPrimary == tabGroup.color) {
+        } else if (tabGroupHighlightColors.primary !== tabGroup.color) {
+          await ActiveWindow.update(tabGroup.windowId, { tabGroupHighlightColors: { ...tabGroupHighlightColors, primary: tabGroup.color } });
+        }
+      }
+
+      // 4
+      await ActiveWindow.focusTabGroup(tabGroup.windowId, tabGroup.id);
 
       const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
       const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
       if (!activeTabInGroup) {
-        // 2.b
-        // we pass tabGroup.id instead of tabGroup because it could be stale
-        await ActiveWindow.expandAndHighlightTabGroup(tabGroup.id);
-
+        // 5
         const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
 
-        // 2.c
         // start loading the tab now (before waiting for the animations to finish)
         if (lastTabInGroup.status === "unloaded") {
           chrome.tabs.update(lastTabInGroup.id, { url: lastTabInGroup.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));

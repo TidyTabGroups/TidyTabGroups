@@ -10,12 +10,16 @@ export interface ModelDataBase extends DBSchema {
 export interface ModelDataBaseActiveWindow {
   windowId: ActiveWindow["windowId"];
   lastActiveTabInfo: ActiveWindow["lastActiveTabInfo"];
+  tabGroupHighlightColors: ActiveWindow["tabGroupHighlightColors"];
+  tabGroups: ActiveWindow["tabGroups"];
 }
 
 export interface ActiveWindow {
   windowId: ChromeWindowId;
   lastActiveTabInfo: LastActiveTabInfo;
   primaryTabActivationInfo: PrimaryTabActivationTimeoutInfo | null;
+  tabGroupHighlightColors: { primary: chrome.tabGroups.ColorEnum; nonPrimary: chrome.tabGroups.ColorEnum } | null;
+  tabGroups: ChromeTabGroupWithId[];
 }
 
 export type ChromeId = number;

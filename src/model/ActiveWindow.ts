@@ -142,7 +142,8 @@ function addInternal(activeWindow: Types.ActiveWindow) {
     throw new Error(`ActiveWindow::active window with id ${activeWindow.windowId} already exists`);
   }
   activeWindows.push(activeWindow);
-  ActiveWindowDatabase.add({ windowId: activeWindow.windowId, lastActiveTabInfo: activeWindow.lastActiveTabInfo }).catch((error) => {
+  const { windowId, lastActiveTabInfo, tabGroupHighlightColors, tabGroups } = activeWindow;
+  ActiveWindowDatabase.add({ windowId, lastActiveTabInfo, tabGroupHighlightColors, tabGroups }).catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`addInternal::failed to add active window with id ${activeWindow.windowId} to database: ${error}`);
   });
@@ -279,25 +280,26 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   if (!selectedTab) {
     throw new Error(`activateWindow::window with id ${windowId} has no active tab`);
   }
-  const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
-
-  // adjust the "shape" of the new active window, using the following adjustments:
-  // 1. blur all but the selected tab group
-  // 2. expand and highlight the selected tab group
-
-  // 1
-  await blurAllTabGroupsExcept(windowId, selectedTab.groupId, tabGroups);
-
+  const tabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
   const selectedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === selectedTab.groupId);
-  if (selectedTabGroup) {
-    await expandAndHighlightTabGroup(selectedTabGroup);
-  }
+  const nonSelectedTabGroups = tabGroups.filter((tabGroup) => tabGroup.id !== selectedTab.groupId);
+
+  // focus the selected tab group
+  const newTabGroupHighlightColors = getTabGroupHighlightColors(selectedTabGroup ?? null, nonSelectedTabGroups);
+  await ChromeWindowHelper.focusTabGroup(
+    selectedTab.groupId,
+    tabGroups,
+    newTabGroupHighlightColors ? { selected: newTabGroupHighlightColors.primary, other: newTabGroupHighlightColors.nonPrimary } : undefined
+  );
 
   const newLastActiveTabInfo = { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title };
+  const newTabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
   await add({
     windowId,
     lastActiveTabInfo: newLastActiveTabInfo,
     primaryTabActivationInfo: null,
+    tabGroupHighlightColors: newTabGroupHighlightColors,
+    tabGroups: newTabGroups,
   });
 
   await startPrimaryTabActivation(selectedTab.windowId, selectedTab.id);
@@ -562,52 +564,66 @@ export async function clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(
 }
 
 export async function blurAllTabGroupsExcept(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId, tabGroups?: ChromeTabGroupWithId[]) {
-  if (!tabGroups) {
-    tabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
+  try {
+    const activeWindow = await getOrThrow(windowId);
+    await ChromeWindowHelper.blurAllTabGroupsExcept(tabGroupId, tabGroups ?? windowId, activeWindow.tabGroupHighlightColors?.nonPrimary);
+  } catch (error) {
+    throw new Error(`blurAllTabGroupsExcept::error:${error}`);
   }
-  await Promise.all(
-    tabGroups.map(async (tabGroup) => {
-      if (tabGroup.id === tabGroupId) {
-        return;
-      }
-
-      const updateProps: chrome.tabGroups.UpdateProperties = {};
-
-      if (!tabGroup.collapsed) {
-        updateProps.collapsed = true;
-      }
-
-      if (tabGroup.color !== "grey") {
-        updateProps.color = "grey";
-      }
-
-      if (Object.keys(updateProps).length > 0) {
-        await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, updateProps);
-      }
-    })
-  );
 }
 
-export async function expandAndHighlightTabGroup(tabGroupOrTabGroupId: ChromeTabGroupId | ChromeTabGroupWithId) {
-  const tabGroupId = typeof tabGroupOrTabGroupId === "number" ? tabGroupOrTabGroupId : tabGroupOrTabGroupId.id;
-  const tabGroup = typeof tabGroupOrTabGroupId === "number" ? await ChromeWindowHelper.getIfTabGroupExists(tabGroupId) : tabGroupOrTabGroupId;
-  if (!tabGroup) {
-    // FIXME: should this throw an error?
-    logger.warn(`highlightTabGroup::tabGroupId ${tabGroupId} not found`);
-    return;
+export async function expandAndHighlightTabGroup(windowId: ChromeWindowId, tabGroupOrTabGroupId: ChromeTabGroupId | ChromeTabGroupWithId) {
+  try {
+    const activeWindow = await getOrThrow(windowId);
+    await ChromeWindowHelper.expandAndHighlightTabGroup(tabGroupOrTabGroupId, activeWindow.tabGroupHighlightColors?.primary);
+  } catch (error) {
+    throw new Error(`expandAndHighlightTabGroup::error:${error}`);
+  }
+}
+
+export async function focusTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId, tabGroups?: ChromeTabGroupWithId[]) {
+  try {
+    const activeWindow = await getOrThrow(windowId);
+    await ChromeWindowHelper.focusTabGroup(
+      tabGroupId,
+      tabGroups ?? windowId,
+      activeWindow.tabGroupHighlightColors
+        ? { selected: activeWindow.tabGroupHighlightColors.primary, other: activeWindow.tabGroupHighlightColors.nonPrimary }
+        : undefined
+    );
+  } catch (error) {
+    throw new Error(`focusTabGroup::error:${error}`);
+  }
+}
+
+function getTabGroupHighlightColors(selectedTabGroup: ChromeTabGroupWithId | null, nonSelectedTabGroups: ChromeTabGroupWithId[]) {
+  let newTabGroupHighlightColors: ActiveWindow["tabGroupHighlightColors"] = null;
+  // TODO: allow the user to enable/disable tab group highlight colors and to choose the colors
+  const tabGroupHighlightColorsEnabled = true;
+  const tabGroupHighlightColorPrimary = "cyan";
+  const tabGroupHighlightColorNonPrimary = "grey";
+
+  if (tabGroupHighlightColorsEnabled) {
+    const primaryTabGroupColor = selectedTabGroup?.color ?? tabGroupHighlightColorPrimary;
+
+    let nonPrimaryTabGroupColor: chrome.tabGroups.ColorEnum = tabGroupHighlightColorNonPrimary;
+    if (nonSelectedTabGroups.length > 0) {
+      let colorToMatch: chrome.tabGroups.ColorEnum | null = nonSelectedTabGroups[0].color;
+      let allColorsMatch = true;
+      for (const tabGroup of nonSelectedTabGroups) {
+        if (tabGroup.color !== colorToMatch) {
+          allColorsMatch = false;
+          break;
+        }
+      }
+
+      if (allColorsMatch) {
+        nonPrimaryTabGroupColor = colorToMatch;
+      }
+    }
+
+    newTabGroupHighlightColors = { primary: primaryTabGroupColor, nonPrimary: nonPrimaryTabGroupColor } as ActiveWindow["tabGroupHighlightColors"];
   }
 
-  const updateProps: chrome.tabGroups.UpdateProperties = {};
-
-  if (tabGroup.collapsed) {
-    updateProps.collapsed = false;
-  }
-
-  if (tabGroup.color !== "pink") {
-    updateProps.color = "pink";
-  }
-
-  if (Object.keys(updateProps).length > 0) {
-    await ChromeWindowHelper.updateTabGroupAndWait(tabGroup.id, updateProps);
-  }
+  return newTabGroupHighlightColors;
 }

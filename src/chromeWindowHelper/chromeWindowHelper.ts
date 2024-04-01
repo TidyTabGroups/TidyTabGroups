@@ -260,3 +260,101 @@ export async function isTabScriptable(tabId: ChromeTabId) {
     });
   });
 }
+
+export async function expandAndHighlightTabGroup(
+  tabGroupOrTabGroupId: ChromeTabGroupId | ChromeTabGroupWithId,
+  highlightColor?: chrome.tabGroups.ColorEnum
+) {
+  const tabGroupId = typeof tabGroupOrTabGroupId === "number" ? tabGroupOrTabGroupId : tabGroupOrTabGroupId.id;
+  const tabGroup = typeof tabGroupOrTabGroupId === "number" ? await getIfTabGroupExists(tabGroupId) : tabGroupOrTabGroupId;
+  if (!tabGroup) {
+    throw new Error(`expandAndHighlightTabGroup::tab group does not exist: ${tabGroupId}`);
+  }
+
+  const updateProps: chrome.tabGroups.UpdateProperties = {};
+
+  if (tabGroup.collapsed) {
+    updateProps.collapsed = false;
+  }
+
+  if (highlightColor && tabGroup.color !== highlightColor) {
+    updateProps.color = highlightColor;
+  }
+
+  if (Object.keys(updateProps).length > 0) {
+    await updateTabGroup(tabGroup.id, updateProps);
+  }
+}
+
+export async function blurAllTabGroupsExcept(
+  tabGroupId: ChromeTabGroupId,
+  tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
+  highlightColor?: chrome.tabGroups.ColorEnum
+) {
+  try {
+    const windowId = typeof tabGroupsOrWindowId === "number" ? tabGroupsOrWindowId : tabGroupsOrWindowId[0]?.windowId;
+    const tabGroups = Array.isArray(tabGroupsOrWindowId)
+      ? tabGroupsOrWindowId
+      : ((await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[]);
+
+    await Promise.all(
+      tabGroups.map(async (tabGroup) => {
+        if (tabGroup.id === tabGroupId) {
+          return;
+        }
+
+        const updateProps: chrome.tabGroups.UpdateProperties = {};
+
+        if (!tabGroup.collapsed) {
+          updateProps.collapsed = true;
+        }
+
+        if (highlightColor && highlightColor !== tabGroup.color) {
+          updateProps.color = highlightColor;
+        }
+
+        if (Object.keys(updateProps).length > 0) {
+          await updateTabGroup(tabGroup.id, updateProps);
+        }
+      })
+    );
+  } catch (error) {
+    throw new Error(`blurAllTabGroupsExcept::error:${error}`);
+  }
+}
+
+export async function focusTabGroup(
+  tabGroupId: ChromeTabGroupId,
+  otherTabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
+  highlightColors?: { selected: chrome.tabGroups.ColorEnum; other: chrome.tabGroups.ColorEnum }
+) {
+  const tabGroups = Array.isArray(otherTabGroupsOrWindowId)
+    ? otherTabGroupsOrWindowId
+    : ((await chrome.tabGroups.query({ windowId: otherTabGroupsOrWindowId })) as ChromeTabGroupWithId[]);
+
+  await Promise.all(
+    tabGroups.map(async (tabGroup) => {
+      const updateProps: chrome.tabGroups.UpdateProperties = {};
+
+      if (tabGroup.id === tabGroupId) {
+        if (tabGroup.collapsed) {
+          updateProps.collapsed = false;
+        }
+        if (highlightColors?.selected && highlightColors.selected !== tabGroup.color) {
+          updateProps.color = highlightColors.selected;
+        }
+      } else {
+        if (!tabGroup.collapsed) {
+          updateProps.collapsed = true;
+        }
+        if (highlightColors?.other && highlightColors.other !== tabGroup.color) {
+          updateProps.color = highlightColors.other;
+        }
+      }
+
+      if (Object.keys(updateProps).length > 0) {
+        await updateTabGroup(tabGroup.id, updateProps);
+      }
+    })
+  );
+}
