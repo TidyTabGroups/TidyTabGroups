@@ -175,6 +175,11 @@ export async function get(id: Types.ActiveWindow["windowId"]) {
   return getInternal(id);
 }
 
+export async function getAll() {
+  await waitForSync();
+  return activeWindows;
+}
+
 export async function add(activeWindow: Types.ActiveWindow) {
   await waitForSync();
   return addInternal(activeWindow);
@@ -276,6 +281,8 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   // adjust the "shape" of the new active window, using the following adjustments:
   // 1. collapse all but the selected tab group
   // 2. un-collapse the selected tab group
+  // 3. update the lastActiveTabInfo of the potential other active window with the same lastActiveTabInfo. This happens
+  //    when a the last active tab of a window is moved to a new window
 
   // 1
   const remaingTabGroupsToCollapse = tabGroups.filter((tabGroup) => tabGroup.id !== selectedTab.groupId);
@@ -297,6 +304,23 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   const selectedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === selectedTab.groupId);
   if (selectedTabGroup && selectedTabGroup.collapsed) {
     await ChromeWindowHelper.updateTabGroup(selectedTabGroup.id, { collapsed: false });
+  }
+
+  // 3
+  const allActiveWindows = await getAll();
+  const activeWindowWithSameLastActiveTabInfo = allActiveWindows.find((activeWindow) => activeWindow.lastActiveTabInfo.tabId === selectedTab.id);
+  // check if the activeWindowWithSameLastActiveTabInfo still exists because it could have been removed, but its corresponding active window object not yet
+  if (activeWindowWithSameLastActiveTabInfo && (await ChromeWindowHelper.doesWindowExist(activeWindowWithSameLastActiveTabInfo.windowId))) {
+    const [activeTab] = (await chrome.tabs.query({ windowId: activeWindowWithSameLastActiveTabInfo.windowId, active: true })) as ChromeTabWithId[];
+    Logger.attentionLogger.log(`activateWindowInternal::activeTab:`, activeTab);
+    if (!activeTab) {
+      throw new Error(
+        `activateWindowInternal::activeWindowWithSameLastActiveTabInfo ${activeWindowWithSameLastActiveTabInfo.windowId} has no active tab`
+      );
+    }
+    await update(activeWindowWithSameLastActiveTabInfo.windowId, {
+      lastActiveTabInfo: { tabId: activeTab.id, tabGroupId: activeTab.groupId, title: activeTab.title },
+    });
   }
 
   const newLastActiveTabInfo = { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title };

@@ -188,6 +188,17 @@ export async function doesTabGroupExist(tabGroupId: ChromeTabGroupId) {
   return !!tabGroup;
 }
 
+export async function getIfWindowExists(windowId: ChromeWindowId) {
+  try {
+    return await chrome.windows.get(windowId);
+  } catch (error) {}
+}
+
+export async function doesWindowExist(windowId: ChromeWindowId) {
+  const window = await getIfWindowExists(windowId);
+  return !!window;
+}
+
 export async function discardTabIfNotDiscarded(tabId: ChromeTabId) {
   try {
     await chrome.tabs.discard(tabId);
