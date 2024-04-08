@@ -206,18 +206,20 @@ export async function onMessage(
   try {
     if (message.type === "pageFocused") {
       // 1. if the tab is pinned, ignore
-      // 2. if the tab is active, set it as the primary tab (TODO: only set the primary tab if it is also not an opener for unaccessed tabs)
+      // 2. if the tab is active, set it as the primary tab
       const { tab } = sender;
       if (!tab || !tab.id) {
         myLogger.warn("pageFocused::sender.tab is not valid:", sender);
         return;
       }
 
+      // 1
       if (tab.pinned) {
         myLogger.warn("pageFocused::tab is pinned:", tab);
         return;
       }
 
+      // 2
       if (tab.active) {
         await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
       } else {

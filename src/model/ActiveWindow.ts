@@ -385,10 +385,13 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
     } else if (tab.index < tabs[tabs.length - 1].index) {
       shouldMoveTab = true;
     }
-  }
 
-  if (shouldMoveTab) {
-    await ChromeWindowHelper.moveTab(tabId, { index: -1 });
+    // if the tab opened any un-accessed tabs that are positioned after it, then dont move it
+    // FIXME: remove the (t as any) cast when the chrome typings are updated to include the lastAccessed property
+    const hasOpenedUnaccessedTabs = tabs.some((t) => t.openerTabId === tab.id && (t as any).lastAccessed === undefined && t.index > tab.index);
+    if (!hasOpenedUnaccessedTabs && shouldMoveTab) {
+      await ChromeWindowHelper.moveTab(tabId, { index: -1 });
+    }
   }
 
   const uncollapsedTabGroups = (await chrome.tabGroups.query({ windowId, collapsed: false })) as ChromeTabGroupWithId[];
