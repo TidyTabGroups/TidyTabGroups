@@ -490,7 +490,7 @@ export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId
       updateProps.lastActiveTabInfo = { ...previousLastActiveTabInfo, tabId: addedTabId };
     }
 
-    ActiveWindow.update(activeWindow.windowId, updateProps);
+    await ActiveWindow.update(activeWindow.windowId, updateProps);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
