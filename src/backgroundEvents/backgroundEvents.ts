@@ -6,8 +6,6 @@ import {
   ChromeTabWithId,
   ChromeWindowId,
   LastActiveTabInfo,
-  PrimaryTabActivationTimeoutInfo,
-  LastGroupedTabInfo,
   ChromeWindowWithId,
 } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
@@ -208,7 +206,7 @@ export async function onMessage(
   try {
     if (message.type === "pageFocused") {
       // 1. if the tab is pinned, ignore
-      // 2. if the tab is awaiting a primary tab activation, set it as the primary tab
+      // 2. if the tab is active, set it as the primary tab (TODO: only set the primary tab if it is also not an opener for unaccessed tabs)
       const { tab } = sender;
       if (!tab || !tab.id) {
         myLogger.warn("pageFocused::sender.tab is not valid:", sender);
@@ -220,12 +218,10 @@ export async function onMessage(
         return;
       }
 
-      if (activeWindow.primaryTabActivationInfo) {
-        if (activeWindow.primaryTabActivationInfo.tabId === tab.id) {
-          await ActiveWindow.triggerPrimaryTabActivation(tab.windowId, tab.id);
-        } else {
-          myLogger.warn("pageFocused::tab is not the primary tab:", tab, activeWindow.primaryTabActivationInfo);
-        }
+      if (tab.active) {
+        await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
+      } else {
+        myLogger.warn("pageFocused::tab is not active:", tab);
       }
     }
   } catch (error) {
@@ -257,8 +253,7 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
 
 export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
   const myLogger = logger.getNestedLogger("onTabGroupsUpdated");
-  // 1. adjust the window's primary tab activation for this event
-  // 2. if the tab group is uncollapsed:
+  // 1. if the tab group is uncollapsed:
   //   a. collapse all other tab groups
   //   b. if the active tab isnt already in this group, activate the last tab in the group
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed);
@@ -272,11 +267,8 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
       return;
     }
 
-    // 1
-    await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(tabGroup.windowId, -1, false, false, false);
-
     if (!tabGroup.collapsed) {
-      // 2.a
+      // 1.a
       const tabGroups = (await chrome.tabGroups.query({ windowId: tabGroup.windowId, collapsed: false })) as ChromeTabGroupWithId[];
       const otherTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.id !== tabGroup.id);
       if (otherTabGroups.length > 0) {
@@ -288,7 +280,7 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
         );
       }
 
-      // 2.b
+      // 1.b
       const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
       const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
       const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
@@ -313,8 +305,7 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
 // FIXME: this needs to handle the case where the active tab is being dragged
 export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInfo: chrome.tabs.TabActiveInfo) {
   const myLogger = logger.getNestedLogger("onTabActivated");
-  // 1. adjust the window's primary tab activation for this event
-  // 2. update the activeWindow's lastActiveTabInfo
+  // 1. update the activeWindow's lastActiveTabInfo
 
   myLogger.log(``, activeInfo.tabId);
 
@@ -327,9 +318,6 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
 
-    // 1
-    await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(tab.windowId, tab.id, tab.active, tab.pinned, false);
-
     // 2
     await ActiveWindow.update(tab.windowId, { lastActiveTabInfo: { tabId: tab.id, tabGroupId: tab.groupId, title: tab.title } });
   } catch (error) {
@@ -339,8 +327,7 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 
 export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome.tabs.Tab) {
   const myLogger = logger.getNestedLogger("onTabCreated");
-  // 1. if the tab isnt active and it's position is after the tab awaiting a primary tab activation, cancel the primary tab activation
-  // 2. if the tab is not in a group, and the last active tab was in a group, add the tab to the last active tab group
+  // 1. if the tab is not in a group, and the last active tab was in a group, add the tab to the last active tab group
   myLogger.log(`tab:`, tab.title, tab.groupId);
 
   if (!tab.id) {
@@ -349,20 +336,9 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
   }
 
   try {
-    let { lastActiveTabInfo: previousLastActiveTabInfo, primaryTabActivationInfo } = activeWindow;
-    const primaryTabActivationTab = primaryTabActivationInfo ? await ChromeWindowHelper.getIfTabExists(primaryTabActivationInfo.tabId) : undefined;
-    if (primaryTabActivationInfo && !primaryTabActivationTab) {
-      myLogger.warn(`primaryTabActivationTab not found. Tab id:`, primaryTabActivationInfo.tabId);
-      primaryTabActivationInfo = null;
-    }
+    let { lastActiveTabInfo: previousLastActiveTabInfo } = activeWindow;
 
     // 1
-    if (!tab.active && primaryTabActivationTab && tab.index > primaryTabActivationTab.index) {
-      myLogger.log(`clearing primary tab activation for last active tab:`, primaryTabActivationTab.id, primaryTabActivationTab.title);
-      await ActiveWindow.clearPrimaryTabActivation(activeWindow.windowId);
-    }
-
-    // 2
     // check if the the tab was updated or removed
     const latestTab = await ChromeWindowHelper.getIfTabExists(tab.id);
     if (!latestTab || !latestTab.id) {
@@ -401,9 +377,7 @@ export async function onTabUpdated(
     return;
   }
 
-  // 1. if the groupId property is updated:
-  //  a. adjust the window's primary tab activation for this event
-  //  b. update the activeWindow's lastActiveTabInfo's groupId property
+  // 1. if the groupId property is updated, update the activeWindow's lastActiveTabInfo's groupId property
 
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
@@ -413,14 +387,8 @@ export async function onTabUpdated(
     // 1
     // we check if the tab still exists because the chrome.tabs.onUpdated event gets called with groupId = -1 when the tab
     //  is removed, in which case we dont care about this event for the current use cases
-    if (changeInfo.groupId !== undefined && (await ChromeWindowHelper.doesTabExist(tabId))) {
-      // 1.a
-      await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(activeWindow.windowId, tab.id, tab.active, tab.pinned, false);
-
-      // 1.b
-      if (previousLastActiveTabInfo?.tabId === tabId) {
-        ActiveWindow.update(activeWindow.windowId, { lastActiveTabInfo: { ...previousLastActiveTabInfo, tabGroupId: changeInfo.groupId } });
-      }
+    if (changeInfo.groupId !== undefined && (await ChromeWindowHelper.doesTabExist(tabId)) && previousLastActiveTabInfo?.tabId === tabId) {
+      ActiveWindow.update(activeWindow.windowId, { lastActiveTabInfo: { ...previousLastActiveTabInfo, tabGroupId: changeInfo.groupId } });
     }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -429,11 +397,8 @@ export async function onTabUpdated(
 
 export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
   const myLogger = logger.getNestedLogger("onTabRemoved");
-  // 1. adjust the window's primary tab activation for this event
   myLogger.log(`tabId:`, tabId, removeInfo);
   try {
-    await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(removeInfo.windowId, -1, false, false, true);
-
     if (removeInfo.isWindowClosing) {
       myLogger.log(`window is closing, nothing to do:`, tabId);
       return;
@@ -445,7 +410,6 @@ export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: Chro
 
 export async function onTabMoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) {
   const myLogger = logger.getNestedLogger("onTabMoved");
-  // 1. adjust the window's primary tab activation for this event
   myLogger.log(`tabId and moveInfo:`, tabId, moveInfo);
 
   try {
@@ -456,9 +420,6 @@ export async function onTabMoved(activeWindow: Types.ActiveWindow, tabId: Chrome
     }
 
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
-
-    // 1
-    await ActiveWindow.clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(moveInfo.windowId, tab.id, tab.active, tab.pinned, false);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -466,8 +427,7 @@ export async function onTabMoved(activeWindow: Types.ActiveWindow, tabId: Chrome
 
 export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId: ChromeTabId, removedTabId: ChromeTabId) {
   const myLogger = logger.getNestedLogger("onTabReplaced");
-  // 1. update the activeWindow's primaryTabActivationInfo's tabId property
-  // 2. update the activeWindow's lastActiveTabInfo's tabId property
+  // 1. update the activeWindow's lastActiveTabInfo's tabId property
   myLogger.log(`addedTabId and removedTabId:`, addedTabId, removedTabId);
 
   try {
@@ -477,20 +437,12 @@ export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId
       return;
     }
 
-    const { lastActiveTabInfo: previousLastActiveTabInfo, primaryTabActivationInfo } = activeWindow;
+    const { lastActiveTabInfo: previousLastActiveTabInfo } = activeWindow;
 
-    const updateProps: { lastActiveTabInfo?: LastActiveTabInfo; primaryTabActivationInfo?: PrimaryTabActivationTimeoutInfo } = {};
     // 1
-    if (primaryTabActivationInfo?.tabId === removedTabId) {
-      updateProps.primaryTabActivationInfo = { ...primaryTabActivationInfo, tabId: addedTabId };
-    }
-
-    // 2
     if (previousLastActiveTabInfo && previousLastActiveTabInfo.tabId === removedTabId) {
-      updateProps.lastActiveTabInfo = { ...previousLastActiveTabInfo, tabId: addedTabId };
+      await ActiveWindow.update(activeWindow.windowId, { lastActiveTabInfo: { ...previousLastActiveTabInfo, tabId: addedTabId } });
     }
-
-    await ActiveWindow.update(activeWindow.windowId, updateProps);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }

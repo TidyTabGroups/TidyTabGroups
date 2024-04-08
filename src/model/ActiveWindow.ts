@@ -56,7 +56,6 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
           const startingWindowSynced = {
             windowId: startingWindowId,
             lastActiveTabInfo: startingPreviousActiveWindow?.lastActiveTabInfo ?? null,
-            primaryTabActivationInfo: null,
           } as Types.ActiveWindow;
           activeWindows.push(startingWindowSynced);
           startingWindowSyncedId = startingWindowSynced.windowId;
@@ -82,7 +81,6 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
           const activeWindowSynced = {
             windowId: activeWindow.windowId,
             lastActiveTabInfo: activeWindow.lastActiveTabInfo,
-            primaryTabActivationInfo: null,
           } as Types.ActiveWindow;
           activeWindows.push(activeWindowSynced);
         } else {
@@ -327,10 +325,7 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   await add({
     windowId,
     lastActiveTabInfo: newLastActiveTabInfo,
-    primaryTabActivationInfo: null,
   });
-
-  await startPrimaryTabActivation(selectedTab.windowId, selectedTab.id);
 
   return tabGroups;
 }
@@ -360,7 +355,6 @@ export async function deactivateWindow(windowId: ChromeWindowId) {
     throw new Error(`deactivateWindow::windowId ${windowId} not found`);
   }
 
-  await clearPrimaryTabActivation(windowId);
   await remove(windowId);
 }
 
@@ -403,195 +397,4 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
       await ChromeWindowHelper.updateTabGroup(tabGroup.id, { collapsed: true });
     }
   });
-}
-
-export async function startPrimaryTabActivation(windowId: ChromeWindowId, tabOrTabId: ChromeTabId | ChromeTabWithId) {
-  const tabId = typeof tabOrTabId === "number" ? tabOrTabId : tabOrTabId.id;
-  logger.log(`startPrimaryTabActivation::windowId: ${windowId}, tabId: ${tabId}`);
-
-  const activeWindow = await getOrThrow(windowId);
-  if (activeWindow.primaryTabActivationInfo !== null) {
-    throw new Error(
-      `startPrimaryTabActivation::windowId ${windowId} already has a primaryTabActivationInfo. If you want to restart the timeout, use restartPrimaryTabActivationTimeout instead. Otherwsie clear the timeout first`
-    );
-  }
-
-  const tab = await Misc.getTabFromTabOrTabId(tabOrTabId);
-  if (!tab) {
-    logger.warn(`startPrimaryTabActivation::tabId ${tabId} not found`);
-    return;
-  }
-
-  const primaryTabActivationTimeoutPeriods = {
-    NON_SCRIPTABLE_TAB: 6500,
-    SCRIPTABLE_TAB: 15000,
-  };
-
-  // Start the primary tab activation timeout now, defaulting to the non-scriptable timeout period.
-  //  Then, once we know if the tab is scriptable, update the timeout period accordingly.
-  //  We do this asyncronously because waiting for a tab to load can take a while.
-  const dateTimeBeforeTabLoad = new Date().getTime();
-  await startPrimaryTabActivationTimeout(windowId, tab.id, primaryTabActivationTimeoutPeriods.NON_SCRIPTABLE_TAB);
-  Misc.callAsync(async () => {
-    try {
-      if (tab.status !== "unloaded") {
-        const wasRemoved = await ChromeWindowHelper.waitForTabToLoad(tab);
-        if (wasRemoved) {
-          logger.warn(`startPrimaryTabActivation::callAsync::tabId ${tabId} was removed before it could load: ${wasRemoved}`);
-          return;
-        }
-      }
-
-      const latestActiveWindow = await get(windowId);
-      if (!latestActiveWindow) {
-        logger.warn(`startPrimaryTabActivation::callAsync::windowId ${windowId} no longer exists.`);
-        return;
-      }
-
-      const { primaryTabActivationInfo } = latestActiveWindow;
-      if (!primaryTabActivationInfo || primaryTabActivationInfo.tabId !== tabId) {
-        logger.warn(`startPrimaryTabActivation::callAsync::tabId ${tabId} is no longer the primary tab.`);
-        return;
-      }
-
-      const isTabScriptable = await ChromeWindowHelper.isTabScriptable(tab.id);
-
-      const dateTimeAfterTabLoad = new Date().getTime();
-      const deltaTime = dateTimeAfterTabLoad - dateTimeBeforeTabLoad;
-      const timeoutPeriod =
-        (isTabScriptable ? primaryTabActivationTimeoutPeriods.SCRIPTABLE_TAB : primaryTabActivationTimeoutPeriods.NON_SCRIPTABLE_TAB) - deltaTime;
-
-      if (timeoutPeriod < 0) {
-        logger.warn(`startPrimaryTabActivation::callAsync::tabId ${tabId} took longer to load than the timeout period.`);
-        return;
-      }
-
-      logger.log(`startPrimaryTabActivation::callAsync::will restart primary tab activation timeout with timeoutPeriod: ${timeoutPeriod}`);
-      await restartPrimaryTabActivationTimeout(windowId, timeoutPeriod);
-    } catch (error) {
-      // TODO: bubble error up to global level
-      logger.error(`startPrimaryTabActivation::callAsync::${error}`);
-    }
-  });
-}
-
-export async function triggerPrimaryTabActivation(windowId: ChromeWindowId, tabId: ChromeTabId) {
-  logger.log(`triggerPrimaryTabActivation::windowId: ${windowId}, tabId: ${tabId}`);
-  const activeWindow = await getOrThrow(windowId);
-  const { primaryTabActivationInfo } = activeWindow;
-  if (primaryTabActivationInfo === null) {
-    logger.warn(`triggerPrimaryTabActivation::windowId ${windowId} has no primaryTabActivationInfo`);
-    return;
-  }
-
-  if (primaryTabActivationInfo.tabId !== tabId) {
-    logger.warn(`triggerPrimaryTabActivation::tabId ${tabId} is not the primary tab`);
-    return;
-  }
-
-  await clearPrimaryTabActivation(windowId);
-  await setPrimaryTab(windowId, primaryTabActivationInfo.tabId);
-}
-
-export async function clearPrimaryTabActivation(windowId: ChromeWindowId) {
-  logger.log(`clearPrimaryTabActivation::windowId: ${windowId}`);
-  const activeWindow = await getOrThrow(windowId);
-  const { primaryTabActivationInfo } = activeWindow;
-  if (primaryTabActivationInfo === null) {
-    logger.warn(`clearPrimaryTabActivation::windowId ${windowId} has no primaryTabActivationInfo`);
-    return;
-  }
-
-  self.clearTimeout(primaryTabActivationInfo.timeoutId);
-  await update(windowId, { primaryTabActivationInfo: null });
-}
-
-export async function restartPrimaryTabActivationTimeout(windowId: ChromeWindowId, timeoutPeriod?: number) {
-  logger.log(`restartPrimaryTabActivationTimeout::windowId: ${windowId}`);
-  const activeWindow = await getOrThrow(windowId);
-  const { primaryTabActivationInfo } = activeWindow;
-  if (primaryTabActivationInfo === null) {
-    logger.warn(`restartPrimaryTabActivationTimeout::windowId ${windowId} has no primaryTabActivationInfo`);
-    return;
-  }
-
-  self.clearTimeout(primaryTabActivationInfo.timeoutId);
-  const newTimeoutPeriod = timeoutPeriod ?? primaryTabActivationInfo.timeoutPeriod;
-  await startPrimaryTabActivationTimeout(windowId, primaryTabActivationInfo.tabId, newTimeoutPeriod);
-}
-
-async function startPrimaryTabActivationTimeout(windowId: ChromeWindowId, tabId: ChromeTabId, timeoutPeriod: number) {
-  const primaryTabActivationTimeoutId = self.setTimeout(async () => {
-    if (await ChromeWindowHelper.doesTabExist(tabId)) {
-      const activeWindow = await get(windowId);
-      if (!activeWindow) {
-        logger.warn(`startPrimaryTabActivationTimeout::windowId ${windowId} no longer exists.`);
-        return;
-      }
-
-      if (activeWindow.primaryTabActivationInfo?.tabId !== tabId) {
-        logger.warn(
-          `startPrimaryTabActivationTimeout::tabId ${tabId} is no longer the primary tab. The timeout should have been cancelled by the when the window was removed, but it was not.`
-        );
-        return;
-      }
-
-      await triggerPrimaryTabActivation(windowId, tabId);
-    } else {
-      logger.warn(
-        `startPrimaryTabActivationTimeout::tabId ${tabId} no longer exists. The timeout should have been cancelled by the chrome.tabs.onRemoved listener the timeout owner, but it was not.`
-      );
-    }
-  }, timeoutPeriod);
-
-  try {
-    await update(windowId, { primaryTabActivationInfo: { tabId: tabId, timeoutId: primaryTabActivationTimeoutId, timeoutPeriod } });
-  } catch (error) {
-    self.clearTimeout(primaryTabActivationTimeoutId);
-    throw new Error(`startPrimaryTabActivationTimeout::${error}`);
-  }
-}
-
-// just a helper used by certain tab/group related events like tabs.onActivated, tabs.onUpdated, tabs.onMoved and tabGroups.onUpdated
-export async function clearOrRestartOrStartNewPrimaryTabActivationForTabEvent(
-  activeWindowId: ChromeWindowId,
-  tabId: ChromeTabId,
-  tabIsActive: boolean,
-  tabIsPinned: boolean,
-  tabIsRemoved: boolean
-) {
-  const activeWindow = await get(activeWindowId);
-  if (!activeWindow) {
-    logger.warn(`clearOrRestartOrStartNewPrimaryTabActivationForTabEvent::active window not found:`, activeWindowId);
-    return;
-  }
-
-  const { primaryTabActivationInfo } = activeWindow;
-  const tabIsAwaitingPrimaryTabActivation = primaryTabActivationInfo?.tabId === tabId;
-
-  logger.log(
-    `clearOrRestartOrStartNewPrimaryTabActivationForTabEvent::tabId: ${tabId}, tabIsActive: ${tabIsActive}, tabIsPinned: ${tabIsPinned}, tabIsRemoved: ${tabIsRemoved}, primaryTabActivationInfo.tabId: ${primaryTabActivationInfo?.tabId}`
-  );
-
-  if (tabIsActive && tabIsPinned) {
-    if (primaryTabActivationInfo !== null) {
-      await clearPrimaryTabActivation(activeWindowId);
-    }
-    await setPrimaryTab(activeWindowId, tabId);
-  } else if (tabIsActive && primaryTabActivationInfo !== null) {
-    if (tabIsAwaitingPrimaryTabActivation) {
-      await restartPrimaryTabActivationTimeout(activeWindowId);
-    } else {
-      await clearPrimaryTabActivation(activeWindowId);
-      await startPrimaryTabActivation(activeWindowId, tabId);
-    }
-  } else if (tabIsActive) {
-    await startPrimaryTabActivation(activeWindowId, tabId);
-  } else if (primaryTabActivationInfo !== null) {
-    if (tabIsRemoved) {
-      await clearPrimaryTabActivation(activeWindowId);
-    } else {
-      await restartPrimaryTabActivationTimeout(activeWindowId);
-    }
-  }
 }

@@ -15,7 +15,6 @@ export interface ModelDataBaseActiveWindow {
 export interface ActiveWindow {
   windowId: ChromeWindowId;
   lastActiveTabInfo: LastActiveTabInfo;
-  primaryTabActivationInfo: PrimaryTabActivationTimeoutInfo | null;
 }
 
 export type ChromeId = number;
@@ -37,11 +36,6 @@ export interface LastActiveTabInfo {
   title: string | undefined;
 }
 
-export interface PrimaryTabActivationTimeoutInfo {
-  tabId: ChromeTabId;
-  timeoutId: number;
-  timeoutPeriod: number;
-}
 export interface LastGroupedTabInfo {
   tabId: ChromeTabId;
   tabGroupId: ChromeTabGroupId;
