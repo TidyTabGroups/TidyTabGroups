@@ -1,9 +1,6 @@
 import { LocalStorageShape } from "../types/types";
 
-export const LOCAL_STORAGE_DEFAULT_VALUES: LocalStorageShape = {
-  // TODO: remove these
-  activeWindows: [],
-};
+export const LOCAL_STORAGE_DEFAULT_VALUES: LocalStorageShape = {};
 
 export async function initialize() {
   await setItems(LOCAL_STORAGE_DEFAULT_VALUES);
