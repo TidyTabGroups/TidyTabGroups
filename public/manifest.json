@@ -2,7 +2,7 @@
   "manifest_version": 3,
 
   "name": "Tidy Tabs",
-  "description": "Keep your most used tabs positioned to the end. Keep your non-used tab groups collapsed. Keep your tabs tidy.",
+  "description": "A suite of powerful tab group features with a focus on productivity, organization, multitasking, and mindful browsing.",
   "version": "1.0",
   "options_ui": {
     "page": "options.html"
