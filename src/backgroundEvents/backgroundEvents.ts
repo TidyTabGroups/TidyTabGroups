@@ -320,6 +320,10 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
 
+    if (tab.pinned) {
+      await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
+    }
+
     // 2
     await ActiveWindow.update(tab.windowId, { lastActiveTabInfo: { tabId: tab.id, tabGroupId: tab.groupId, title: tab.title } });
   } catch (error) {
