@@ -308,6 +308,7 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
 export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInfo: chrome.tabs.TabActiveInfo) {
   const myLogger = logger.getNestedLogger("onTabActivated");
   // 1. update the activeWindow's lastActiveTabInfo
+  // 2. if the tab is pinned, or it is not-scriptable, set it as the primary tab now
 
   myLogger.log(``, activeInfo.tabId);
 
@@ -320,8 +321,30 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
 
+    // 2
     if (tab.pinned) {
       await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
+    } else {
+      // We do this asyncronously because waiting for a tab to load can take a while.
+      Misc.callAsync(async () => {
+        const myMyLogger = myLogger.getNestedLogger("checkIfTabIsScriptable");
+        try {
+          const [isTabScriptable] = await ChromeWindowHelper.isTabScriptable(tab.id, true);
+
+          // get the latest info about the tab since it could have been removed or un-activated
+          //  by the time it loaded while checking if it was scriptable
+          const latestTab = await ChromeWindowHelper.getIfTabExists(activeInfo.tabId);
+          if (!latestTab || !latestTab.id || !tab.active) {
+            return;
+          }
+
+          if (!isTabScriptable) {
+            await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
+          }
+        } catch (error) {
+          myMyLogger.warn(`error:${error}`);
+        }
+      });
     }
 
     // 2
