@@ -28,7 +28,17 @@ export type ChromeTabGroupWithId = chrome.tabGroups.TabGroup & {
 };
 export type ChromeTabWithId = chrome.tabs.Tab & { id: ChromeTabId };
 
-export interface LocalStorageShape {}
+export interface LocalStorageShape {
+  userSettings: UserSettings;
+}
+
+export interface UserSettings {
+  repositionTabs: boolean;
+  repositionTabGroups: boolean;
+  addNewTabToFocusedTabGroup: boolean;
+  collapseUnfocusedTabGroups: boolean;
+  activateTabInFocusedTabGroup: boolean;
+}
 
 export interface LastActiveTabInfo {
   tabId: ChromeTabId;
