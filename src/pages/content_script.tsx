@@ -139,7 +139,7 @@ function startPageFocusTimeout() {
   pageFocusTimeoutId = DetachableDOM.setTimeout(() => {
     chrome.runtime.sendMessage({ type: "pageFocused" });
     pageFocusTimeoutId = null;
-  }, 4000);
+  }, 2500);
 }
 
 function clearPageFocusTimeout() {
