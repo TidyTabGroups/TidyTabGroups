@@ -57,7 +57,10 @@ const UserSettings = () => {
 
   return (
     <Container maxWidth="md" sx={{ height: "100vh", padding: "24px" }}>
-      <Card>
+      <Typography variant="h6" gutterBottom>
+        Behaviour
+      </Typography>
+      <Card sx={{ borderRadius: "10px" }}>
         <CardContent sx={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           <UserSetting
             control={<Switch checked={userSettings.repositionTabs} onChange={(e) => updateSettings({ repositionTabs: e.target.checked })} />}
