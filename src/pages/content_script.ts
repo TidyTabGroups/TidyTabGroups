@@ -50,11 +50,10 @@ window.addEventListener("message", event => {
 // 2. click
 // 3. keydown
 // 4. mouse move (if the mouse moves more than 2px)
-// 5. scroll
 
 // the events that clear the page focus timeout (main frame only):
-// 6. mouse leave
-// 7. visibility change to hidden
+// 5. mouse leave
+// 6. visibility change to hidden
 
 // 1
 DetachableDOM.addEventListener(window, "mousedown", () => {
@@ -92,15 +91,8 @@ DetachableDOM.addEventListener(window, "mousemove", async event => {
   }
 }, true)
 
-// 5
-DetachableDOM.addEventListener(window, "scroll", () => {
-  if(listenToPageFocusEvents) {
-    startPageFocusTimeout()
-  }
-}, true)
-
 if(isMainFrame) {
-  // 6
+  // 5
   DetachableDOM.addEventListener(document, "mouseleave", event => {
     if(event.target !== document) {
       return
@@ -109,7 +101,7 @@ if(isMainFrame) {
     clearPageFocusTimeout()
   }, true)
 
-  // 7
+  // 6
   DetachableDOM.addEventListener(window, "visibilitychange", event => {
     if (document.visibilityState === "hidden") {
       clearPageFocusTimeout();
