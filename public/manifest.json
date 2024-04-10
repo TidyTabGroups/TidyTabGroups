@@ -4,13 +4,12 @@
   "name": "Tidy Tabs",
   "description": "A suite of powerful tab group features with a focus on productivity, organization, multitasking, and mindful browsing.",
   "version": "1.0",
-  "options_ui": {
-    "page": "options.html"
-  },
 
   "action": {
     "default_icon": "icon.png"
   },
+
+  "options_page": "options.html",
 
   "content_scripts": [
     {
