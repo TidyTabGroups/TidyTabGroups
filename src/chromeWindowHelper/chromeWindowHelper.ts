@@ -209,15 +209,25 @@ export async function discardTabIfNotDiscarded(tabId: ChromeTabId) {
   }
 }
 
-// some tabs may not be scriptable, for example chrome://*, the chrome web store, accounts.google.com
-export async function isTabScriptable(tabId: ChromeTabId) {
-  return new Promise((resolve) => {
+// Checks if tab is scriptable by attempting to send it a message. Some tabs may not be scriptable, for example chrome://*,
+// the chrome web store, accounts.google.com. Returns [isScriptable, wasRemoved]. If wasRemoved is true, the tab was removed
+// before it loaded. In this case, isScriptable is also false.
+export async function isTabScriptable(tabId: ChromeTabId, waitForLoadOptions?: boolean | { forceLoad: boolean }) {
+  if (waitForLoadOptions) {
+    const forceLoad = typeof waitForLoadOptions === "boolean" ? false : waitForLoadOptions.forceLoad;
+    const wasRemoved = await waitForTabToLoad(tabId, forceLoad);
+    if (wasRemoved) {
+      return [false, true] as const;
+    }
+  }
+
+  return new Promise<readonly [boolean, boolean]>((resolve) => {
     chrome.tabs.sendMessage(tabId, { type: "ping" }, { frameId: 0 }, async () => {
       if (chrome.runtime.lastError) {
         console.warn(`isTabScriptable::chrome.runtime.lastError for ${tabId}:`, chrome.runtime.lastError.message);
-        resolve(false);
+        resolve([false, false] as const);
       } else {
-        resolve(true);
+        resolve([true, false] as const);
       }
     });
   });
