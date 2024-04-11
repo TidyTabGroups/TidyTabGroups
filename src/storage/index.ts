@@ -23,7 +23,3 @@ export const removeItems = store.remove;
 export const updateItems = store.update;
 export const changeStream = store.changeStream;
 export const valueStream = store.valueStream;
-
-updateItems(async (prev) => {
-  return prev;
-});
