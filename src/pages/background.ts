@@ -1,4 +1,4 @@
-import BackgroundEvents from "../backgroundEvents";
+import ActiveWindowManager from "../activeWindowManager";
 import Database from "../database";
 import Logger from "../logger";
 import { ActiveWindow } from "../model";
@@ -10,7 +10,7 @@ const logger = Logger.getLogger("Background", { color: "pink" });
 Database.initializeDatabaseConnection("model").catch(onError);
 Storage.initialize().catch(onError);
 UserPreferences.initialize();
-BackgroundEvents.initialize(onError);
+ActiveWindowManager.initialize(onError);
 
 chrome.action.onClicked.addListener(function (tab) {
   chrome.runtime.openOptionsPage();

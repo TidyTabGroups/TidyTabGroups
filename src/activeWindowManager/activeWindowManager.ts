@@ -14,7 +14,7 @@ import Logger from "../logger";
 import Types from "../types";
 import UserPreferences from "../userPreferences";
 
-const logger = Logger.getLogger("backgroundEvents", { color: "#fcba03" });
+const logger = Logger.getLogger("activeWindowManager", { color: "#fcba03" });
 
 const awokenTime = new Date();
 function justWokeUp() {
