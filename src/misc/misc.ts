@@ -59,3 +59,17 @@ export function waitMs(ms: number) {
     setTimeout(resolve, ms);
   });
 }
+
+export function lazyCall<T>(fn: () => Promise<T>) {
+  let value: T;
+  let hasValue = false;
+
+  return async function () {
+    if (!hasValue) {
+      value = await fn();
+      hasValue = true;
+    }
+
+    return value;
+  };
+}

@@ -1,10 +1,18 @@
-import Database from "../database";
 import Types from "../types";
-import { ChromeWindowWithId, ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabId, ActiveWindow } from "../types/types";
+import {
+  ChromeWindowWithId,
+  ChromeWindowId,
+  ChromeTabWithId,
+  ChromeTabGroupWithId,
+  ChromeTabId,
+  ActiveWindow,
+  ChromeTabGroupId,
+} from "../types/types";
 import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
+import UserPreferences from "../userPreferences";
 
 const logger = Logger.getLogger("ActiveWindow", { color: "#b603fc" });
 
@@ -283,20 +291,9 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   //    when a the last active tab of a window is moved to a new window
 
   // 1
-  const remaingTabGroupsToCollapse = tabGroups.filter((tabGroup) => tabGroup.id !== selectedTab.groupId);
-  const collapseNextTabGroup = async () => {
-    const tabGroup = remaingTabGroupsToCollapse.pop();
-    if (!tabGroup) {
-      return;
-    }
-
-    if (!tabGroup.collapsed) {
-      await ChromeWindowHelper.updateTabGroup(tabGroup.id, { collapsed: true });
-    }
-    await collapseNextTabGroup();
-  };
-
-  await collapseNextTabGroup();
+  if ((await UserPreferences.get()).collapseUnfocusedTabGroups) {
+    await collapseUnFocusedTabGroups(tabGroups, selectedTab.groupId);
+  }
 
   // 2
   const selectedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === selectedTab.groupId);
@@ -369,34 +366,49 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
     throw new Error(`setPrimaryTab::tabId ${tabId} not found in windowId ${windowId}`);
   }
 
-  let shouldMoveTab = false;
+  const getUserPreferences = Misc.lazyCall(UserPreferences.get);
+
   if (!tab.pinned) {
+    // if the tab is in a tab group, lastRelativeTabIndex will be the last tab in the group, otherwise it will be the last tab in the window
+    let lastRelativeTabIndex = tabs[tabs.length - 1].index;
+
+    // reposition the tab's group to the end
     if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
       const tabsInGroup = tabs.filter((otherTab) => otherTab.groupId === tab.groupId);
       const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
-      if (lastTabInGroup.index < tabs[tabs.length - 1].index) {
+      if (lastTabInGroup.index < tabs[tabs.length - 1].index && (await getUserPreferences()).repositionTabGroups) {
         await ChromeWindowHelper.moveTabGroup(tab.groupId, { index: -1 });
+      } else {
+        lastRelativeTabIndex = lastTabInGroup.index;
       }
-
-      if (tab.index < lastTabInGroup.index) {
-        shouldMoveTab = true;
-      }
-    } else if (tab.index < tabs[tabs.length - 1].index) {
-      shouldMoveTab = true;
     }
 
+    // reposition the tab to the end
     // if the tab opened any un-accessed tabs that are positioned after it, then dont move it
     // FIXME: remove the (t as any) cast when the chrome typings are updated to include the lastAccessed property
     const hasOpenedUnaccessedTabs = tabs.some((t) => t.openerTabId === tab.id && (t as any).lastAccessed === undefined && t.index > tab.index);
-    if (!hasOpenedUnaccessedTabs && shouldMoveTab) {
-      await ChromeWindowHelper.moveTab(tabId, { index: -1 });
+    if (tab.index < lastRelativeTabIndex && !hasOpenedUnaccessedTabs && (await getUserPreferences()).repositionTabs) {
+      await ChromeWindowHelper.moveTab(tabId, { index: lastRelativeTabIndex });
     }
   }
 
-  const uncollapsedTabGroups = (await chrome.tabGroups.query({ windowId, collapsed: false })) as ChromeTabGroupWithId[];
-  uncollapsedTabGroups.forEach(async (tabGroup) => {
-    if (tabGroup.id !== tab.groupId) {
-      await ChromeWindowHelper.updateTabGroup(tabGroup.id, { collapsed: true });
-    }
-  });
+  if ((await getUserPreferences()).collapseUnfocusedTabGroups) {
+    await collapseUnFocusedTabGroups(windowId, tab.groupId);
+  }
+}
+
+export async function collapseUnFocusedTabGroups(tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId, focusedTabGroupId: ChromeTabGroupId) {
+  let tabGroups: ChromeTabGroupWithId[];
+  if (typeof tabGroupsOrWindowId === "number") {
+    tabGroups = (await chrome.tabGroups.query({ windowId: tabGroupsOrWindowId, collapsed: false })) as ChromeTabGroupWithId[];
+  } else {
+    tabGroups = tabGroupsOrWindowId.filter((tabGroup) => !tabGroup.collapsed);
+  }
+
+  const unfocusedTabGroups = tabGroups.filter((tabGroup) => tabGroup.id !== focusedTabGroupId);
+  await Promise.all(
+    unfocusedTabGroups.map(async (unfocusedTabGroup) => {
+      await ChromeWindowHelper.updateTabGroup(unfocusedTabGroup.id, { collapsed: true });
+    })
+  );
 }

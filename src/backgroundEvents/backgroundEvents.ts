@@ -12,6 +12,7 @@ import ChromeWindowHelper from "../chromeWindowHelper";
 import Misc from "../misc";
 import Logger from "../logger";
 import Types from "../types";
+import UserPreferences from "../userPreferences";
 
 const logger = Logger.getLogger("backgroundEvents", { color: "#fcba03" });
 
@@ -269,34 +270,31 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
       return;
     }
 
+    const getUserPreferences = Misc.lazyCall(UserPreferences.get);
+
     if (!tabGroup.collapsed) {
       // 1.a
-      const tabGroups = (await chrome.tabGroups.query({ windowId: tabGroup.windowId, collapsed: false })) as ChromeTabGroupWithId[];
-      const otherTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.id !== tabGroup.id);
-      if (otherTabGroups.length > 0) {
-        myLogger.log(`collapsing all other tab groups`);
-        await Promise.all(
-          otherTabGroups.map(async (otherTabGroup) => {
-            await ChromeWindowHelper.updateTabGroup(otherTabGroup.id, { collapsed: true });
-          })
-        );
+      if ((await getUserPreferences()).collapseUnfocusedTabGroups) {
+        await ActiveWindow.collapseUnFocusedTabGroups(tabGroup.windowId, tabGroup.id);
       }
 
       // 1.b
-      const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
-      const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
-      const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
-      if (!activeTabInGroup) {
-        const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
+      if ((await getUserPreferences()).activateTabInFocusedTabGroup) {
+        const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
+        const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
+        const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
+        if (!activeTabInGroup) {
+          const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
 
-        // start loading the tab now (before waiting for the animations to finish)
-        if (lastTabInGroup.status === "unloaded") {
-          chrome.tabs.update(lastTabInGroup.id, { url: lastTabInGroup.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
+          // start loading the tab now (before waiting for the animations to finish)
+          if (lastTabInGroup.status === "unloaded") {
+            chrome.tabs.update(lastTabInGroup.id, { url: lastTabInGroup.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
+          }
+          // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
+          const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
+          await Misc.waitMs(timeToWaitBeforeActivation);
+          await ChromeWindowHelper.activateTab(lastTabInGroup.id);
         }
-        // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
-        const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
-        await Misc.waitMs(timeToWaitBeforeActivation);
-        await ChromeWindowHelper.activateTab(lastTabInGroup.id);
       }
     }
   } catch (error) {
@@ -356,7 +354,8 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
     if (
       !tab.pinned &&
       tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
-      previousLastActiveTabInfo.tabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE
+      previousLastActiveTabInfo.tabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE &&
+      (await UserPreferences.get()).addNewTabToFocusedTabGroup
     ) {
       myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${previousLastActiveTabInfo.title}'`);
       await chrome.tabs.group({ tabIds: tab.id, groupId: previousLastActiveTabInfo.tabGroupId });
