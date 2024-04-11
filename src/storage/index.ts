@@ -13,7 +13,10 @@ export const LOCAL_STORAGE_DEFAULT_VALUES: LocalStorageShape = {
 };
 
 export async function initialize(defaultValues = LOCAL_STORAGE_DEFAULT_VALUES) {
-  await setItems(defaultValues);
+  const items = await getItems();
+  const missingItems = (Object.keys(defaultValues) as (keyof LocalStorageShape)[]).filter((key) => !items[key]);
+  const newItems = missingItems.reduce((acc, key) => ({ ...acc, [key]: defaultValues[key] }), {});
+  await setItems(newItems);
 }
 
 export const getItems = store.get;
