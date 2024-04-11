@@ -310,7 +310,6 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   // check if the activeWindowWithSameLastActiveTabInfo still exists because it could have been removed, but its corresponding active window object not yet
   if (activeWindowWithSameLastActiveTabInfo && (await ChromeWindowHelper.doesWindowExist(activeWindowWithSameLastActiveTabInfo.windowId))) {
     const [activeTab] = (await chrome.tabs.query({ windowId: activeWindowWithSameLastActiveTabInfo.windowId, active: true })) as ChromeTabWithId[];
-    Logger.attentionLogger.log(`activateWindowInternal::activeTab:`, activeTab);
     if (!activeTab) {
       throw new Error(
         `activateWindowInternal::activeWindowWithSameLastActiveTabInfo ${activeWindowWithSameLastActiveTabInfo.windowId} has no active tab`
