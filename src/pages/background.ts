@@ -1,13 +1,14 @@
 import BackgroundEvents from "../backgroundEvents";
 import Database from "../database";
 import Logger from "../logger";
+import { ActiveWindow } from "../model";
 import * as Storage from "../storage";
 
 const logger = Logger.getLogger("Background", { color: "pink" });
 
 Database.initializeDatabaseConnection("model");
-BackgroundEvents.initialize(onError);
 Storage.initialize();
+BackgroundEvents.initialize(onError);
 
 chrome.action.onClicked.addListener(function (tab) {
   chrome.runtime.openOptionsPage();
