@@ -4,8 +4,8 @@ const store = getBucket<LocalStorageShape>("store");
 
 export const LOCAL_STORAGE_DEFAULT_VALUES: LocalStorageShape = {
   userPreferences: {
-    repositionTabs: true,
-    repositionTabGroups: true,
+    repositionTabs: false,
+    repositionTabGroups: false,
     addNewTabToFocusedTabGroup: true,
     collapseUnfocusedTabGroups: true,
     activateTabInFocusedTabGroup: true,
