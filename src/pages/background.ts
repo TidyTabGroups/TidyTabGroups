@@ -3,11 +3,13 @@ import Database from "../database";
 import Logger from "../logger";
 import { ActiveWindow } from "../model";
 import * as Storage from "../storage";
+import UserPreferences from "../userPreferences";
 
 const logger = Logger.getLogger("Background", { color: "pink" });
 
 Database.initializeDatabaseConnection("model");
 Storage.initialize();
+UserPreferences.initialize();
 BackgroundEvents.initialize(onError);
 
 chrome.action.onClicked.addListener(function (tab) {

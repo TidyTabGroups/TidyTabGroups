@@ -22,6 +22,13 @@ function justWokeUp() {
 }
 
 export async function initialize(onError: () => void) {
+  UserPreferences.addChangeListener(async (changes) => {
+    if (!changes.oldValue?.collapseUnfocusedTabGroups && changes.newValue?.collapseUnfocusedTabGroups) {
+      const activeTabs = await chrome.tabs.query({ active: true });
+      await Promise.all(activeTabs.map((tab) => ActiveWindow.collapseUnFocusedTabGroups(tab.windowId, tab.groupId)));
+    }
+  });
+
   chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {
     queueOperation(() => onInstalled(details), true);
   });
