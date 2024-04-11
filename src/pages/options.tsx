@@ -57,7 +57,7 @@ const UserSettings = () => {
 
   return (
     <Container maxWidth="md" sx={{ height: "100vh", padding: "24px" }}>
-      <Typography variant="h6" gutterBottom>
+      <Typography variant="h6" component={"h1"} gutterBottom color="GrayText">
         Behaviour
       </Typography>
       <Card sx={{ borderRadius: "10px" }}>
