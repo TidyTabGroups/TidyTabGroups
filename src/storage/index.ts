@@ -3,7 +3,7 @@ import { getBucket } from "@extend-chrome/storage";
 const store = getBucket<LocalStorageShape>("store");
 
 export const LOCAL_STORAGE_DEFAULT_VALUES: LocalStorageShape = {
-  userSettings: {
+  userPreferences: {
     repositionTabs: true,
     repositionTabGroups: true,
     addNewTabToFocusedTabGroup: true,

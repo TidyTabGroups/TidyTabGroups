@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as Storage from "../storage";
-import { UserSettings } from "../types/types";
+import { UserPreferences } from "../types/types";
 import {
   Switch,
   Container,
@@ -16,26 +16,24 @@ import {
   AppBar,
   Toolbar,
   Grid,
-  Input,
-  Slider,
 } from "@mui/material";
 
-const UserSettings = () => {
-  const [loadingSettings, setLoadingSettings] = useState(true);
-  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+const UserPreferences = () => {
+  const [loadingPreferences, setLoadingPreferences] = useState(true);
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
 
-  const isLoading = userSettings === null;
+  const isLoading = userPreferences === null;
 
   useEffect(() => {
     (async () => {
-      const { userSettings } = await Storage.getItems("userSettings");
-      setLoadingSettings(false);
-      setUserSettings(userSettings);
+      const { userPreferences } = await Storage.getItems("userPreferences");
+      setLoadingPreferences(false);
+      setUserPreferences(userPreferences);
     })();
 
     const subscription = Storage.changeStream.subscribe((changes) => {
-      if (changes.userSettings?.newValue) {
-        setUserSettings(changes.userSettings.newValue);
+      if (changes.userPreferences?.newValue) {
+        setUserPreferences(changes.userPreferences.newValue);
       }
     });
 
@@ -44,9 +42,9 @@ const UserSettings = () => {
     };
   }, []);
 
-  async function updateSettings(newSettings: Partial<UserSettings>) {
+  async function updatePreferences(newPreferences: Partial<UserPreferences>) {
     await Storage.updateItems(async (prev) => {
-      prev.userSettings = { ...prev.userSettings, ...newSettings };
+      prev.userPreferences = { ...prev.userPreferences, ...newPreferences };
       return prev;
     });
   }
@@ -62,43 +60,43 @@ const UserSettings = () => {
       </Typography>
       <Card sx={{ borderRadius: "10px" }}>
         <CardContent sx={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          <UserSetting
-            control={<Switch checked={userSettings.repositionTabs} onChange={(e) => updateSettings({ repositionTabs: e.target.checked })} />}
+          <UserPreference
+            control={<Switch checked={userPreferences.repositionTabs} onChange={(e) => updatePreferences({ repositionTabs: e.target.checked })} />}
             name="Reposition focused Tabs to the end"
           />
           <Divider />
-          <UserSetting
+          <UserPreference
             control={
-              <Switch checked={userSettings.repositionTabGroups} onChange={(e) => updateSettings({ repositionTabGroups: e.target.checked })} />
+              <Switch checked={userPreferences.repositionTabGroups} onChange={(e) => updatePreferences({ repositionTabGroups: e.target.checked })} />
             }
             name="Reposition focused Tab Groups to the end"
           />
           <Divider />
-          <UserSetting
+          <UserPreference
             control={
               <Switch
-                checked={userSettings.addNewTabToFocusedTabGroup}
-                onChange={(e) => updateSettings({ addNewTabToFocusedTabGroup: e.target.checked })}
+                checked={userPreferences.addNewTabToFocusedTabGroup}
+                onChange={(e) => updatePreferences({ addNewTabToFocusedTabGroup: e.target.checked })}
               />
             }
             name="Automatically place new Tabs in focused Tab Group"
           />
           <Divider />
-          <UserSetting
+          <UserPreference
             control={
               <Switch
-                checked={userSettings.collapseUnfocusedTabGroups}
-                onChange={(e) => updateSettings({ collapseUnfocusedTabGroups: e.target.checked })}
+                checked={userPreferences.collapseUnfocusedTabGroups}
+                onChange={(e) => updatePreferences({ collapseUnfocusedTabGroups: e.target.checked })}
               />
             }
             name="Automatically collapse unfocused Tab Groups"
           />
           <Divider />
-          <UserSetting
+          <UserPreference
             control={
               <Switch
-                checked={userSettings.activateTabInFocusedTabGroup}
-                onChange={(e) => updateSettings({ activateTabInFocusedTabGroup: e.target.checked })}
+                checked={userPreferences.activateTabInFocusedTabGroup}
+                onChange={(e) => updatePreferences({ activateTabInFocusedTabGroup: e.target.checked })}
               />
             }
             name="Automatically activate Tab in focused Tab Group"
@@ -109,12 +107,12 @@ const UserSettings = () => {
   );
 };
 
-interface UserSettingProps {
+interface UserPreferenceProps {
   name: string;
   control: React.ReactElement;
 }
 
-const UserSetting = (props: UserSettingProps) => {
+const UserPreference = (props: UserPreferenceProps) => {
   const { name, control } = props;
 
   return (
@@ -170,7 +168,7 @@ const App = () => {
           </Toolbar>
         </Container>
       </AppBar>
-      <UserSettings />
+      <UserPreferences />
     </ThemeProvider>
   );
 };
