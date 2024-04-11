@@ -7,8 +7,8 @@ import UserPreferences from "../userPreferences";
 
 const logger = Logger.getLogger("Background", { color: "pink" });
 
-Database.initializeDatabaseConnection("model");
-Storage.initialize();
+Database.initializeDatabaseConnection("model").catch(onError);
+Storage.initialize().catch(onError);
 UserPreferences.initialize();
 BackgroundEvents.initialize(onError);
 
