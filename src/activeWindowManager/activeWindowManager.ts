@@ -282,18 +282,24 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
       if ((await getUserPreferences()).activateTabInFocusedTabGroup) {
         const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
         const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
+        if (tabsInGroup.length === 0) {
+          myLogger.warn(`no tabs found in group:`, tabGroup.id);
+          return;
+        }
+
         const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
         if (!activeTabInGroup) {
-          const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
+          const lastAccessedTabInTabGroup = ChromeWindowHelper.getLastAccessedTab(tabsInGroup);
+          const tabToActivate = lastAccessedTabInTabGroup ? lastAccessedTabInTabGroup : tabsInGroup[tabsInGroup.length - 1];
 
           // start loading the tab now (before waiting for the animations to finish)
-          if (lastTabInGroup.status === "unloaded") {
-            chrome.tabs.update(lastTabInGroup.id, { url: lastTabInGroup.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
+          if (tabToActivate.status === "unloaded") {
+            chrome.tabs.update(tabToActivate.id, { url: tabToActivate.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
           }
           // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
           const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
           await Misc.waitMs(timeToWaitBeforeActivation);
-          await ChromeWindowHelper.activateTab(lastTabInGroup.id);
+          await ChromeWindowHelper.activateTab(tabToActivate.id);
         }
       }
     }
