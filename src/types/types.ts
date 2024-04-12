@@ -5,16 +5,26 @@ export interface ModelDataBase extends DBSchema {
     value: ModelDataBaseActiveWindow;
     key: ModelDataBaseActiveWindow["windowId"];
   };
+  activeTabGroups: {
+    value: ModelDataBaseActiveTabGroup;
+    key: ModelDataBaseActiveTabGroup["tabGroupId"];
+    indexes: { windowId: ModelDataBaseActiveTabGroup["windowId"] };
+  };
 }
 
-export interface ModelDataBaseActiveWindow {
-  windowId: ActiveWindow["windowId"];
-  lastActiveTabInfo: ActiveWindow["lastActiveTabInfo"];
-}
+export type ModelDataBaseActiveWindow = ActiveWindow;
 
 export interface ActiveWindow {
   windowId: ChromeWindowId;
   lastActiveTabInfo: LastActiveTabInfo;
+}
+
+export type ModelDataBaseActiveTabGroup = ActiveTabGroup;
+
+export interface ActiveTabGroup {
+  tabGroupId: ChromeTabGroupId;
+  windowId: ChromeWindowId;
+  lastActiveTabId: ChromeTabId | null;
 }
 
 export type ChromeId = number;

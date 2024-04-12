@@ -12,11 +12,14 @@ import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
+import * as ActiveTabGroupDatabase from "./ActiveTabGroupDatabase";
 import UserPreferences from "../userPreferences";
+import Database from "../database";
 
 const logger = Logger.getLogger("ActiveWindow", { color: "#b603fc" });
 
 let activeWindows: Types.ActiveWindow[] = [];
+let activeTabGroups: Types.ActiveTabGroup[] = [];
 
 let windowsBeingActivated: ChromeWindowId[] = [];
 let activatingAllWindows = false;
@@ -24,13 +27,16 @@ let reactivatingAllWindows = false;
 
 let hasSyncedDatabase = false;
 let hasSyncedDatabaseForStartingWindowId: ChromeWindowId | null = null;
+let hasSyncedDatabaseForStartingTabGroupId: ChromeTabGroupId | null = null;
 let isSyncingDatabase = false;
 const startingWindowSyncing = new Misc.NonRejectablePromise<ChromeWindowId | null>();
 const startingWindowSyncingPromise = startingWindowSyncing.getPromise();
+const startingTabGroupSyncing = new Misc.NonRejectablePromise<ChromeTabGroupId | null>();
+const startingTabGroupSyncingPromise = startingTabGroupSyncing.getPromise();
 const remainingWindowsSyncing = new Misc.NonRejectablePromise<void>();
 const remainingWindowsSyncingPromise = remainingWindowsSyncing.getPromise();
 
-async function waitForSync(startingWindowId?: ChromeWindowId) {
+async function waitForSync(startingWindowId?: ChromeWindowId, startingTabGroupId?: ChromeTabGroupId) {
   return new Promise<void>(async (resolve, reject) => {
     try {
       if (hasSyncedDatabase) {
@@ -40,7 +46,8 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
 
       if (isSyncingDatabase) {
         const startingWindowSyncedId = await startingWindowSyncingPromise;
-        if (startingWindowId === startingWindowSyncedId) {
+        const startingTabGroupSyncedId = await startingTabGroupSyncingPromise;
+        if (startingWindowId === startingWindowSyncedId || startingTabGroupId === startingTabGroupSyncedId) {
           resolve();
           return;
         }
@@ -54,7 +61,7 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
 
       // calling waitForSync again after setting isSyncingDatabase
       //  to true will handle the resolution of this promise
-      waitForSync(startingWindowId).then(resolve, reject);
+      waitForSync(startingWindowId, startingTabGroupId).then(resolve, reject);
 
       // match and sync the starting active window
       let startingWindowSyncedId: Types.ActiveWindow["windowId"] | null = null;
@@ -73,6 +80,25 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
       }
       hasSyncedDatabaseForStartingWindowId = startingWindowSyncedId;
       startingWindowSyncing.resolve(startingWindowSyncedId);
+
+      // match and sync the starting active tab group
+      let startingTabGroupSyncedId: Types.ActiveTabGroup["tabGroupId"] | null = null;
+      if (startingTabGroupId !== undefined) {
+        const startingPreviousActiveTabGroup = await ActiveTabGroupDatabase.get(startingTabGroupId);
+        if (startingPreviousActiveTabGroup) {
+          const startingTabGroupSynced = {
+            tabGroupId: startingTabGroupId,
+            windowId: startingPreviousActiveTabGroup.windowId,
+            lastActiveTabId: startingPreviousActiveTabGroup.lastActiveTabId,
+          } as Types.ActiveTabGroup;
+          activeTabGroups.push(startingTabGroupSynced);
+          startingTabGroupSyncedId = startingTabGroupSynced.tabGroupId;
+        } else {
+          logger.warn(`waitForSync::startingTabGroupId ${startingTabGroupId} not found in database`);
+        }
+      }
+      hasSyncedDatabaseForStartingTabGroupId = startingTabGroupSyncedId;
+      startingTabGroupSyncing.resolve(startingTabGroupSyncedId);
 
       // match and sync the remaining active windows
       const [windows, previousActiveWindows] = await Promise.all([chrome.windows.getAll({ windowTypes: ["normal"] }), ActiveWindowDatabase.getAll()]);
@@ -102,6 +128,42 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
         logger.warn(`waitForSync::nonMatchingActiveWindows:`, nonMatchingActiveWindowIds);
       }
 
+      // match and sync the remaining active tab groups
+      const [tabGroups, previousActiveTabGroups] = await Promise.all([chrome.tabGroups.query({}), ActiveTabGroupDatabase.getAll()]);
+      const remainingPreviousActiveTabGroups =
+        startingTabGroupId !== undefined
+          ? previousActiveTabGroups.filter((activeTabGroup) => activeTabGroup.tabGroupId !== startingTabGroupId)
+          : previousActiveTabGroups;
+      const remainingTabGroups = startingTabGroupId !== undefined ? tabGroups.filter((tabGroup) => tabGroup.id !== startingTabGroupId) : tabGroups;
+
+      const nonMatchingActiveTabGroupIds: Types.ModelDataBaseActiveTabGroup["tabGroupId"][] = [];
+      await Promise.all(
+        remainingPreviousActiveTabGroups.map(async (activeTabGroup) => {
+          const matchingTabGroup = remainingTabGroups.find((tabGroup) => tabGroup.id === activeTabGroup.tabGroupId);
+          if (matchingTabGroup) {
+            const activeTabGroupSynced = {
+              tabGroupId: activeTabGroup.tabGroupId,
+              // use the windowId from the matching tab group instead of the active tab group from the database
+              //  because it could have been moved to another window
+              windowId: matchingTabGroup.windowId,
+              // check if the last active tab still exists because it could have been removed
+              lastActiveTabId:
+                activeTabGroup.lastActiveTabId !== null && (await ChromeWindowHelper.doesTabExist(activeTabGroup.lastActiveTabId))
+                  ? activeTabGroup.lastActiveTabId
+                  : null,
+            } as Types.ActiveTabGroup;
+            activeTabGroups.push(activeTabGroupSynced);
+          } else {
+            nonMatchingActiveTabGroupIds.push(activeTabGroup.tabGroupId);
+          }
+        })
+      );
+
+      if (nonMatchingActiveTabGroupIds.length > 0) {
+        // FIXME: should the non-matching active tab groups be removed from the database?
+        logger.warn(`waitForSync::nonMatchingActiveTabGroups:`, nonMatchingActiveTabGroupIds);
+      }
+
       isSyncingDatabase = false;
       hasSyncedDatabase = true;
     } catch (error) {
@@ -110,8 +172,12 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
   });
 }
 
-function throwIfNotSynced(methodName: string, startingWindowId?: ChromeWindowId) {
-  if (!hasSyncedDatabase && hasSyncedDatabaseForStartingWindowId !== startingWindowId) {
+function throwIfNotSynced(methodName: string, startingWindowId?: ChromeWindowId, startingTabGroupId?: ChromeTabGroupId) {
+  if (
+    !hasSyncedDatabase &&
+    hasSyncedDatabaseForStartingWindowId !== startingWindowId &&
+    hasSyncedDatabaseForStartingTabGroupId !== startingTabGroupId
+  ) {
     throw new Error(
       `ActiveWindow::a read or write operation in ActiveWindow.${methodName} to the database copy has been made before it finished syncing`
     );
@@ -171,6 +237,69 @@ function updateInternal(id: Types.ActiveWindow["windowId"], updatedProperties: P
   });
 }
 
+function getActiveTabGroupInternal(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  throwIfNotSynced("getActiveTabGroupInternal", windowId, tabGroupId);
+  return activeTabGroups.find((activeTabGroup) => activeTabGroup.windowId === windowId && activeTabGroup.tabGroupId === tabGroupId);
+}
+
+function getActiveTabGroupOrThrowInternal(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  throwIfNotSynced("getActiveTabGroupOrThrowInternal", windowId, tabGroupId);
+  const activeTabGroup = getActiveTabGroupInternal(windowId, tabGroupId);
+  if (!activeTabGroup) {
+    throw new Error(`ActiveWindow::getActiveTabGroupOrThrowInternal with windowId ${windowId} and tabGroupId ${tabGroupId} not found`);
+  }
+
+  return activeTabGroup;
+}
+
+function addActiveTabGroupInternal(activeTabGroup: Types.ActiveTabGroup) {
+  throwIfNotSynced("addActiveTabGroupInternal");
+  const index = activeTabGroups.findIndex(
+    (existingActiveTabGroup) =>
+      existingActiveTabGroup.windowId === activeTabGroup.windowId && existingActiveTabGroup.tabGroupId === activeTabGroup.tabGroupId
+  );
+  if (index !== -1) {
+    throw new Error(
+      `ActiveWindow::active tab group with windowId ${activeTabGroup.windowId} and tabGroupId ${activeTabGroup.tabGroupId} already exists`
+    );
+  }
+  activeTabGroups.push(activeTabGroup);
+  ActiveTabGroupDatabase.add(activeTabGroup).catch((error) => {
+    // TODO: bubble error up to global level
+    logger.error(
+      `addActiveTabGroupInternal::failed to add active tab group with windowId ${activeTabGroup.windowId} and tabGroupId ${activeTabGroup.tabGroupId} to database: ${error}`
+    );
+  });
+}
+
+function removeActiveTabGroupInternal(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  throwIfNotSynced("removeActiveTabGroupInternal", windowId, tabGroupId);
+  const index = activeTabGroups.findIndex((activeTabGroup) => activeTabGroup.windowId === windowId && activeTabGroup.tabGroupId === tabGroupId);
+  if (index === -1) {
+    throw new Error(`ActiveWindow::removeActiveTabGroupInternal with windowId ${windowId} and tabGroupId ${tabGroupId} not found`);
+  }
+
+  activeTabGroups.splice(index, 1);
+  ActiveTabGroupDatabase.remove(tabGroupId).catch((error) => {
+    // TODO: bubble error up to global level
+    logger.error(
+      `removeActiveTabGroupInternal::failed to remove active tab group with windowId ${windowId} and tabGroupId ${tabGroupId} from database: ${error}`
+    );
+  });
+}
+
+function updateActiveTabGroupInternal(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId, updatedProperties: Partial<Types.ActiveTabGroup>) {
+  throwIfNotSynced("updateActiveTabGroupInternal", windowId, tabGroupId);
+  const activeTabGroup = getActiveTabGroupOrThrowInternal(windowId, tabGroupId);
+  Object.assign(activeTabGroup, updatedProperties);
+  ActiveTabGroupDatabase.update(tabGroupId, updatedProperties).catch((error) => {
+    // TODO: bubble error up to global level
+    logger.error(
+      `updateActiveTabGroupInternal::failed to update active tab group with windowId ${windowId} and tabGroupId ${tabGroupId} in database: ${error}`
+    );
+  });
+}
+
 export async function getOrThrow(id: Types.ActiveWindow["windowId"]) {
   await waitForSync(id);
   return getOrThrowInternal(id);
@@ -199,6 +328,31 @@ export async function remove(id: Types.ActiveWindow["windowId"]) {
 export async function update(id: Types.ActiveWindow["windowId"], updatedProperties: Partial<Types.ActiveWindow>) {
   await waitForSync(id);
   return updateInternal(id, updatedProperties);
+}
+
+export async function getActiveTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  await waitForSync(windowId, tabGroupId);
+  return getActiveTabGroupInternal(windowId, tabGroupId);
+}
+
+export async function getActiveTabGroupOrThrow(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  await waitForSync(windowId, tabGroupId);
+  return getActiveTabGroupOrThrowInternal(windowId, tabGroupId);
+}
+
+export async function addActiveTabGroup(activeTabGroup: Types.ActiveTabGroup) {
+  await waitForSync();
+  return addActiveTabGroupInternal(activeTabGroup);
+}
+
+export async function removeActiveTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  await waitForSync(windowId, tabGroupId);
+  return removeActiveTabGroupInternal(windowId, tabGroupId);
+}
+
+export async function updateActiveTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId, updatedProperties: Partial<Types.ActiveTabGroup>) {
+  await waitForSync(windowId, tabGroupId);
+  return updateActiveTabGroupInternal(windowId, tabGroupId, updatedProperties);
 }
 
 export function isActivatingAllWindows() {
@@ -236,7 +390,16 @@ export async function reactivateAllWindows() {
 
   reactivatingAllWindows = true;
   activeWindows = [];
-  ActiveWindowDatabase.clear().catch((error) => {
+  activeTabGroups = [];
+
+  const transaction = await Database.createTransaction<Types.ModelDataBase, ["activeWindows", "activeTabGroups"], "readwrite">(
+    "model",
+    ["activeWindows", "activeTabGroups"],
+    "readwrite"
+  );
+  ActiveWindowDatabase.clear(transaction);
+  ActiveTabGroupDatabase.clear(transaction);
+  transaction.done.catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`reactivateAllWindows::failed to clear database: ${error}`);
   });
@@ -322,6 +485,11 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
     windowId,
     lastActiveTabInfo: newLastActiveTabInfo,
   });
+  await Promise.all(
+    tabGroups.map((tabGroup) =>
+      addActiveTabGroup({ tabGroupId: tabGroup.id, windowId, lastActiveTabId: selectedTab.groupId === tabGroup.id ? selectedTab.id : null })
+    )
+  );
 
   return tabGroups;
 }
