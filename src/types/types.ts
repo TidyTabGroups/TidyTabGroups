@@ -9,12 +9,10 @@ export interface ModelDataBase extends DBSchema {
 
 export interface ModelDataBaseActiveWindow {
   windowId: ActiveWindow["windowId"];
-  lastActiveTabInfo: ActiveWindow["lastActiveTabInfo"];
 }
 
 export interface ActiveWindow {
   windowId: ChromeWindowId;
-  lastActiveTabInfo: LastActiveTabInfo;
 }
 
 export type ChromeId = number;
@@ -26,7 +24,11 @@ export type ChromeWindowWithId = chrome.windows.Window & { id: ChromeWindowId };
 export type ChromeTabGroupWithId = chrome.tabGroups.TabGroup & {
   id: ChromeTabGroupId;
 };
-export type ChromeTabWithId = chrome.tabs.Tab & { id: ChromeTabId };
+export type ChromeTabWithId = chrome.tabs.Tab & {
+  id: ChromeTabId;
+  // FIXME: remove this when the chrome typings are updated to include the lastAccessed property
+  lastAccessed?: number | undefined;
+};
 
 export interface LocalStorageShape {
   userPreferences: UserPreferences;
@@ -38,12 +40,6 @@ export interface UserPreferences {
   addNewTabToFocusedTabGroup: boolean;
   collapseUnfocusedTabGroups: boolean;
   activateTabInFocusedTabGroup: boolean;
-}
-
-export interface LastActiveTabInfo {
-  tabId: ChromeTabId;
-  tabGroupId: ChromeTabGroupId;
-  title: string | undefined;
 }
 
 export interface LastGroupedTabInfo {

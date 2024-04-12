@@ -63,7 +63,6 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
         if (startingPreviousActiveWindow) {
           const startingWindowSynced = {
             windowId: startingWindowId,
-            lastActiveTabInfo: startingPreviousActiveWindow?.lastActiveTabInfo ?? null,
           } as Types.ActiveWindow;
           activeWindows.push(startingWindowSynced);
           startingWindowSyncedId = startingWindowSynced.windowId;
@@ -88,7 +87,6 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
         if (remainingWindowsIds.includes(activeWindow.windowId)) {
           const activeWindowSynced = {
             windowId: activeWindow.windowId,
-            lastActiveTabInfo: activeWindow.lastActiveTabInfo,
           } as Types.ActiveWindow;
           activeWindows.push(activeWindowSynced);
         } else {
@@ -140,7 +138,7 @@ function addInternal(activeWindow: Types.ActiveWindow) {
     throw new Error(`ActiveWindow::active window with id ${activeWindow.windowId} already exists`);
   }
   activeWindows.push(activeWindow);
-  ActiveWindowDatabase.add({ windowId: activeWindow.windowId, lastActiveTabInfo: activeWindow.lastActiveTabInfo }).catch((error) => {
+  ActiveWindowDatabase.add({ windowId: activeWindow.windowId }).catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`addInternal::failed to add active window with id ${activeWindow.windowId} to database: ${error}`);
   });
@@ -287,8 +285,6 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   // adjust the "shape" of the new active window, using the following adjustments:
   // 1. collapse all but the selected tab group
   // 2. un-collapse the selected tab group
-  // 3. update the lastActiveTabInfo of the potential other active window with the same lastActiveTabInfo. This happens
-  //    when a the last active tab of a window is moved to a new window
 
   // 1
   if ((await UserPreferences.get()).collapseUnfocusedTabGroups) {
@@ -301,26 +297,8 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
     await ChromeWindowHelper.updateTabGroup(selectedTabGroup.id, { collapsed: false });
   }
 
-  // 3
-  const allActiveWindows = await getAll();
-  const activeWindowWithSameLastActiveTabInfo = allActiveWindows.find((activeWindow) => activeWindow.lastActiveTabInfo.tabId === selectedTab.id);
-  // check if the activeWindowWithSameLastActiveTabInfo still exists because it could have been removed, but its corresponding active window object not yet
-  if (activeWindowWithSameLastActiveTabInfo && (await ChromeWindowHelper.doesWindowExist(activeWindowWithSameLastActiveTabInfo.windowId))) {
-    const [activeTab] = (await chrome.tabs.query({ windowId: activeWindowWithSameLastActiveTabInfo.windowId, active: true })) as ChromeTabWithId[];
-    if (!activeTab) {
-      throw new Error(
-        `activateWindowInternal::activeWindowWithSameLastActiveTabInfo ${activeWindowWithSameLastActiveTabInfo.windowId} has no active tab`
-      );
-    }
-    await update(activeWindowWithSameLastActiveTabInfo.windowId, {
-      lastActiveTabInfo: { tabId: activeTab.id, tabGroupId: activeTab.groupId, title: activeTab.title },
-    });
-  }
-
-  const newLastActiveTabInfo = { tabId: selectedTab.id, tabGroupId: selectedTab.groupId, title: selectedTab.title };
   await add({
     windowId,
-    lastActiveTabInfo: newLastActiveTabInfo,
   });
 
   return tabGroups;
@@ -385,8 +363,7 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
 
     // reposition the tab to the end
     // if the tab opened any un-accessed tabs that are positioned after it, then dont move it
-    // FIXME: remove the (t as any) cast when the chrome typings are updated to include the lastAccessed property
-    const hasOpenedUnaccessedTabs = tabs.some((t) => t.openerTabId === tab.id && (t as any).lastAccessed === undefined && t.index > tab.index);
+    const hasOpenedUnaccessedTabs = tabs.some((t) => t.openerTabId === tab.id && t.lastAccessed === undefined && t.index > tab.index);
     if (tab.index < lastRelativeTabIndex && !hasOpenedUnaccessedTabs && (await getUserPreferences()).repositionTabs) {
       await ChromeWindowHelper.moveTab(tabId, { index: lastRelativeTabIndex });
     }

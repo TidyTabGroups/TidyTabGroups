@@ -1,13 +1,5 @@
 import { ActiveWindow } from "../model";
-import {
-  ChromeTabGroupId,
-  ChromeTabGroupWithId,
-  ChromeTabId,
-  ChromeTabWithId,
-  ChromeWindowId,
-  LastActiveTabInfo,
-  ChromeWindowWithId,
-} from "../types/types";
+import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Misc from "../misc";
 import Logger from "../logger";
@@ -313,7 +305,7 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
 // FIXME: this needs to handle the case where the active tab is being dragged
 export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInfo: chrome.tabs.TabActiveInfo) {
   const myLogger = logger.getNestedLogger("onTabActivated");
-  // 1. update the activeWindow's lastActiveTabInfo
+  // 1. if the tab is pinned, set it as the primary tab
 
   myLogger.log(``, activeInfo.tabId);
 
@@ -326,12 +318,10 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
 
+    // 1
     if (tab.pinned) {
       await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
     }
-
-    // 2
-    await ActiveWindow.update(tab.windowId, { lastActiveTabInfo: { tabId: tab.id, tabGroupId: tab.groupId, title: tab.title } });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -348,8 +338,6 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
   }
 
   try {
-    let { lastActiveTabInfo: previousLastActiveTabInfo } = activeWindow;
-
     // 1
     // check if the the tab was updated or removed
     const latestTab = await ChromeWindowHelper.getIfTabExists(tab.id);
@@ -359,14 +347,24 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
     }
     tab = latestTab;
 
+    const tabsOrderedByLastAccessed = await ChromeWindowHelper.getTabsOrderedByLastAccessed(tab.windowId);
+    let lastActiveTab: ChromeTabWithId | undefined;
+    // the last active tab could be this tab if it is activated, in that case, get the previous last active tab
+    if (tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 1]?.id === tab.id) {
+      lastActiveTab = tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 2] as ChromeTabWithId | undefined;
+    } else {
+      lastActiveTab = tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 1] as ChromeTabWithId | undefined;
+    }
+
     if (
       !tab.pinned &&
       tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
-      previousLastActiveTabInfo.tabGroupId !== chrome.tabGroups.TAB_GROUP_ID_NONE &&
+      lastActiveTab &&
+      lastActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE &&
       (await UserPreferences.get()).addNewTabToFocusedTabGroup
     ) {
-      myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${previousLastActiveTabInfo.title}'`);
-      await chrome.tabs.group({ tabIds: tab.id, groupId: previousLastActiveTabInfo.tabGroupId });
+      myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${lastActiveTab.title}'`);
+      await chrome.tabs.group({ tabIds: tab.id, groupId: lastActiveTab.groupId });
     }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -379,33 +377,13 @@ export async function onTabUpdated(
   changeInfo: chrome.tabs.TabChangeInfo,
   tab: chrome.tabs.Tab
 ) {
-  const myLogger = logger.getNestedLogger("onTabUpdated");
-  if (!tab.id) {
-    myLogger.warn(`tabId not found for tab:`, tab);
-    return;
-  }
-
   const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId"];
   if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
     return;
   }
 
-  // 1. if the groupId property is updated, update the activeWindow's lastActiveTabInfo's groupId property
-
+  const myLogger = logger.getNestedLogger("onTabUpdated");
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
-
-  try {
-    const previousLastActiveTabInfo = activeWindow.lastActiveTabInfo;
-
-    // 1
-    // we check if the tab still exists because the chrome.tabs.onUpdated event gets called with groupId = -1 when the tab
-    //  is removed, in which case we dont care about this event for the current use cases
-    if (changeInfo.groupId !== undefined && (await ChromeWindowHelper.doesTabExist(tabId)) && previousLastActiveTabInfo?.tabId === tabId) {
-      ActiveWindow.update(activeWindow.windowId, { lastActiveTabInfo: { ...previousLastActiveTabInfo, tabGroupId: changeInfo.groupId } });
-    }
-  } catch (error) {
-    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
-  }
 }
 
 export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
@@ -440,23 +418,5 @@ export async function onTabMoved(activeWindow: Types.ActiveWindow, tabId: Chrome
 
 export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId: ChromeTabId, removedTabId: ChromeTabId) {
   const myLogger = logger.getNestedLogger("onTabReplaced");
-  // 1. update the activeWindow's lastActiveTabInfo's tabId property
   myLogger.log(`addedTabId and removedTabId:`, addedTabId, removedTabId);
-
-  try {
-    let addedTab = await ChromeWindowHelper.getIfTabExists(addedTabId);
-    if (!addedTab || !addedTab.id) {
-      myLogger.warn(`addedTab not found for addedTabId:`, addedTabId);
-      return;
-    }
-
-    const { lastActiveTabInfo: previousLastActiveTabInfo } = activeWindow;
-
-    // 1
-    if (previousLastActiveTabInfo && previousLastActiveTabInfo.tabId === removedTabId) {
-      await ActiveWindow.update(activeWindow.windowId, { lastActiveTabInfo: { ...previousLastActiveTabInfo, tabId: addedTabId } });
-    }
-  } catch (error) {
-    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
-  }
 }

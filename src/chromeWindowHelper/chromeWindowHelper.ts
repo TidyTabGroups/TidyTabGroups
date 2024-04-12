@@ -232,3 +232,28 @@ export async function isTabScriptable(tabId: ChromeTabId, waitForLoadOptions?: b
     });
   });
 }
+
+export async function getLastAccessedTabInWindow(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+  const tabs = Array.isArray(windowIdOrTabs) ? windowIdOrTabs : ((await chrome.tabs.query({ windowId: windowIdOrTabs })) as ChromeTabWithId[]);
+  return getLastAccessedTab(tabs);
+}
+
+export async function getLastAccessedTabInTabGroup(tabGroupIdOrTabs: ChromeTabGroupId | ChromeTabWithId[]) {
+  const tabs = Array.isArray(tabGroupIdOrTabs) ? tabGroupIdOrTabs : ((await chrome.tabs.query({ groupId: tabGroupIdOrTabs })) as ChromeTabWithId[]);
+  return getLastAccessedTab(tabs);
+}
+
+export function getLastAccessedTab(tabs: ChromeTabWithId[]) {
+  let lastAccessedTab: ChromeTabWithId | undefined;
+  tabs.forEach((tab) => {
+    if (tab.lastAccessed !== undefined && (lastAccessedTab?.lastAccessed === undefined || tab.lastAccessed > lastAccessedTab.lastAccessed)) {
+      lastAccessedTab = tab;
+    }
+  });
+  return lastAccessedTab;
+}
+
+export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+  const tabs = Array.isArray(windowIdOrTabs) ? windowIdOrTabs : ((await chrome.tabs.query({ windowId: windowIdOrTabs })) as ChromeTabWithId[]);
+  return tabs.sort((tab1, tab2) => (tab1.lastAccessed || 0) - (tab2.lastAccessed || 0));
+}
