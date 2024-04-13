@@ -4,7 +4,7 @@ import ChromeWindowHelper from "../chromeWindowHelper";
 import Misc from "../misc";
 import Logger from "../logger";
 import Types from "../types";
-import UserPreferences from "../userPreferences";
+import * as Storage from "../storage";
 
 const logger = Logger.getLogger("activeWindowManager", { color: "#fcba03" });
 
@@ -14,8 +14,9 @@ function justWokeUp() {
 }
 
 export async function initialize(onError: () => void) {
-  UserPreferences.addChangeListener(async (changes) => {
-    if (!changes.oldValue?.collapseUnfocusedTabGroups && changes.newValue?.collapseUnfocusedTabGroups) {
+  Storage.addChangeListener(async (changes) => {
+    const { userPreferences } = changes;
+    if (userPreferences && !userPreferences.oldValue?.collapseUnfocusedTabGroups && userPreferences.newValue?.collapseUnfocusedTabGroups) {
       const activeTabs = await chrome.tabs.query({ active: true });
       await Promise.all(activeTabs.map((tab) => ActiveWindow.collapseUnFocusedTabGroups(tab.windowId, tab.groupId)));
     }
@@ -270,7 +271,9 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
       return;
     }
 
-    const getUserPreferences = Misc.lazyCall(UserPreferences.get);
+    const getUserPreferences = Misc.lazyCall(async () => {
+      return (await Storage.getItems("userPreferences")).userPreferences;
+    });
 
     if (!tabGroup.collapsed) {
       // 1.a
@@ -367,7 +370,7 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
       tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
       lastActiveTab &&
       lastActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE &&
-      (await UserPreferences.get()).addNewTabToFocusedTabGroup
+      (await Storage.getItems("userPreferences")).userPreferences.addNewTabToFocusedTabGroup
     ) {
       myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${lastActiveTab.title}'`);
       await chrome.tabs.group({ tabIds: tab.id, groupId: lastActiveTab.groupId });

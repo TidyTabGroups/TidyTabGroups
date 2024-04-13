@@ -18,6 +18,8 @@ import {
   Grid,
 } from "@mui/material";
 
+Storage.initialize();
+
 const UserPreferences = () => {
   const [loadingPreferences, setLoadingPreferences] = useState(true);
   const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
@@ -31,19 +33,21 @@ const UserPreferences = () => {
       setUserPreferences(userPreferences);
     })();
 
-    const subscription = Storage.changeStream.subscribe((changes) => {
+    Storage.addChangeListener(onChangeUserPreferences);
+
+    function onChangeUserPreferences(changes: { userPreferences?: { newValue?: UserPreferences; oldValue?: UserPreferences } }) {
       if (changes.userPreferences?.newValue) {
         setUserPreferences(changes.userPreferences.newValue);
       }
-    });
+    }
 
     return () => {
-      subscription.unsubscribe();
+      Storage.removeChangeListener(onChangeUserPreferences);
     };
   }, []);
 
   async function updatePreferences(newPreferences: Partial<UserPreferences>) {
-    await Storage.updateItems(async (prev) => {
+    await Storage.updateItems("userPreferences", async (prev) => {
       prev.userPreferences = { ...prev.userPreferences, ...newPreferences };
       return prev;
     });

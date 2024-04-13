@@ -12,7 +12,7 @@ import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
-import UserPreferences from "../userPreferences";
+import * as Storage from "../storage";
 
 const logger = Logger.getLogger("ActiveWindow", { color: "#b603fc" });
 
@@ -287,7 +287,7 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   // 2. un-collapse the selected tab group
 
   // 1
-  if ((await UserPreferences.get()).collapseUnfocusedTabGroups) {
+  if ((await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups) {
     await collapseUnFocusedTabGroups(tabGroups, selectedTab.groupId);
   }
 
@@ -344,7 +344,9 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
     throw new Error(`setPrimaryTab::tabId ${tabId} not found in windowId ${windowId}`);
   }
 
-  const getUserPreferences = Misc.lazyCall(UserPreferences.get);
+  const getUserPreferences = Misc.lazyCall(async () => {
+    return (await Storage.getItems("userPreferences")).userPreferences;
+  });
 
   if (!tab.pinned) {
     // if the tab is in a tab group, lastRelativeTabIndex will be the last tab in the group, otherwise it will be the last tab in the window
