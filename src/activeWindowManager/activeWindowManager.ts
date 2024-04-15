@@ -280,10 +280,26 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
 
 export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
   const myLogger = logger.getNestedLogger("onTabGroupCreated");
-  // 1. add the ActiveWindowTabGroup
+  // 1. adjust the tab group's color based on the active window's focus mode
+  // 2. add the ActiveWindowTabGroup
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
     // 1
+    const [activeTab] = await chrome.tabs.query({ windowId: tabGroup.windowId, active: true });
+    if (!activeTab) {
+      throw new Error(myLogger.getPrefixedMessage(`could not find activeTab in windowId: ${tabGroup.windowId}`));
+    }
+    const isFocusedTabGroup = activeTab.groupId === tabGroup.id;
+    const { focusMode } = activeWindow;
+    if (focusMode) {
+      if (isFocusedTabGroup && focusMode.colors.focused !== tabGroup.color) {
+        await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.focused });
+      } else if (!isFocusedTabGroup && focusMode.colors.nonFocused !== tabGroup.color) {
+        await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.nonFocused });
+      }
+    }
+
+    // 2
     await ActiveWindow.update(activeWindow.windowId, { tabGroups: [...activeWindow.tabGroups, tabGroup] });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -352,11 +368,21 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
         );
       } else {
         // 2
-        newFocusModeColors = { ...focusMode.colors, focused: tabGroup.color };
+        const activeTab = tabs.find((tab) => tab.active);
+        if (!activeTab) {
+          throw new Error(myLogger.getPrefixedMessage(`could not find activeTab in windowId: ${tabGroup.windowId}`));
+        }
+        const isFocusedTabGroup = activeTab.groupId === tabGroup.id;
+        const shouldUpdateFocusModeColor = (await getUserPreferences()).activateTabInFocusedTabGroup ? isFocusedTabGroup : true;
+        if (shouldUpdateFocusModeColor) {
+          newFocusModeColors = { ...focusMode.colors, focused: tabGroup.color };
+        }
       }
 
-      activeWindow = await ActiveWindow.update(tabGroup.windowId, { focusMode: { ...focusMode, colors: newFocusModeColors } });
-      focusMode = activeWindow.focusMode;
+      if (newFocusModeColors) {
+        activeWindow = await ActiveWindow.update(tabGroup.windowId, { focusMode: { ...focusMode, colors: newFocusModeColors } });
+        focusMode = activeWindow.focusMode;
+      }
     }
 
     if (wasExpanded) {
