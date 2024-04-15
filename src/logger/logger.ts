@@ -62,6 +62,18 @@ export function getLogger(prefix?: string, options?: { color?: string; divider?:
     error: (message: any, ...args: any[]) => {
       log("error", message, ...args);
     },
+    logPrefixed: (message: any, ...args: any[]) => {
+      log("log", getPrefixedMessage(message), ...args);
+    },
+    warnPrefixed: (message: any, ...args: any[]) => {
+      log("warn", getPrefixedMessage(message), ...args);
+    },
+    errorPrefixed: (message: any, ...args: any[]) => {
+      log("error", getPrefixedMessage(message), ...args);
+    },
+    throwPrefixed: (message?: string | undefined) => {
+      throw new Error(message ? getPrefixedMessage(message) : undefined);
+    },
   };
 }
 
