@@ -17,6 +17,8 @@ import {
   Toolbar,
   Grid,
 } from "@mui/material";
+import { UserPreference } from "./userPreference";
+import { App } from "./app";
 
 Storage.start();
 
@@ -111,76 +113,33 @@ const UserPreferences = () => {
   );
 };
 
-interface UserPreferenceProps {
-  name: string;
-  control: React.ReactElement;
-}
-
-const UserPreference = (props: UserPreferenceProps) => {
-  const { name, control } = props;
-
-  return (
-    <Grid container spacing={2} alignItems="center" justifyContent="space-between">
-      <Grid item>
-        <Typography variant="h6" gutterBottom>
-          {name}
-        </Typography>
-      </Grid>
-      <Grid item xs sx={{ textAlign: "end" }}>
-        {control}
-      </Grid>
-    </Grid>
-  );
-};
-
-const App = () => {
-  const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
-
-  const theme = React.useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode: prefersDarkMode ? "dark" : "light",
-        },
-      }),
-    [prefersDarkMode]
-  );
-
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AppBar position="sticky">
-        <Container maxWidth="xl">
-          <Toolbar disableGutters>
-            <Typography
-              variant="h6"
-              noWrap
-              component="a"
-              href="#app-bar-with-responsive-menu"
-              sx={{
-                mr: 2,
-                display: { xs: "none", md: "flex" },
-                fontFamily: "monospace",
-                fontWeight: 700,
-                letterSpacing: ".3rem",
-                color: "inherit",
-                textDecoration: "none",
-              }}
-            >
-              TIDY TABS SETTINGS
-            </Typography>
-          </Toolbar>
-        </Container>
-      </AppBar>
-      <UserPreferences />
-    </ThemeProvider>
-  );
-};
-
 const root = createRoot(document.getElementById("root")!);
 
 root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
+  <App>
+    <AppBar position="sticky">
+      <Container maxWidth="xl">
+        <Toolbar disableGutters>
+          <Typography
+            variant="h6"
+            noWrap
+            component="a"
+            href="#app-bar-with-responsive-menu"
+            sx={{
+              mr: 2,
+              display: { xs: "none", md: "flex" },
+              fontFamily: "monospace",
+              fontWeight: 700,
+              letterSpacing: ".3rem",
+              color: "inherit",
+              textDecoration: "none",
+            }}
+          >
+            TIDY TABS SETTINGS
+          </Typography>
+        </Toolbar>
+      </Container>
+    </AppBar>
+    <UserPreferences />
+  </App>
 );

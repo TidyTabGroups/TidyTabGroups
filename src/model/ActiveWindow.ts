@@ -61,11 +61,8 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
       if (startingWindowId !== undefined) {
         const startingPreviousActiveWindow = await ActiveWindowDatabase.get(startingWindowId);
         if (startingPreviousActiveWindow) {
-          const startingWindowSynced = {
-            windowId: startingWindowId,
-          } as Types.ActiveWindow;
-          activeWindows.push(startingWindowSynced);
-          startingWindowSyncedId = startingWindowSynced.windowId;
+          activeWindows.push(startingPreviousActiveWindow);
+          startingWindowSyncedId = startingPreviousActiveWindow.windowId;
         } else {
           logger.warn(`waitForSync::startingWindowId ${startingWindowId} not found in database`);
         }
@@ -85,10 +82,7 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
       const nonMatchingActiveWindowIds: Types.ModelDataBaseActiveWindow["windowId"][] = [];
       remainingPreviousActiveWindows.forEach((activeWindow) => {
         if (remainingWindowsIds.includes(activeWindow.windowId)) {
-          const activeWindowSynced = {
-            windowId: activeWindow.windowId,
-          } as Types.ActiveWindow;
-          activeWindows.push(activeWindowSynced);
+          activeWindows.push(activeWindow);
         } else {
           nonMatchingActiveWindowIds.push(activeWindow.windowId);
         }
@@ -138,7 +132,7 @@ function addInternal(activeWindow: Types.ActiveWindow) {
     throw new Error(`ActiveWindow::active window with id ${activeWindow.windowId} already exists`);
   }
   activeWindows.push(activeWindow);
-  ActiveWindowDatabase.add({ windowId: activeWindow.windowId }).catch((error) => {
+  ActiveWindowDatabase.add(activeWindow).catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`addInternal::failed to add active window with id ${activeWindow.windowId} to database: ${error}`);
   });
@@ -161,12 +155,13 @@ function removeInternal(id: Types.ActiveWindow["windowId"]) {
 function updateInternal(id: Types.ActiveWindow["windowId"], updatedProperties: Partial<Types.ActiveWindow>) {
   throwIfNotSynced("updateInternal", id);
   const activeWindow = getOrThrowInternal(id);
-  Object.assign(activeWindow, updatedProperties);
+  const updatedActiveWindow = Object.assign(activeWindow, updatedProperties);
   // FIXME: pass in Partial<Types.ModelDataBaseActiveWindow> instead of Partial<Types.ActiveWindow>
   ActiveWindowDatabase.update(id, updatedProperties).catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`updateInternal::failed to update active window with id ${id} in database: ${error}`);
   });
+  return updatedActiveWindow as Types.ActiveWindow;
 }
 
 export async function getOrThrow(id: Types.ActiveWindow["windowId"]) {
@@ -285,11 +280,14 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
     collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
   });
 
-  await add({
+  const newActiveWindow = {
     windowId,
-  });
+    focusMode: null,
+    tabGroups: tabGroups.map(chromeTabGroupToActiveWindowTabGroup),
+  } as Types.ActiveWindow;
 
-  return tabGroups;
+  await add(newActiveWindow);
+  return newActiveWindow;
 }
 
 export async function activateWindow(windowId: ChromeWindowId) {
@@ -326,6 +324,8 @@ export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
 }
 
 export async function focusTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
+  const activeWindow = await getOrThrow(windowId);
+
   const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
   const tab = tabs.find((tab) => tab.id === tabId);
   if (!tab) {
@@ -361,6 +361,7 @@ export async function focusTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
 
   await ChromeWindowHelper.focusTabGroup(tab.groupId, windowId, {
     collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
+    highlightColors: activeWindow.focusMode?.colors,
   });
 }
 
@@ -378,4 +379,14 @@ export async function collapseUnFocusedTabGroups(tabGroupsOrWindowId: ChromeTabG
       await ChromeWindowHelper.updateTabGroup(unfocusedTabGroup.id, { collapsed: true });
     })
   );
+}
+
+export function chromeTabGroupToActiveWindowTabGroup(tabGroup: chrome.tabGroups.TabGroup) {
+  const activeWindowTabGroup = { id: tabGroup.id, color: tabGroup.color, collapsed: tabGroup.collapsed } as Types.ActiveWindowTabGroup;
+
+  if (tabGroup.title !== undefined) {
+    activeWindowTabGroup.title = tabGroup.title;
+  }
+
+  return activeWindowTabGroup;
 }

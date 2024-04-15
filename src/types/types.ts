@@ -9,10 +9,27 @@ export interface ModelDataBase extends DBSchema {
 
 export interface ModelDataBaseActiveWindow {
   windowId: ActiveWindow["windowId"];
+  focusMode: ActiveWindow["focusMode"];
+  tabGroups: ActiveWindow["tabGroups"];
 }
 
 export interface ActiveWindow {
   windowId: ChromeWindowId;
+  focusMode: {
+    colors: {
+      focused: chrome.tabGroups.ColorEnum;
+      nonFocused: chrome.tabGroups.ColorEnum;
+    };
+    savedTabGroupColors: Array<{ tabGroupId: ChromeTabGroupId; color: chrome.tabGroups.ColorEnum }>;
+  } | null;
+  tabGroups: ActiveWindowTabGroup[];
+}
+
+export interface ActiveWindowTabGroup {
+  id: chrome.tabGroups.TabGroup["id"];
+  title?: chrome.tabGroups.TabGroup["title"];
+  color: chrome.tabGroups.TabGroup["color"];
+  collapsed: chrome.tabGroups.TabGroup["collapsed"];
 }
 
 export type ChromeId = number;

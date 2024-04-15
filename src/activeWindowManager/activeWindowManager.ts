@@ -40,11 +40,17 @@ export async function initialize(onError: (error: any) => void) {
   });
 
   chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-    if (!sender.tab) {
-      logger.warn("onMessage::sender.tab is not valid:", sender);
+    let windowId: ChromeWindowId;
+    if (sender.tab) {
+      windowId = sender.tab.windowId;
+    } else if (message.data?.windowId) {
+      windowId = message.data.windowId;
+    } else {
+      logger.warn("onMessage::sender windowId is not valid:", sender);
       return;
     }
-    queueOperationIfWindowIsActive((activeWindow) => onMessage(activeWindow, message, sender, sendResponse), sender.tab.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onMessage(activeWindow, message, sender, sendResponse), windowId, false);
+    return true;
   });
 
   chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
@@ -82,8 +88,16 @@ export async function initialize(onError: (error: any) => void) {
     );
   });
 
+  chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
+    queueOperationIfWindowIsActive((activeWindow) => onTabGroupCreated(activeWindow, tabGroup), tabGroup.windowId, false);
+  });
+
+  chrome.tabGroups.onRemoved.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
+    queueOperationIfWindowIsActive((activeWindow) => onTabGroupRemoved(activeWindow, tabGroup), tabGroup.windowId, false);
+  });
+
   chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
-    queueOperationIfWindowIsActive((activeWindow) => onTabGroupsUpdated(activeWindow, tabGroup), tabGroup.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabGroupUpdated(activeWindow, tabGroup), tabGroup.windowId, false);
   });
 
   type ActiveWindowQueuedEventOperation = (activeWindow: Types.ActiveWindow) => Promise<void>;
@@ -226,9 +240,19 @@ export async function onMessage(
       } else {
         myLogger.warn("pageFocused::tab is not active:", tab);
       }
+    } else if (message.type === "getActiveWindow") {
+      const { windowId } = message.data as { windowId: ChromeWindowId };
+      const activeWindow = await ActiveWindow.get(windowId);
+      sendResponse({ activeWindow });
+    } else if (message.type === "updateActiveWindow") {
+      const { windowId, updateProps } = message.data as { windowId: Types.ActiveWindow["windowId"]; updateProps: Partial<Types.ActiveWindow> };
+      const updatedActiveWindow = await ActiveWindow.update(windowId, updateProps);
+      sendResponse({ activeWindow: updatedActiveWindow });
     }
   } catch (error) {
-    throw new Error(myLogger.getPrefixedMessage(`error processing message:${error}`));
+    const errorMessage = myLogger.getPrefixedMessage(`error processing message:${error}`);
+    sendResponse({ error: errorMessage });
+    throw new Error(errorMessage);
   }
 }
 
@@ -254,17 +278,45 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
   }
 }
 
-export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
-  const myLogger = logger.getNestedLogger("onTabGroupsUpdated");
-  // 1. if the tab group is uncollapsed:
-  //   a. collapse all other tab groups
-  //   b. if the active tab isnt already in this group, activate the last tab in the group
-  myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed);
+export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
+  const myLogger = logger.getNestedLogger("onTabGroupCreated");
+  // 1. add the ActiveWindowTabGroup
+  myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
+  try {
+    // 1
+    await ActiveWindow.update(activeWindow.windowId, { tabGroups: [...activeWindow.tabGroups, tabGroup] });
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
+  }
+}
+
+export async function onTabGroupRemoved(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
+  const myLogger = logger.getNestedLogger("onTabGroupRemoved");
+  // 1. remove the ActiveWindowTabGroup
+  myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
+  try {
+    // 1
+    await ActiveWindow.update(activeWindow.windowId, {
+      tabGroups: activeWindow.tabGroups.filter((otherTabGroup) => otherTabGroup.id !== tabGroup.id),
+    });
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
+  }
+}
+
+export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
+  const myLogger = logger.getNestedLogger("onTabGroupUpdated");
+  // 1. update the active window's non-primary tab group color
+  // 2. update the active window's primary tab group color
+  // 3. focus the tab group
+  // 4. activate the last active tab in the group
+  // 5. update the ActiveWindowTabGroup
+  myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
     // This is a workaround for when Chrome restores a window and fires a bunch of tabGroup.onUpdated events with these "psuedo" tab groups.
     // Note, for this to work, it relies on the fact that this is code path is async.
-    const tabGroupsWithSameTitle = await chrome.tabGroups.query({ windowId: tabGroup.windowId, title: tabGroup.title });
-    const tabGroupWithSameTitleAndId = tabGroupsWithSameTitle.find((otherTabGroup) => otherTabGroup.id === tabGroup.id);
+    const tabGroups = await chrome.tabGroups.query({ windowId: tabGroup.windowId });
+    const tabGroupWithSameTitleAndId = tabGroups.find((otherTabGroup) => otherTabGroup.id === tabGroup.id && otherTabGroup.title === tabGroup.title);
     if (!tabGroupWithSameTitleAndId) {
       myLogger.warn(`tab group with same title and id not found for windowId:`, tabGroup.windowId, tabGroup.id);
       return;
@@ -274,37 +326,71 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
       return (await Storage.getItems("userPreferences")).userPreferences;
     });
 
-    if (!tabGroup.collapsed) {
-      // 1.a
-      if ((await getUserPreferences()).collapseUnfocusedTabGroups) {
-        await ActiveWindow.collapseUnFocusedTabGroups(tabGroup.windowId, tabGroup.id);
+    const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
+
+    const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tabGroup.id);
+    if (!activeWindowTabGroup) {
+      throw new Error(myLogger.getPrefixedMessage(`activeWindowTabGroup not found for tabGroup:${tabGroup.id}`));
+    }
+    const wasCollapsed = tabGroup.collapsed && !activeWindowTabGroup.collapsed;
+    const wasExpanded = !tabGroup.collapsed && activeWindowTabGroup.collapsed;
+    const wasColorUpdated = tabGroup.color !== activeWindowTabGroup.color;
+
+    let { focusMode } = activeWindow;
+
+    if (focusMode && wasColorUpdated) {
+      let newFocusModeColors;
+      if (tabGroup.collapsed) {
+        // 1
+        newFocusModeColors = { ...focusMode.colors, nonFocused: tabGroup.color };
+        // update the color of all other collapsed tab groups
+        const otherCollapsedTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.collapsed && otherTabGroup.id !== tabGroup.id);
+        await Promise.all(
+          otherCollapsedTabGroups.map((otherCollapsedTabGroup) =>
+            ChromeWindowHelper.updateTabGroup(otherCollapsedTabGroup.id, { color: tabGroup.color })
+          )
+        );
+      } else {
+        // 2
+        newFocusModeColors = { ...focusMode.colors, focused: tabGroup.color };
       }
 
-      // 1.b
+      activeWindow = await ActiveWindow.update(tabGroup.windowId, { focusMode: { ...focusMode, colors: newFocusModeColors } });
+      focusMode = activeWindow.focusMode;
+    }
+
+    if (wasExpanded) {
+      // 3
+      await ChromeWindowHelper.focusTabGroup(tabGroup.id, tabGroups, {
+        collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
+        highlightColors: focusMode?.colors,
+      });
+
+      // 4
       if ((await getUserPreferences()).activateTabInFocusedTabGroup) {
-        const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
         const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
         if (tabsInGroup.length === 0) {
-          myLogger.warn(`no tabs found in group:`, tabGroup.id);
-          return;
+          throw new Error(myLogger.getPrefixedMessage(`no tabs found in tab group:${tabGroup.id}`));
         }
 
-        const activeTabInGroup = tabsInGroup.find((tab) => tab.active);
-        if (!activeTabInGroup) {
-          const lastAccessedTabInTabGroup = ChromeWindowHelper.getLastAccessedTab(tabsInGroup);
-          const tabToActivate = lastAccessedTabInTabGroup ? lastAccessedTabInTabGroup : tabsInGroup[tabsInGroup.length - 1];
+        const lastAccessedTabInTabGroup = ChromeWindowHelper.getLastAccessedTab(tabsInGroup);
+        const tabToActivate = lastAccessedTabInTabGroup ? lastAccessedTabInTabGroup : tabsInGroup[tabsInGroup.length - 1];
 
-          // start loading the tab now (before waiting for the animations to finish)
-          if (tabToActivate.status === "unloaded") {
-            chrome.tabs.update(tabToActivate.id, { url: tabToActivate.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
-          }
-          // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
-          const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
-          await Misc.waitMs(timeToWaitBeforeActivation);
-          await ChromeWindowHelper.activateTab(tabToActivate.id);
+        // start loading the tab now (before waiting for the animations to finish)
+        if (tabToActivate.status === "unloaded") {
+          chrome.tabs.update(tabToActivate.id, { url: tabToActivate.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
         }
+        // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
+        const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
+        await Misc.waitMs(timeToWaitBeforeActivation);
+        await ChromeWindowHelper.activateTab(tabToActivate.id);
       }
     }
+
+    // 5
+    await ActiveWindow.update(tabGroup.windowId, {
+      tabGroups: activeWindow.tabGroups.map((otherTabGroup) => (otherTabGroup.id === tabGroup.id ? tabGroup : otherTabGroup)),
+    });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
