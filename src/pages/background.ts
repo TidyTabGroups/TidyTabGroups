@@ -43,5 +43,6 @@ async function getLocalStorageDefaultValues() {
       collapseUnfocusedTabGroups: true,
       activateTabInFocusedTabGroup: true,
     },
+    lastSeenFocusModeColors: null,
   };
 }

@@ -7,6 +7,7 @@ import {
   ChromeTabId,
   ActiveWindow,
   ChromeTabGroupId,
+  ActiveWindowFocusModeColors,
 } from "../types/types";
 import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
@@ -242,7 +243,7 @@ export async function reactivateAllWindows() {
     await Promise.all(
       windowIds.map(async (windowId) => {
         const previousActiveWindow = previousActiveWindows.find((previousActiveWindow) => previousActiveWindow.windowId === windowId);
-        await activateWindowInternal(windowId, previousActiveWindow?.focusMode);
+        await activateWindowInternal(windowId, previousActiveWindow?.focusMode?.colors);
       })
     );
   } catch (error) {
@@ -269,7 +270,7 @@ export async function activateAllWindows() {
   }
 }
 
-async function activateWindowInternal(windowId: ChromeWindowId, focusMode?: ActiveWindow["focusMode"]) {
+async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?: ActiveWindowFocusModeColors) {
   const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
   if (!window) {
     throw new Error(`activateWindow::window with id ${window} not found`);
@@ -285,14 +286,31 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusMode?: Acti
     throw new Error(`activateWindow::window with id ${windowId} has no active tab`);
   }
 
+  let newFocusModeColors: ActiveWindowFocusModeColors | null = null;
+  if (focusModeColors) {
+    newFocusModeColors = focusModeColors;
+  } else {
+    newFocusModeColors = (await Storage.getItems("lastSeenFocusModeColors")).lastSeenFocusModeColors;
+  }
+
+  if (window.focused && newFocusModeColors) {
+    await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors });
+  }
+
   const tabGroups = await ChromeWindowHelper.focusTabGroup(selectedTab.groupId, windowId, {
     collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
-    highlightColors: focusMode?.colors,
+    highlightColors: newFocusModeColors ?? undefined,
   });
 
+  let newFocusMode = newFocusModeColors
+    ? {
+        colors: newFocusModeColors,
+        savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
+      }
+    : null;
   const newActiveWindow = {
     windowId,
-    focusMode: focusMode || null,
+    focusMode: newFocusMode,
     tabGroups: tabGroups.map(chromeTabGroupToActiveWindowTabGroup),
   } as Types.ActiveWindow;
 

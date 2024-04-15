@@ -33,10 +33,15 @@ const Popup = () => {
 
   async function onChangeFocusMode(e: React.ChangeEvent<HTMLInputElement>) {
     let newFocusMode: Types.ActiveWindow["focusMode"];
+    if (!activeWindow) {
+      throw new Error("onChangeFocusMode called with no active window");
+    }
+    const myActiveWindow = activeWindow;
+    const { windowId } = myActiveWindow;
 
     const enableFocusMode = e.target.checked;
     if (enableFocusMode) {
-      const tabs = (await chrome.tabs.query({ windowId: activeWindow!.windowId })) as Types.ChromeTabWithId[];
+      const tabs = (await chrome.tabs.query({ windowId })) as Types.ChromeTabWithId[];
       const activeTab = tabs.find((tab) => tab.active);
 
       if (!activeTab) {
@@ -44,17 +49,13 @@ const Popup = () => {
       }
       const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
       const focusedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === activeTab.groupId);
-      const focusedTabGroupColor = focusedTabGroup?.color || "cyan";
 
       newFocusMode = {
-        colors: {
-          focused: focusedTabGroupColor,
-          nonFocused: "grey",
-        },
+        colors: { focused: focusedTabGroup?.color || "cyan", nonFocused: focusedTabGroup?.color === "grey" ? "cyan" : "grey" },
         savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
-      } as Types.ActiveWindow["focusMode"];
+      } as Types.ActiveWindowFocusMode;
     } else {
-      const { focusMode } = activeWindow!;
+      const { focusMode } = myActiveWindow;
       if (focusMode === null) {
         throw new Error("Focus mode is null");
       }
@@ -64,16 +65,18 @@ const Popup = () => {
       newFocusMode = null;
     }
 
-    chrome.runtime.sendMessage(
-      { type: "updateActiveWindow", data: { windowId: activeWindow!.windowId, updateProps: { focusMode: newFocusMode } } },
-      (response) => {
-        if (response.activeWindow) {
-          setActiveWindow(response.activeWindow);
-        } else {
-          myLogger.error("No activeWindow in response", response.error);
+    chrome.runtime.sendMessage({ type: "updateActiveWindow", data: { windowId, updateProps: { focusMode: newFocusMode } } }, async (response) => {
+      const { activeWindow } = response;
+      if (activeWindow) {
+        setActiveWindow(activeWindow);
+        const window = await ChromeWindowHelper.getIfWindowExists(activeWindow.windowId);
+        if (window?.focused) {
+          await Storage.setItems({ lastSeenFocusModeColors: activeWindow.focusMode?.colors || null });
         }
+      } else {
+        myLogger.error("No activeWindow in response", response.error);
       }
-    );
+    });
   }
 
   if (isLoading) {

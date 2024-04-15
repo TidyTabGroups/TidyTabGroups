@@ -39,6 +39,10 @@ export async function initialize(onError: (error: any) => void) {
     queueOperationIfWindowIsActive(onWindowRemoved, windowId, true);
   });
 
+  chrome.windows.onFocusChanged.addListener((windowId: ChromeWindowId) => {
+    queueOperationIfWindowIsActive(onWindowFocusChanged, windowId, false);
+  });
+
   chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
     let windowId: ChromeWindowId;
     if (sender.tab) {
@@ -278,6 +282,17 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
   }
 }
 
+export async function onWindowFocusChanged(activeWindow: Types.ActiveWindow) {
+  const myLogger = Logger.getLogger("onWindowFocusChanged");
+  const { windowId } = activeWindow;
+  myLogger.log(`windowId: ${windowId}`);
+  try {
+    await Storage.setItems({ lastSeenFocusModeColors: activeWindow.focusMode?.colors || null });
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
+  }
+}
+
 export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
   const myLogger = logger.getNestedLogger("onTabGroupCreated");
   // 1. adjust the tab group's color based on the active window's focus mode
@@ -382,6 +397,10 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       if (newFocusModeColors) {
         activeWindow = await ActiveWindow.update(tabGroup.windowId, { focusMode: { ...focusMode, colors: newFocusModeColors } });
         focusMode = activeWindow.focusMode;
+        const window = await ChromeWindowHelper.getIfWindowExists(tabGroup.windowId);
+        if (window?.focused) {
+          await Storage.setItems({ lastSeenFocusModeColors: focusMode?.colors || null });
+        }
       }
     }
 

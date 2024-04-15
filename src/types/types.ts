@@ -15,14 +15,18 @@ export interface ModelDataBaseActiveWindow {
 
 export interface ActiveWindow {
   windowId: ChromeWindowId;
-  focusMode: {
-    colors: {
-      focused: chrome.tabGroups.ColorEnum;
-      nonFocused: chrome.tabGroups.ColorEnum;
-    };
-    savedTabGroupColors: Array<{ tabGroupId: ChromeTabGroupId; color: chrome.tabGroups.ColorEnum }>;
-  } | null;
+  focusMode: ActiveWindowFocusMode | null;
   tabGroups: ActiveWindowTabGroup[];
+}
+
+export interface ActiveWindowFocusMode {
+  colors: ActiveWindowFocusModeColors;
+  savedTabGroupColors: Array<{ tabGroupId: ChromeTabGroupId; color: chrome.tabGroups.ColorEnum }>;
+}
+
+export interface ActiveWindowFocusModeColors {
+  focused: chrome.tabGroups.ColorEnum;
+  nonFocused: chrome.tabGroups.ColorEnum;
 }
 
 export interface ActiveWindowTabGroup {
@@ -49,6 +53,7 @@ export type ChromeTabWithId = chrome.tabs.Tab & {
 
 export interface LocalStorageShape {
   userPreferences: UserPreferences;
+  lastSeenFocusModeColors: ActiveWindowFocusModeColors | null;
 }
 
 export interface UserPreferences {
