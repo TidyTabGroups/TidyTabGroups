@@ -227,15 +227,24 @@ export async function reactivateAllWindows() {
     throw new Error("reactivateAllWindows::already re-activating all windows, or another window is being activated");
   }
 
-  reactivatingAllWindows = true;
-  activeWindows = [];
-  ActiveWindowDatabase.clear().catch((error) => {
-    // TODO: bubble error up to global level
-    logger.error(`reactivateAllWindows::failed to clear database: ${error}`);
-  });
-
   try {
-    await activateAllWindows();
+    reactivatingAllWindows = true;
+
+    const [windows, previousActiveWindows] = await Promise.all([chrome.windows.getAll() as Promise<ChromeWindowWithId[]>, getAll()]);
+    const windowIds = windows.map((window) => window.id);
+
+    activeWindows = [];
+    ActiveWindowDatabase.clear().catch((error) => {
+      // TODO: bubble error up to global level
+      logger.error(`reactivateAllWindows::failed to clear database: ${error}`);
+    });
+
+    await Promise.all(
+      windowIds.map(async (windowId) => {
+        const previousActiveWindow = previousActiveWindows.find((previousActiveWindow) => previousActiveWindow.windowId === windowId);
+        await activateWindowInternal(windowId, previousActiveWindow?.focusMode);
+      })
+    );
   } catch (error) {
     throw new Error(`reactivateAllWindows::${error}`);
   } finally {
@@ -260,7 +269,7 @@ export async function activateAllWindows() {
   }
 }
 
-async function activateWindowInternal(windowId: ChromeWindowId) {
+async function activateWindowInternal(windowId: ChromeWindowId, focusMode?: ActiveWindow["focusMode"]) {
   const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
   if (!window) {
     throw new Error(`activateWindow::window with id ${window} not found`);
@@ -278,11 +287,12 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
 
   const tabGroups = await ChromeWindowHelper.focusTabGroup(selectedTab.groupId, windowId, {
     collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
+    highlightColors: focusMode?.colors,
   });
 
   const newActiveWindow = {
     windowId,
-    focusMode: null,
+    focusMode: focusMode || null,
     tabGroups: tabGroups.map(chromeTabGroupToActiveWindowTabGroup),
   } as Types.ActiveWindow;
 
