@@ -340,8 +340,8 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
   // 1. handle the case where the tab group is a "psuedo" tab group
   // 2. handle the case where the tab group's focus mode color is overridden
   //      due to a chromium bug when creating new tab groups
-  // 3. update the active window's non-primary tab group color
-  // 4. update the active window's primary tab group color
+  // 3. if the tab group is focused, update the active window's focus mode focused color
+  // 4. if the tab group is NOT focused, update the active window's focus mode nonFocused color
   // 5. focus the tab group
   // 6. activate the last active tab in the group
   // 7. update the ActiveWindowTabGroup
@@ -362,6 +362,12 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
     });
 
     const tabs = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
+    const activeTab = tabs.find((tab) => tab.active);
+    if (!activeTab) {
+      throw new Error(myLogger.getPrefixedMessage(`could not find activeTab in windowId: ${tabGroup.windowId}`));
+    }
+    const focusedTabGroupId = activeTab.groupId;
+    const isFocusedTabGroup = tabGroup.id === focusedTabGroupId;
 
     const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tabGroup.id);
     if (!activeWindowTabGroup) {
@@ -383,27 +389,17 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
         await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: activeWindowTabGroup.color });
       } else {
         let newFocusModeColors;
-        if (tabGroup.collapsed) {
+        if (isFocusedTabGroup) {
           // 3
-          newFocusModeColors = { ...focusMode.colors, nonFocused: tabGroup.color };
-          // update the color of all other collapsed tab groups
-          const otherCollapsedTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.collapsed && otherTabGroup.id !== tabGroup.id);
-          await Promise.all(
-            otherCollapsedTabGroups.map((otherCollapsedTabGroup) =>
-              ChromeWindowHelper.updateTabGroup(otherCollapsedTabGroup.id, { color: tabGroup.color })
-            )
-          );
+          newFocusModeColors = { ...focusMode.colors, focused: tabGroup.color };
         } else {
           // 4
-          const activeTab = tabs.find((tab) => tab.active);
-          if (!activeTab) {
-            throw new Error(myLogger.getPrefixedMessage(`could not find activeTab in windowId: ${tabGroup.windowId}`));
-          }
-          const isFocusedTabGroup = activeTab.groupId === tabGroup.id;
-          const shouldUpdateFocusModeColor = (await getUserPreferences()).activateTabInFocusedTabGroup ? isFocusedTabGroup : true;
-          if (shouldUpdateFocusModeColor) {
-            newFocusModeColors = { ...focusMode.colors, focused: tabGroup.color };
-          }
+          newFocusModeColors = { ...focusMode.colors, nonFocused: tabGroup.color };
+          // this will effectively update the color of all other non-focused tab groups
+          await ChromeWindowHelper.focusTabGroup(focusedTabGroupId, tabGroups, {
+            collapseUnfocusedTabGroups: false,
+            highlightColors: newFocusModeColors,
+          });
         }
 
         if (newFocusModeColors) {
