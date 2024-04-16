@@ -337,13 +337,17 @@ export async function onTabGroupRemoved(activeWindow: Types.ActiveWindow, tabGro
 
 export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
   const myLogger = logger.getNestedLogger("onTabGroupUpdated");
-  // 1. update the active window's non-primary tab group color
-  // 2. update the active window's primary tab group color
-  // 3. focus the tab group
-  // 4. activate the last active tab in the group
-  // 5. update the ActiveWindowTabGroup
+  // 1. handle the case where the tab group is a "psuedo" tab group
+  // 2. handle the case where the tab group's focus mode color is overridden
+  //      due to a chromium bug when creating new tab groups
+  // 3. update the active window's non-primary tab group color
+  // 4. update the active window's primary tab group color
+  // 5. focus the tab group
+  // 6. activate the last active tab in the group
+  // 7. update the ActiveWindowTabGroup
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
+    // 1
     // This is a workaround for when Chrome restores a window and fires a bunch of tabGroup.onUpdated events with these "psuedo" tab groups.
     // Note, for this to work, it relies on the fact that this is code path is async.
     const tabGroups = await chrome.tabGroups.query({ windowId: tabGroup.windowId });
@@ -366,52 +370,61 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
     const wasCollapsed = tabGroup.collapsed && !activeWindowTabGroup.collapsed;
     const wasExpanded = !tabGroup.collapsed && activeWindowTabGroup.collapsed;
     const wasColorUpdated = tabGroup.color !== activeWindowTabGroup.color;
+    const wasTitleUpdated = tabGroup.title !== activeWindowTabGroup.title;
 
     let { focusMode } = activeWindow;
 
     if (focusMode && wasColorUpdated) {
-      let newFocusModeColors;
-      if (tabGroup.collapsed) {
-        // 1
-        newFocusModeColors = { ...focusMode.colors, nonFocused: tabGroup.color };
-        // update the color of all other collapsed tab groups
-        const otherCollapsedTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.collapsed && otherTabGroup.id !== tabGroup.id);
-        await Promise.all(
-          otherCollapsedTabGroups.map((otherCollapsedTabGroup) =>
-            ChromeWindowHelper.updateTabGroup(otherCollapsedTabGroup.id, { color: tabGroup.color })
-          )
-        );
-      } else {
+      if (wasTitleUpdated) {
         // 2
-        const activeTab = tabs.find((tab) => tab.active);
-        if (!activeTab) {
-          throw new Error(myLogger.getPrefixedMessage(`could not find activeTab in windowId: ${tabGroup.windowId}`));
+        // this is a workaround for a chromium bug where updating the title of a newly created tab group
+        // causes the color to be reset back to its original (non-focus mode) color. We need to reset back
+        // to it's previous color, which is it's respective focus mode color.
+        await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: activeWindowTabGroup.color });
+      } else {
+        let newFocusModeColors;
+        if (tabGroup.collapsed) {
+          // 3
+          newFocusModeColors = { ...focusMode.colors, nonFocused: tabGroup.color };
+          // update the color of all other collapsed tab groups
+          const otherCollapsedTabGroups = tabGroups.filter((otherTabGroup) => otherTabGroup.collapsed && otherTabGroup.id !== tabGroup.id);
+          await Promise.all(
+            otherCollapsedTabGroups.map((otherCollapsedTabGroup) =>
+              ChromeWindowHelper.updateTabGroup(otherCollapsedTabGroup.id, { color: tabGroup.color })
+            )
+          );
+        } else {
+          // 4
+          const activeTab = tabs.find((tab) => tab.active);
+          if (!activeTab) {
+            throw new Error(myLogger.getPrefixedMessage(`could not find activeTab in windowId: ${tabGroup.windowId}`));
+          }
+          const isFocusedTabGroup = activeTab.groupId === tabGroup.id;
+          const shouldUpdateFocusModeColor = (await getUserPreferences()).activateTabInFocusedTabGroup ? isFocusedTabGroup : true;
+          if (shouldUpdateFocusModeColor) {
+            newFocusModeColors = { ...focusMode.colors, focused: tabGroup.color };
+          }
         }
-        const isFocusedTabGroup = activeTab.groupId === tabGroup.id;
-        const shouldUpdateFocusModeColor = (await getUserPreferences()).activateTabInFocusedTabGroup ? isFocusedTabGroup : true;
-        if (shouldUpdateFocusModeColor) {
-          newFocusModeColors = { ...focusMode.colors, focused: tabGroup.color };
-        }
-      }
 
-      if (newFocusModeColors) {
-        activeWindow = await ActiveWindow.update(tabGroup.windowId, { focusMode: { ...focusMode, colors: newFocusModeColors } });
-        focusMode = activeWindow.focusMode;
-        const window = await ChromeWindowHelper.getIfWindowExists(tabGroup.windowId);
-        if (window?.focused) {
-          await Storage.setItems({ lastSeenFocusModeColors: focusMode?.colors || null });
+        if (newFocusModeColors) {
+          activeWindow = await ActiveWindow.update(tabGroup.windowId, { focusMode: { ...focusMode, colors: newFocusModeColors } });
+          focusMode = activeWindow.focusMode;
+          const window = await ChromeWindowHelper.getIfWindowExists(tabGroup.windowId);
+          if (window?.focused) {
+            await Storage.setItems({ lastSeenFocusModeColors: focusMode?.colors || null });
+          }
         }
       }
     }
 
     if (wasExpanded) {
-      // 3
+      // 5
       await ChromeWindowHelper.focusTabGroup(tabGroup.id, tabGroups, {
         collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
         highlightColors: focusMode?.colors,
       });
 
-      // 4
+      // 6
       if ((await getUserPreferences()).activateTabInFocusedTabGroup) {
         const tabsInGroup = tabs.filter((tab) => tab.groupId === tabGroup.id);
         if (tabsInGroup.length === 0) {
@@ -432,7 +445,7 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       }
     }
 
-    // 5
+    // 7
     await ActiveWindow.update(tabGroup.windowId, {
       tabGroups: activeWindow.tabGroups.map((otherTabGroup) => (otherTabGroup.id === tabGroup.id ? tabGroup : otherTabGroup)),
     });
