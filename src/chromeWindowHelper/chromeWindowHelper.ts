@@ -60,6 +60,10 @@ export async function moveTabGroup(tabGroupId: ChromeTabGroupId, moveProperties:
   return waitForUserTabDraggingUsingCall(() => chrome.tabGroups.move(tabGroupId, moveProperties));
 }
 
+export async function groupTabs(options: chrome.tabs.GroupOptions) {
+  return waitForUserTabDraggingUsingCall(() => chrome.tabs.group(options));
+}
+
 export async function waitForUserTabDraggingUsingCall<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();

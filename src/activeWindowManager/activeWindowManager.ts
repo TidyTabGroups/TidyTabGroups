@@ -405,9 +405,10 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
     if (focusMode && wasColorUpdated) {
       if (wasTitleUpdated) {
         // 2
-        // this is a workaround for a chromium bug where updating the title of a newly created tab group
+        // FIXME: this is a workaround for a chromium bug where updating the title of a newly created tab group
         // causes the color to be reset back to its original (non-focus mode) color. We need to reset back
         // to it's previous color, which is it's respective focus mode color.
+        // Remove once the Chromium bug is fixed: https://issues.chromium.org/issues/334965868
         await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: activeWindowTabGroup.color });
       } else {
         let newFocusModeColors;
@@ -501,6 +502,7 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome.tabs.Tab) {
   const myLogger = logger.getNestedLogger("onTabCreated");
   // 1. if the tab is not in a group, and the last active tab was in a group, add the tab to the last active tab group
+  // 2. if the tab is not in a group, create a group for it
   myLogger.log(`tab:`, tab.title, tab.groupId);
 
   if (!tab.id) {
@@ -509,7 +511,6 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
   }
 
   try {
-    // 1
     // check if the the tab was updated or removed
     const latestTab = await ChromeWindowHelper.getIfTabExists(tab.id);
     if (!latestTab || !latestTab.id) {
@@ -527,15 +528,28 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
       lastActiveTab = tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 1] as ChromeTabWithId | undefined;
     }
 
-    if (
-      !tab.pinned &&
-      tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
-      lastActiveTab &&
-      lastActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE &&
-      (await Storage.getItems("userPreferences")).userPreferences.addNewTabToFocusedTabGroup
-    ) {
-      myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${lastActiveTab.title}'`);
-      await chrome.tabs.group({ tabIds: tab.id, groupId: lastActiveTab.groupId });
+    if (!tab.pinned) {
+      let existingGroupId: ChromeTabGroupId | undefined | null = null;
+      if (lastActiveTab && lastActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+        if ((await Storage.getItems("userPreferences")).userPreferences.addNewTabToFocusedTabGroup) {
+          // 1
+          myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${lastActiveTab.title}'`);
+          existingGroupId = lastActiveTab.groupId;
+        }
+      } else {
+        // 2
+        myLogger.log(`creating new tab group for tab: '${tab.title}'`);
+        existingGroupId = undefined;
+      }
+
+      if (existingGroupId !== null) {
+        const createNewGroup = existingGroupId === undefined;
+        tab.groupId = await ChromeWindowHelper.groupTabs({
+          createProperties: createNewGroup ? { windowId: tab.windowId } : undefined,
+          groupId: createNewGroup ? undefined : existingGroupId,
+          tabIds: tab.id,
+        });
+      }
     }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -550,7 +564,8 @@ export async function onTabUpdated(
 ) {
   // 1. filter out events we dont care about using validChangeInfo. This is just for keeping the logs less verbose.
   // 2. check if the tab still exists. This event gets fired even after with groupId set to -1 after the tab is removed.
-  // 3. if groupId has changed and tab is active, focus the tab's group
+  // 3. if the tab was ungrouped, create a new group for it
+  // 4. if the tab's group changed and the tab is active, focus the tab's group
 
   // 1
   const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title"];
@@ -568,12 +583,20 @@ export async function onTabUpdated(
       return;
     }
 
-    if (changeInfo.groupId !== undefined && tab.active) {
+    if (changeInfo.groupId !== undefined) {
       // 3
-      await ChromeWindowHelper.focusTabGroup(tab.groupId, tab.windowId, {
-        collapseUnfocusedTabGroups: tab.pinned,
-        highlightColors: activeWindow.focusMode?.colors,
-      });
+      if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+        // TODO: need to handle the case where multiple tabs are ungrouped at the same time
+        tab.groupId = await ChromeWindowHelper.groupTabs({ createProperties: { windowId: tab.windowId }, tabIds: tab.id });
+      }
+
+      // 4
+      if (tab.active) {
+        await ChromeWindowHelper.focusTabGroup(tab.groupId, tab.windowId, {
+          collapseUnfocusedTabGroups: tab.pinned,
+          highlightColors: activeWindow.focusMode?.colors,
+        });
+      }
     }
   } catch (error) {
     throw new Error(myLogger.throwPrefixed(`error:${error}`));
