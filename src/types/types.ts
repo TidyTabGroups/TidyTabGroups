@@ -34,6 +34,7 @@ export interface ActiveWindowTabGroup {
   title?: chrome.tabGroups.TabGroup["title"];
   color: chrome.tabGroups.TabGroup["color"];
   collapsed: chrome.tabGroups.TabGroup["collapsed"];
+  useTabTitle: boolean;
 }
 
 export type ChromeId = number;

@@ -5,6 +5,7 @@ import Misc from "../misc";
 import Logger from "../logger";
 import Types from "../types";
 import * as Storage from "../storage";
+import { chromeTabGroupToActiveWindowTabGroup } from "../model/ActiveWindow";
 
 const logger = Logger.getLogger("activeWindowManager", { color: "#fcba03" });
 
@@ -313,7 +314,8 @@ export async function onWindowFocusChanged(activeWindow: Types.ActiveWindow) {
 export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
   const myLogger = logger.getNestedLogger("onTabGroupCreated");
   // 1. adjust the tab group's color based on the active window's focus mode
-  // 2. add the ActiveWindowTabGroup
+  // 2. if the tab group's title is empty, set the ActiveWindowTabGroup's useTabTitle to true
+  // 3. add the ActiveWindowTabGroup
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
     // 1
@@ -326,13 +328,20 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
     if (focusMode) {
       if (isFocusedTabGroup && focusMode.colors.focused !== tabGroup.color) {
         await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.focused });
+        Logger.attentionLogger.log(`Updated tab group (${tabGroup.title}) color to ${focusMode.colors.focused}`);
       } else if (!isFocusedTabGroup && focusMode.colors.nonFocused !== tabGroup.color) {
         await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.nonFocused });
       }
     }
 
-    // 2
-    await ActiveWindow.update(activeWindow.windowId, { tabGroups: [...activeWindow.tabGroups, tabGroup] });
+    // 2 and 3
+    const useTabTitle = tabGroup.title === "";
+    await ActiveWindow.update(activeWindow.windowId, {
+      tabGroups: [...activeWindow.tabGroups, chromeTabGroupToActiveWindowTabGroup(tabGroup, { useTabTitle })],
+    });
+    if (useTabTitle && activeTab.url && new URL(activeTab.url).hostname !== "newtab") {
+      await ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: activeTab.title });
+    }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -361,7 +370,8 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
   // 4. if the tab group is NOT focused, update the active window's focus mode nonFocused color
   // 5. focus the tab group
   // 6. activate the last active tab in the group
-  // 7. update the ActiveWindowTabGroup
+  // 7. if the tab group's title is updated and it doesnt equal it's active tab's title, then set it's useSetTabTitle to false
+  // 8. update the ActiveWindowTabGroup
   try {
     const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tabGroup.id);
     if (!activeWindowTabGroup) {
@@ -473,9 +483,23 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       }
     }
 
-    // 7
+    let otherUpdateProps: Partial<Types.ActiveWindowTabGroup> = {};
+    if (wasTitleUpdated && tabGroup.title !== activeTab.title) {
+      // 7
+      // TODO: need to check if any onTabUpdated events have been fired
+      // for the active tab to see if it's title has changed. If so, then do
+      // not set useTabTitle to false
+      Logger.attentionLogger.log(`tab group title: ${tabGroup.title} is different from active tab title: ${activeTab.title}`);
+      otherUpdateProps.useTabTitle = false;
+    }
+
+    // 8
     await ActiveWindow.update(tabGroup.windowId, {
-      tabGroups: activeWindow.tabGroups.map((otherTabGroup) => (otherTabGroup.id === tabGroup.id ? tabGroup : otherTabGroup)),
+      tabGroups: activeWindow.tabGroups.map((otherTabGroup) =>
+        otherTabGroup.id === tabGroup.id
+          ? { ...otherTabGroup, ...chromeTabGroupToActiveWindowTabGroup(tabGroup), ...otherUpdateProps }
+          : otherTabGroup
+      ),
     });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -486,6 +510,7 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
 export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInfo: chrome.tabs.TabActiveInfo) {
   const myLogger = logger.getNestedLogger("onTabActivated");
   // 1. focus the tab's group
+  // 2. if it's tab group's useSetTabTitle is true, set the tab group's title to the tab's title
 
   myLogger.log(``, activeInfo.tabId);
 
@@ -503,6 +528,13 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
       collapseUnfocusedTabGroups: tab.pinned,
       highlightColors: activeWindow.focusMode?.colors,
     });
+
+    // 2
+    // TODO: this is breaking in Edge when the user creates a new tab group
+    const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tab.groupId);
+    if (activeWindowTabGroup?.useTabTitle) {
+      await ChromeWindowHelper.updateTabGroup(tab.groupId, { title: tab.title });
+    }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }

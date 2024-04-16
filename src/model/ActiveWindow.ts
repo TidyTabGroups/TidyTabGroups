@@ -321,7 +321,8 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
   const newActiveWindow = {
     windowId,
     focusMode: newFocusMode,
-    tabGroups: tabGroups.map(chromeTabGroupToActiveWindowTabGroup),
+    // TODO: need to allow the caller to pass in other ActiveWindowTabGroup properties like useTabTitle
+    tabGroups: tabGroups.map((tabGroup) => chromeTabGroupToActiveWindowTabGroup(tabGroup)),
   } as Types.ActiveWindow;
 
   await add(newActiveWindow);
@@ -419,8 +420,16 @@ export async function collapseUnFocusedTabGroups(tabGroupsOrWindowId: ChromeTabG
   );
 }
 
-export function chromeTabGroupToActiveWindowTabGroup(tabGroup: chrome.tabGroups.TabGroup) {
-  const activeWindowTabGroup = { id: tabGroup.id, color: tabGroup.color, collapsed: tabGroup.collapsed } as Types.ActiveWindowTabGroup;
+export function chromeTabGroupToActiveWindowTabGroup(
+  tabGroup: chrome.tabGroups.TabGroup,
+  otherProperties?: { useTabTitle: Types.ActiveWindowTabGroup["useTabTitle"] }
+) {
+  const activeWindowTabGroup = {
+    id: tabGroup.id,
+    color: tabGroup.color,
+    collapsed: tabGroup.collapsed,
+    ...otherProperties,
+  } as Types.ActiveWindowTabGroup;
 
   if (tabGroup.title !== undefined) {
     activeWindowTabGroup.title = tabGroup.title;
