@@ -460,6 +460,7 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
     // 1
     await ChromeWindowHelper.focusTabGroup(tab.groupId, tab.windowId, {
       collapseUnfocusedTabGroups: tab.pinned,
+      highlightColors: activeWindow.focusMode?.colors,
     });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -540,6 +541,7 @@ export async function onTabUpdated(
       // 3
       await ChromeWindowHelper.focusTabGroup(tab.groupId, tab.windowId, {
         collapseUnfocusedTabGroups: tab.pinned,
+        highlightColors: activeWindow.focusMode?.colors,
       });
     }
   } catch (error) {
