@@ -257,3 +257,45 @@ export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowI
   const tabs = Array.isArray(windowIdOrTabs) ? windowIdOrTabs : ((await chrome.tabs.query({ windowId: windowIdOrTabs })) as ChromeTabWithId[]);
   return tabs.sort((tab1, tab2) => (tab1.lastAccessed || 0) - (tab2.lastAccessed || 0));
 }
+
+export async function focusTabGroup(
+  tabGroupId: ChromeTabGroupId,
+  tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
+  options: {
+    collapseUnfocusedTabGroups: boolean;
+    highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
+  }
+) {
+  const tabGroups = Array.isArray(tabGroupsOrWindowId)
+    ? tabGroupsOrWindowId
+    : ((await chrome.tabGroups.query({ windowId: tabGroupsOrWindowId })) as ChromeTabGroupWithId[]);
+
+  const { collapseUnfocusedTabGroups, highlightColors } = options;
+
+  return await Promise.all(
+    tabGroups.map(async (tabGroup) => {
+      const updateProps: chrome.tabGroups.UpdateProperties = {};
+
+      if (tabGroup.id === tabGroupId) {
+        if (tabGroup.collapsed) {
+          updateProps.collapsed = false;
+        }
+        if (highlightColors?.focused && highlightColors.focused !== tabGroup.color) {
+          updateProps.color = highlightColors.focused;
+        }
+      } else {
+        if (collapseUnfocusedTabGroups && !tabGroup.collapsed) {
+          updateProps.collapsed = true;
+        }
+        if (highlightColors?.nonFocused && highlightColors.nonFocused !== tabGroup.color) {
+          updateProps.color = highlightColors.nonFocused;
+        }
+      }
+
+      if (Object.keys(updateProps).length > 0) {
+        return await updateTabGroup(tabGroup.id, updateProps);
+      }
+      return tabGroup;
+    })
+  );
+}

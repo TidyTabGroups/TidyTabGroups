@@ -280,22 +280,10 @@ async function activateWindowInternal(windowId: ChromeWindowId) {
   if (!selectedTab) {
     throw new Error(`activateWindow::window with id ${windowId} has no active tab`);
   }
-  const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
 
-  // adjust the "shape" of the new active window, using the following adjustments:
-  // 1. collapse all but the selected tab group
-  // 2. un-collapse the selected tab group
-
-  // 1
-  if ((await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups) {
-    await collapseUnFocusedTabGroups(tabGroups, selectedTab.groupId);
-  }
-
-  // 2
-  const selectedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === selectedTab.groupId);
-  if (selectedTabGroup && selectedTabGroup.collapsed) {
-    await ChromeWindowHelper.updateTabGroup(selectedTabGroup.id, { collapsed: false });
-  }
+  const tabGroups = await ChromeWindowHelper.focusTabGroup(selectedTab.groupId, windowId, {
+    collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
+  });
 
   await add({
     windowId,
@@ -337,11 +325,11 @@ export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
   return tabGroupsOrdered.length > 0 ? tabGroupsOrdered[tabGroupsOrdered.length - 1] : null;
 }
 
-export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
+export async function focusTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
   const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
   const tab = tabs.find((tab) => tab.id === tabId);
   if (!tab) {
-    throw new Error(`setPrimaryTab::tabId ${tabId} not found in windowId ${windowId}`);
+    throw new Error(`focusTab::tabId ${tabId} not found in windowId ${windowId}`);
   }
 
   const getUserPreferences = Misc.lazyCall(async () => {
@@ -371,9 +359,9 @@ export async function setPrimaryTab(windowId: ChromeWindowId, tabId: ChromeTabId
     }
   }
 
-  if ((await getUserPreferences()).collapseUnfocusedTabGroups) {
-    await collapseUnFocusedTabGroups(windowId, tab.groupId);
-  }
+  await ChromeWindowHelper.focusTabGroup(tab.groupId, windowId, {
+    collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
+  });
 }
 
 export async function collapseUnFocusedTabGroups(tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId, focusedTabGroupId: ChromeTabGroupId) {

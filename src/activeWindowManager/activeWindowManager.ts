@@ -223,7 +223,7 @@ export async function onMessage(
 
       // 2
       if (tab.active) {
-        await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
+        await ActiveWindow.focusTab(tab.windowId, tab.id);
       } else {
         myLogger.warn("pageFocused::tab is not active:", tab);
       }
@@ -314,7 +314,7 @@ export async function onTabGroupsUpdated(activeWindow: Types.ActiveWindow, tabGr
 // FIXME: this needs to handle the case where the active tab is being dragged
 export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInfo: chrome.tabs.TabActiveInfo) {
   const myLogger = logger.getNestedLogger("onTabActivated");
-  // 1. if the tab is pinned, set it as the primary tab
+  // 1. focus the tab's group
 
   myLogger.log(``, activeInfo.tabId);
 
@@ -328,9 +328,9 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
 
     // 1
-    if (tab.pinned) {
-      await ActiveWindow.setPrimaryTab(tab.windowId, tab.id);
-    }
+    await ChromeWindowHelper.focusTabGroup(tab.groupId, tab.windowId, {
+      collapseUnfocusedTabGroups: tab.pinned,
+    });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -386,13 +386,35 @@ export async function onTabUpdated(
   changeInfo: chrome.tabs.TabChangeInfo,
   tab: chrome.tabs.Tab
 ) {
-  const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId"];
+  // 1. filter out events we dont care about using validChangeInfo. This is just for keeping the logs less verbose.
+  // 2. check if the tab still exists. This event gets fired even after with groupId set to -1 after the tab is removed.
+  // 3. if groupId has changed and tab is active, focus the tab's group
+
+  // 1
+  const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title"];
   if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
     return;
   }
 
   const myLogger = logger.getNestedLogger("onTabUpdated");
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
+
+  try {
+    // 2
+    const tab = await ChromeWindowHelper.getIfTabExists(tabId);
+    if (!tab || !tab.id) {
+      return;
+    }
+
+    if (changeInfo.groupId !== undefined && tab.active) {
+      // 3
+      await ChromeWindowHelper.focusTabGroup(tab.groupId, tab.windowId, {
+        collapseUnfocusedTabGroups: tab.pinned,
+      });
+    }
+  } catch (error) {
+    throw new Error(myLogger.throwPrefixed(`error:${error}`));
+  }
 }
 
 export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
