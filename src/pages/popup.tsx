@@ -69,6 +69,14 @@ const Popup = () => {
       const { activeWindow } = response;
       if (activeWindow) {
         setActiveWindow(activeWindow);
+        const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as Types.ChromeTabWithId[];
+        if (activeTab) {
+          await ChromeWindowHelper.focusTabGroup(activeTab.groupId, windowId, {
+            collapseUnfocusedTabGroups: true,
+            highlightColors: activeWindow.focusMode?.colors,
+          });
+        }
+
         const window = await ChromeWindowHelper.getIfWindowExists(activeWindow.windowId);
         if (window?.focused) {
           await Storage.setItems({ lastSeenFocusModeColors: activeWindow.focusMode?.colors || null });
