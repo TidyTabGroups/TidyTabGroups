@@ -10,6 +10,8 @@ import Logger from "../logger";
 
 const logger = Logger.getLogger("popup");
 
+Storage.start();
+
 const Popup = () => {
   const myLogger = logger.getNestedLogger("Popup");
   const [activeWindow, setActiveWindow] = useState<Types.ActiveWindow | undefined | null>(null);
@@ -48,10 +50,10 @@ const Popup = () => {
         throw new Error("No active tab found");
       }
       const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
-      const focusedTabGroup = tabGroups.find((tabGroup) => tabGroup.id === activeTab.groupId);
+      const { lastSeenFocusModeColors } = await Storage.getItems(["lastSeenFocusModeColors"]);
 
       newFocusMode = {
-        colors: { focused: focusedTabGroup?.color || "cyan", nonFocused: focusedTabGroup?.color === "grey" ? "cyan" : "grey" },
+        colors: lastSeenFocusModeColors,
         savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
       } as Types.ActiveWindowFocusMode;
     } else {
@@ -79,7 +81,10 @@ const Popup = () => {
 
         const window = await ChromeWindowHelper.getIfWindowExists(activeWindow.windowId);
         if (window?.focused) {
-          await Storage.setItems({ lastSeenFocusModeColors: activeWindow.focusMode?.colors || null });
+          await Storage.setItems({
+            lastSeenFocusModeColors: activeWindow.focusMode?.colors || null,
+            lastFocusedWindowHadFocusMode: activeWindow.focusMode !== null,
+          });
         }
       } else {
         myLogger.error("No activeWindow in response", response.error);

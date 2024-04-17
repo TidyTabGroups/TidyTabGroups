@@ -290,11 +290,15 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
   if (focusModeColors) {
     newFocusModeColors = focusModeColors;
   } else {
-    newFocusModeColors = (await Storage.getItems("lastSeenFocusModeColors")).lastSeenFocusModeColors;
+    const { lastSeenFocusModeColors, lastFocusedWindowHadFocusMode } = await Storage.getItems([
+      "lastSeenFocusModeColors",
+      "lastFocusedWindowHadFocusMode",
+    ]);
+    newFocusModeColors = lastFocusedWindowHadFocusMode ? lastSeenFocusModeColors : null;
   }
 
   if (window.focused && newFocusModeColors) {
-    await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors });
+    await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors, lastFocusedWindowHadFocusMode: true });
   }
 
   const tabGroups = await ChromeWindowHelper.focusTabGroup(selectedTab.groupId, windowId, {

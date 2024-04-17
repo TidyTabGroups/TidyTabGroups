@@ -35,14 +35,22 @@ async function initializeStorage() {
 }
 
 async function getLocalStorageDefaultValues() {
-  return {
-    userPreferences: {
-      repositionTabs: false,
-      repositionTabGroups: false,
-      addNewTabToFocusedTabGroup: true,
-      collapseUnfocusedTabGroups: true,
-      activateTabInFocusedTabGroup: true,
-    },
-    lastSeenFocusModeColors: null,
-  };
+  try {
+    const currentWindow = (await chrome.windows.getCurrent()) as ChromeWindowWithId;
+    const activeWindow = await ActiveWindow.get(currentWindow.id);
+
+    return {
+      userPreferences: {
+        repositionTabs: false,
+        repositionTabGroups: false,
+        addNewTabToFocusedTabGroup: true,
+        collapseUnfocusedTabGroups: true,
+        activateTabInFocusedTabGroup: true,
+      },
+      lastSeenFocusModeColors: activeWindow?.focusMode?.colors || { focused: "pink", nonFocused: "purple" },
+      lastFocusedWindowHadFocusMode: activeWindow?.focusMode ? true : false,
+    };
+  } catch (error) {
+    throw new Error(`getLocalStorageDefaultValues::An error occurred while getting the default values: ${error}`);
+  }
 }

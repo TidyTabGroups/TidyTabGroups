@@ -53,7 +53,8 @@ export type ChromeTabWithId = chrome.tabs.Tab & {
 
 export interface LocalStorageShape {
   userPreferences: UserPreferences;
-  lastSeenFocusModeColors: ActiveWindowFocusModeColors | null;
+  lastSeenFocusModeColors: ActiveWindowFocusModeColors;
+  lastFocusedWindowHadFocusMode: boolean;
 }
 
 export interface UserPreferences {

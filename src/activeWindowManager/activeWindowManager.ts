@@ -287,7 +287,11 @@ export async function onWindowFocusChanged(activeWindow: Types.ActiveWindow) {
   const { windowId } = activeWindow;
   myLogger.log(`windowId: ${windowId}`);
   try {
-    await Storage.setItems({ lastSeenFocusModeColors: activeWindow.focusMode?.colors || null });
+    let keys: Partial<Types.LocalStorageShape> = {};
+    if (activeWindow.focusMode) {
+      keys = { ...keys, lastSeenFocusModeColors: activeWindow.focusMode.colors };
+    }
+    await Storage.setItems({ ...keys, lastFocusedWindowHadFocusMode: activeWindow.focusMode !== null });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -407,7 +411,7 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
           focusMode = activeWindow.focusMode;
           const window = await ChromeWindowHelper.getIfWindowExists(tabGroup.windowId);
           if (window?.focused) {
-            await Storage.setItems({ lastSeenFocusModeColors: focusMode?.colors || null });
+            await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors });
           }
         }
       }
