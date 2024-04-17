@@ -13,7 +13,7 @@ function justWokeUp() {
   return new Date().getTime() - awokenTime.getTime() < 500;
 }
 
-export async function initialize(onError: () => void) {
+export async function initialize(onError: (error: any) => void) {
   Storage.addChangeListener(async (changes) => {
     const { userPreferences } = changes;
     if (userPreferences && !userPreferences.oldValue?.collapseUnfocusedTabGroups && userPreferences.newValue?.collapseUnfocusedTabGroups) {
@@ -166,8 +166,7 @@ export async function initialize(onError: () => void) {
     try {
       await ActiveWindow.reactivateAllWindows();
     } catch (error) {
-      logger.error("onError::error reactivating all windows:", error);
-      onError();
+      onError(`error reactivating all windows: ${error}`);
     }
   }
 }
