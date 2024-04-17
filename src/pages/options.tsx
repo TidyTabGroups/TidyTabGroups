@@ -18,7 +18,7 @@ import {
   Grid,
 } from "@mui/material";
 
-Storage.initialize();
+Storage.start();
 
 const UserPreferences = () => {
   const [loadingPreferences, setLoadingPreferences] = useState(true);
