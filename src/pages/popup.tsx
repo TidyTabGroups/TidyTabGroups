@@ -7,6 +7,8 @@ import { App } from "./app";
 import Types from "../types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
+import Misc from "../misc";
+import { ChromeTabGroupColorEnum } from "../types/types";
 
 const logger = Logger.getLogger("popup");
 
@@ -35,6 +37,7 @@ const Popup = () => {
 
   async function onChangeFocusMode(e: React.ChangeEvent<HTMLInputElement>) {
     let newFocusMode: Types.ActiveWindow["focusMode"];
+    let savedTabGroupColorsToRestore: Types.ActiveWindowFocusMode["savedTabGroupColors"] | null = null;
     if (!activeWindow) {
       throw new Error("onChangeFocusMode called with no active window");
     }
@@ -62,23 +65,59 @@ const Popup = () => {
         throw new Error("Focus mode is null");
       }
 
-      const { savedTabGroupColors } = focusMode;
-      await Promise.all(savedTabGroupColors.map(({ tabGroupId, color }) => ChromeWindowHelper.updateTabGroup(tabGroupId, { color })));
+      savedTabGroupColorsToRestore = focusMode.savedTabGroupColors;
       newFocusMode = null;
     }
 
     chrome.runtime.sendMessage({ type: "updateActiveWindow", data: { windowId, updateProps: { focusMode: newFocusMode } } }, async (response) => {
+      // 1. set the new activeWindow
+      // 2. focus the active tab group
+      // 3. restore the colors of the tab groups that were saved before enabling focus mode
+      // 4. if the window is focused, set the new lastSeenFocusModeColors and lastFocusedWindowHadFocusMode
       const { activeWindow } = response;
       if (activeWindow) {
+        // 1
         setActiveWindow(activeWindow);
+
+        // 2
         const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as Types.ChromeTabWithId[];
+        let getTabGroups = Misc.lazyCall(() => chrome.tabGroups.query({ windowId }));
         if (activeTab) {
-          await ChromeWindowHelper.focusTabGroup(activeTab.groupId, windowId, {
+          const latestTabGroups = await ChromeWindowHelper.focusTabGroup(activeTab.groupId, await getTabGroups(), {
             collapseUnfocusedTabGroups: true,
             highlightColors: activeWindow.focusMode?.colors,
           });
+          getTabGroups = async () => latestTabGroups;
         }
 
+        if (savedTabGroupColorsToRestore !== null) {
+          const tabGroups = await getTabGroups();
+          let colorIndex = 0;
+          // take out grey, just because it's not a very nice color
+          const colors = ChromeWindowHelper.TAB_GROUP_COLORS.filter((color) => color !== "grey");
+          await Promise.all(
+            tabGroups.map((tabGroup) => {
+              let newColor: ChromeTabGroupColorEnum;
+              // FIXME: the compiler thinks that savedTabGroupColorsToRestore could be null
+              const savedColor = savedTabGroupColorsToRestore!.find((savedColor) => savedColor.tabGroupId === tabGroup.id)?.color;
+              if (savedColor) {
+                newColor = savedColor;
+              } else {
+                newColor = colors[colorIndex++ % colors.length];
+              }
+
+              // FIXME: figure out why newColor: Types.ChromeTabGroupColorEnum cant be passed in to updateTabGroup with the same type
+              // @ts-ignore
+              return ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: newColor });
+            })
+          );
+        }
+
+        // 3
+        // We dont need to await this
+        savedTabGroupColorsToRestore?.map(({ tabGroupId, color }) => ChromeWindowHelper.updateTabGroup(tabGroupId, { color }));
+
+        // 4
         const window = await ChromeWindowHelper.getIfWindowExists(activeWindow.windowId);
         if (window?.focused) {
           await Storage.setItems({

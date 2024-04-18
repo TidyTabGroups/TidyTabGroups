@@ -44,11 +44,18 @@ export type ChromeTabId = ChromeId;
 export type ChromeWindowWithId = chrome.windows.Window & { id: ChromeWindowId };
 export type ChromeTabGroupWithId = chrome.tabGroups.TabGroup & {
   id: ChromeTabGroupId;
+  color: ChromeTabGroupColorEnum;
 };
 export type ChromeTabWithId = chrome.tabs.Tab & {
   id: ChromeTabId;
   // FIXME: remove this when the chrome typings are updated to include the lastAccessed property
   lastAccessed?: number | undefined;
+};
+
+// FIXME: remove these when the chrome.tabGroups.ColorEnum is updated to include the orange color
+export type ChromeTabGroupColorEnum = chrome.tabGroups.ColorEnum | "orange";
+export type ChromeTabGroupUpdateProperties = chrome.tabGroups.UpdateProperties & {
+  color?: ChromeTabGroupColorEnum | undefined;
 };
 
 export interface LocalStorageShape {

@@ -1,4 +1,12 @@
-import { ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabId, ChromeTabGroupId } from "../types/types";
+import {
+  ChromeWindowId,
+  ChromeTabWithId,
+  ChromeTabGroupWithId,
+  ChromeTabId,
+  ChromeTabGroupId,
+  ChromeTabGroupUpdateProperties,
+  ChromeTabGroupColorEnum,
+} from "../types/types";
 import Misc from "../misc";
 
 export async function getTabGroupsOrdered(
@@ -29,7 +37,7 @@ export async function activateTab(tabId: ChromeTabId) {
   return waitForUserTabDraggingUsingCall(() => chrome.tabs.update(tabId, { active: true }));
 }
 
-export async function updateTabGroup(tabGroupId: ChromeTabGroupId, updatedProperties: chrome.tabGroups.UpdateProperties) {
+export async function updateTabGroup(tabGroupId: ChromeTabGroupId, updatedProperties: ChromeTabGroupUpdateProperties) {
   try {
     return await waitForUserTabDraggingUsingCall(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
   } catch (error) {
@@ -299,3 +307,6 @@ export async function focusTabGroup(
     })
   );
 }
+
+// FIXME: remove the "orange" explicit type once the chrome.tabGroups.ColorEnum type is updated
+export const TAB_GROUP_COLORS: Array<ChromeTabGroupColorEnum> = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
