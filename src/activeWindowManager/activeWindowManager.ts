@@ -501,8 +501,12 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 
 export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome.tabs.Tab) {
   const myLogger = logger.getNestedLogger("onTabCreated");
-  // 1. if the tab is not in a group, and the last active tab was in a group, add the tab to the last active tab group
-  // 2. if the tab is not in a group, create a group for it
+  // 1. check if the the tab was updated or removed
+  // 2. get the lastActiveTab
+  // 3. if the tab is not pinned nor in a group, and the last active tab was in a group, add the tab to the last active tab group
+  // 4. if the tab is not pinned nor in a group, and the last active tab was not in a group, and the tab in the
+  //      index before the created tab is in a group, create a group for it
+  // 5. if the tab is not pinned nor in a group, and the only tab in the window, create a group for it
   myLogger.log(`tab:`, tab.title, tab.groupId);
 
   if (!tab.id) {
@@ -511,15 +515,17 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
   }
 
   try {
-    // check if the the tab was updated or removed
-    const latestTab = await ChromeWindowHelper.getIfTabExists(tab.id);
-    if (!latestTab || !latestTab.id) {
-      myLogger.warn(`latestTab not found for tabId:`, tab.id);
+    const tabs = (await chrome.tabs.query({ windowId: tab.windowId })) as ChromeTabWithId[];
+    // 1
+    const tabIndex = tabs.findIndex((otherTab) => otherTab.id === tab.id);
+    if (tabIndex === -1) {
+      myLogger.warn(`tab not found for tabId:`, tab.id);
       return;
     }
-    tab = latestTab;
+    tab = tabs[tabIndex];
 
-    const tabsOrderedByLastAccessed = await ChromeWindowHelper.getTabsOrderedByLastAccessed(tab.windowId);
+    // 2
+    const tabsOrderedByLastAccessed = await ChromeWindowHelper.getTabsOrderedByLastAccessed(tabs);
     let lastActiveTab: ChromeTabWithId | undefined;
     // the last active tab could be this tab if it is activated, in that case, get the previous last active tab
     if (tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 1]?.id === tab.id) {
@@ -528,17 +534,28 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
       lastActiveTab = tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 1] as ChromeTabWithId | undefined;
     }
 
-    if (!tab.pinned) {
+    const previousIndexTab = tabs.find((otherTab) => otherTab.index === tabIndex - 1);
+    const creatingNewTabConsoleMessage = `creating new tab group for tab: '${tab.title}'`;
+
+    if (!tab.pinned && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
       let existingGroupId: ChromeTabGroupId | undefined | null = null;
-      if (lastActiveTab && lastActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-        if ((await Storage.getItems("userPreferences")).userPreferences.addNewTabToFocusedTabGroup) {
-          // 1
-          myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${lastActiveTab.title}'`);
-          existingGroupId = lastActiveTab.groupId;
+      if (lastActiveTab) {
+        if (lastActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+          if ((await Storage.getItems("userPreferences")).userPreferences.addNewTabToFocusedTabGroup) {
+            // 3
+            myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${lastActiveTab.title}'`);
+            existingGroupId = lastActiveTab.groupId;
+          }
+        } else if (previousIndexTab && previousIndexTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+          // 4
+          // TODO: check for `automatically group created tabs` user preference
+          myLogger.log(`${creatingNewTabConsoleMessage} (1)`);
+          existingGroupId = undefined;
         }
       } else {
-        // 2
-        myLogger.log(`creating new tab group for tab: '${tab.title}'`);
+        // 5
+        // TODO: check for `automatically group created tabs` user preference
+        myLogger.log(`${creatingNewTabConsoleMessage} (2)`);
         existingGroupId = undefined;
       }
 
@@ -586,6 +603,7 @@ export async function onTabUpdated(
     if (changeInfo.groupId !== undefined) {
       // 3
       if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+        // TODO: check for `automatically group created tabs` user preference
         // TODO: need to handle the case where multiple tabs are ungrouped at the same time
         tab.groupId = await ChromeWindowHelper.groupTabs({ createProperties: { windowId: tab.windowId }, tabIds: tab.id });
       }

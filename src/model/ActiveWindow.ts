@@ -301,6 +301,12 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
     await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors, lastFocusedWindowHadFocusMode: true });
   }
 
+  // TODO: check for `automatically group created tabs` user preference
+  if (tabs.length === 1 && selectedTab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+    const newGroupId = await ChromeWindowHelper.groupTabs({ createProperties: { windowId }, tabIds: selectedTab.id });
+    selectedTab.groupId = newGroupId;
+  }
+
   const tabGroups = await ChromeWindowHelper.focusTabGroup(selectedTab.groupId, windowId, {
     collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
     highlightColors: newFocusModeColors ?? undefined,
