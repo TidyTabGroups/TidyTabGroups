@@ -335,6 +335,7 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
     }
 
     // 2 and 3
+    // TODO: check for `use tab title for blank tab groups` user preference
     const useTabTitle = tabGroup.title === "";
     await ActiveWindow.update(activeWindow.windowId, {
       tabGroups: [...activeWindow.tabGroups, chromeTabGroupToActiveWindowTabGroup(tabGroup, { useTabTitle })],
