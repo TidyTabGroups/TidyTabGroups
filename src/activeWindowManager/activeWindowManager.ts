@@ -328,7 +328,6 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
     if (focusMode) {
       if (isFocusedTabGroup && focusMode.colors.focused !== tabGroup.color) {
         await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.focused });
-        Logger.attentionLogger.log(`Updated tab group (${tabGroup.title}) color to ${focusMode.colors.focused}`);
       } else if (!isFocusedTabGroup && focusMode.colors.nonFocused !== tabGroup.color) {
         await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.nonFocused });
       }
@@ -341,7 +340,12 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
       tabGroups: [...activeWindow.tabGroups, chromeTabGroupToActiveWindowTabGroup(tabGroup, { useTabTitle })],
     });
     if (useTabTitle && activeTab.url && new URL(activeTab.url).hostname !== "newtab") {
-      await ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: activeTab.title });
+      // FIXME: remove the setTimeout workaround once the chromium bug is resolved: https://issues.chromium.org/issues/334965868#comment4
+      setTimeout(() => {
+        ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: activeTab.title }).catch((error) => {
+          // TODO: bubble up error to global level
+        });
+      }, 30);
     }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -490,7 +494,6 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       // TODO: need to check if any onTabUpdated events have been fired
       // for the active tab to see if it's title has changed. If so, then do
       // not set useTabTitle to false
-      Logger.attentionLogger.log(`tab group title: ${tabGroup.title} is different from active tab title: ${activeTab.title}`);
       otherUpdateProps.useTabTitle = false;
     }
 
