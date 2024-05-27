@@ -26,7 +26,6 @@ const Popup = () => {
       const window = (await chrome.windows.getCurrent()) as Types.ChromeWindowWithId;
       chrome.runtime.sendMessage({ type: "getActiveWindow", data: { windowId: window.id } }, (response) => {
         if (response.activeWindow) {
-          Logger.attentionLogger.log("Popup", "Active window", response.activeWindow);
           setActiveWindow(response.activeWindow);
         } else {
           myLogger.error("No activeWindow in response", response.error);
@@ -134,8 +133,6 @@ const Popup = () => {
   if (isLoading) {
     return null;
   }
-
-  Logger.attentionLogger.log(activeWindow?.focusMode);
 
   return (
     <Container maxWidth="md" sx={{ height: "100vh", width: "50vw", padding: "24px" }}>
