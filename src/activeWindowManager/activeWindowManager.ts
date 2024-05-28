@@ -628,18 +628,36 @@ export async function onTabUpdated(
         }
         // get all the highlighted tabs in order to handle the case where multiple tabs are ungrouped together
         const highlightedTabs = await getHighlightedTabsPromise;
-        tab.groupId = await ChromeWindowHelper.groupTabs({
-          createProperties: { windowId: tab.windowId },
-          tabIds: [tab.id, ...highlightedTabs.map((highlightedTab) => highlightedTab.id)],
-        });
+        const newGroupId = await ChromeWindowHelper.groupTabs<true>(
+          {
+            createProperties: { windowId: tab.windowId },
+            tabIds: [tab.id, ...highlightedTabs.map((highlightedTab) => highlightedTab.id)],
+          },
+          async function shouldRetryCallWhileWaitingForUserTabDragging() {
+            const tab = await ChromeWindowHelper.getIfTabExists(tabId);
+            return tab !== undefined && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
+          }
+        );
+
+        if (newGroupId) {
+          tab.groupId = newGroupId;
+        }
       }
 
       // 4
       if (tab.active) {
-        await ChromeWindowHelper.focusTabGroup(tab.groupId, tab.windowId, {
-          collapseUnfocusedTabGroups: tab.pinned,
-          highlightColors: activeWindow.focusMode?.colors,
-        });
+        await ChromeWindowHelper.focusTabGroup<true>(
+          tab.groupId,
+          tab.windowId,
+          {
+            collapseUnfocusedTabGroups: tab.pinned,
+            highlightColors: activeWindow.focusMode?.colors,
+          },
+          async function shouldRetryCallWhileWaitingForUserTabDragging() {
+            const tab = await ChromeWindowHelper.getIfTabExists(tabId);
+            return tab !== undefined && tab.active && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
+          }
+        );
       }
     }
   } catch (error) {

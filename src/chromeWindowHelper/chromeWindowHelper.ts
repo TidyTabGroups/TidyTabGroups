@@ -37,9 +37,16 @@ export async function activateTab(tabId: ChromeTabId) {
   return waitForUserTabDraggingUsingCall(() => chrome.tabs.update(tabId, { active: true }));
 }
 
-export async function updateTabGroup(tabGroupId: ChromeTabGroupId, updatedProperties: ChromeTabGroupUpdateProperties) {
+export async function updateTabGroup<ShouldRetryCall extends boolean = false>(
+  tabGroupId: ChromeTabGroupId,
+  updatedProperties: ChromeTabGroupUpdateProperties,
+  shouldRetryCallWhileWaitingForUserTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
+) {
   try {
-    return await waitForUserTabDraggingUsingCall(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
+    return await waitForUserTabDraggingUsingCall<chrome.tabGroups.TabGroup, ShouldRetryCall>(
+      () => chrome.tabGroups.update(tabGroupId, updatedProperties),
+      shouldRetryCallWhileWaitingForUserTabDragging
+    );
   } catch (error) {
     // FIXME: remove this once saved tab groups are editable
     // @ts-ignore
@@ -60,11 +67,17 @@ export async function moveTabGroup(tabGroupId: ChromeTabGroupId, moveProperties:
   return waitForUserTabDraggingUsingCall(() => chrome.tabGroups.move(tabGroupId, moveProperties));
 }
 
-export async function groupTabs(options: chrome.tabs.GroupOptions) {
-  return waitForUserTabDraggingUsingCall(() => chrome.tabs.group(options));
+export async function groupTabs<ShouldRetryCall extends boolean = false>(
+  options: chrome.tabs.GroupOptions,
+  shouldRetryCallWhileWaitingForUserTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
+) {
+  return waitForUserTabDraggingUsingCall<number, ShouldRetryCall>(() => chrome.tabs.group(options), shouldRetryCallWhileWaitingForUserTabDragging);
 }
 
-export async function waitForUserTabDraggingUsingCall<T>(fn: () => Promise<T>): Promise<T> {
+export async function waitForUserTabDraggingUsingCall<T, ShouldRetryCall extends boolean = false>(
+  fn: () => Promise<T>,
+  shouldRetryCall?: ShouldRetryCall extends true ? () => Promise<boolean> : never
+): Promise<ShouldRetryCall extends true ? T | void : T> {
   try {
     return await fn();
   } catch (error) {
@@ -72,8 +85,13 @@ export async function waitForUserTabDraggingUsingCall<T>(fn: () => Promise<T>): 
     if (error?.message === "Tabs cannot be edited right now (user may be dragging a tab).") {
       console.log(`waitForUserTabDraggingUsingCall::user may be dragging a tab: `, fn.toString());
       return new Promise((resolve, reject) =>
-        setTimeout(() => {
-          waitForUserTabDraggingUsingCall(fn).then(resolve).catch(reject);
+        setTimeout(async () => {
+          const shouldRetry = shouldRetryCall ? await shouldRetryCall() : true;
+          if (shouldRetry) {
+            waitForUserTabDraggingUsingCall(fn, shouldRetryCall).then(resolve).catch(reject);
+          } else {
+            resolve(undefined as ShouldRetryCall extends true ? T | void : T);
+          }
         }, 100)
       );
     } else {
@@ -274,13 +292,14 @@ export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowI
   return tabs.sort((tab1, tab2) => (tab1.lastAccessed || 0) - (tab2.lastAccessed || 0));
 }
 
-export async function focusTabGroup(
+export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
   tabGroupId: ChromeTabGroupId,
   tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
   options: {
     collapseUnfocusedTabGroups: boolean;
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
-  }
+  },
+  shouldRetryCallWhileWaitingForUserTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
 ) {
   const tabGroups = Array.isArray(tabGroupsOrWindowId)
     ? tabGroupsOrWindowId
@@ -309,7 +328,7 @@ export async function focusTabGroup(
       }
 
       if (Object.keys(updateProps).length > 0) {
-        return await updateTabGroup(tabGroup.id, updateProps);
+        return await updateTabGroup<ShouldRetryCall>(tabGroup.id, updateProps, shouldRetryCallWhileWaitingForUserTabDragging);
       }
       return tabGroup;
     })
