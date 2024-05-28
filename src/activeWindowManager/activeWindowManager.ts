@@ -66,7 +66,16 @@ export async function initialize(onError: (error: any) => void) {
   });
 
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-    queueOperationIfWindowIsActive((activeWindow) => onTabUpdated(activeWindow, tabId, changeInfo, tab), tab.windowId, false);
+    // get the highlighted tabs right now because the highlighted tabs could change by the time the operation is executed
+    const getHighlightedTabsPromise =
+      changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE
+        ? (chrome.tabs.query({ highlighted: true }) as Promise<ChromeTabWithId[]>)
+        : undefined;
+    queueOperationIfWindowIsActive(
+      (activeWindow) => onTabUpdated(activeWindow, tabId, changeInfo, tab, getHighlightedTabsPromise),
+      tab.windowId,
+      false
+    );
   });
 
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
@@ -577,7 +586,8 @@ export async function onTabUpdated(
   activeWindow: Types.ActiveWindow,
   tabId: ChromeTabId,
   changeInfo: chrome.tabs.TabChangeInfo,
-  tab: chrome.tabs.Tab
+  tab: chrome.tabs.Tab,
+  getHighlightedTabsPromise: Promise<ChromeTabWithId[]> | undefined
 ) {
   // 1. filter out events we dont care about using validChangeInfo. This is just for keeping the logs less verbose.
   // 2. check if the tab still exists. This event gets fired even after with groupId set to -1 after the tab is removed.
@@ -602,10 +612,26 @@ export async function onTabUpdated(
 
     if (changeInfo.groupId !== undefined) {
       // 3
-      if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      if (
+        changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
+        // check if the tab is still not in a group because of one of two possible reasons:
+        //   1. when a user moves a tab to another group, this event gets called with groupId set to -1, then it gets fired again with
+        //    groupId set to the group it actually got moved to
+        //   2. it could have been auto-grouped by the previous onTabUpdated event if it is one of the highlighted tabs.
+        tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
+        // check if the tab is pinned because this event gets called with groupId set to -1 when the tab gets pinned
+        !tab.pinned
+      ) {
         // TODO: check for `automatically group created tabs` user preference
-        // TODO: need to handle the case where multiple tabs are ungrouped at the same time
-        tab.groupId = await ChromeWindowHelper.groupTabs({ createProperties: { windowId: tab.windowId }, tabIds: tab.id });
+        if (getHighlightedTabsPromise === undefined) {
+          throw new Error(`getHighlightedTabsPromise is undefined`);
+        }
+        // get all the highlighted tabs in order to handle the case where multiple tabs are ungrouped together
+        const highlightedTabs = await getHighlightedTabsPromise;
+        tab.groupId = await ChromeWindowHelper.groupTabs({
+          createProperties: { windowId: tab.windowId },
+          tabIds: [tab.id, ...highlightedTabs.map((highlightedTab) => highlightedTab.id)],
+        });
       }
 
       // 4
