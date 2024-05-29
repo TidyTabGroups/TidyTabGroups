@@ -401,8 +401,13 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
     // This is a workaround for when Chrome restores a window and fires a bunch of tabGroup.onUpdated events with these "psuedo" tab groups.
     // Note, for this to work, it relies on the fact that this is code path is async.
     const tabGroups = await chrome.tabGroups.query({ windowId: tabGroup.windowId });
-    const tabGroupWithSameTitleAndId = tabGroups.find((otherTabGroup) => otherTabGroup.id === tabGroup.id && otherTabGroup.title === tabGroup.title);
-    if (!tabGroupWithSameTitleAndId) {
+    const tabGroupWithSameId = tabGroups.find((otherTabGroup) => otherTabGroup.id === tabGroup.id);
+    const tabGroupWithSameTitle = tabGroupWithSameId ? tabGroupWithSameId.title === tabGroup.title : false;
+    if (!tabGroupWithSameId || !tabGroupWithSameTitle) {
+      if (tabGroupWithSameId) {
+        // we still want to update the active window tab group
+        await updateActiveWindowTabGroup();
+      }
       myLogger.warn(`tab group with same title and id not found for windowId:`, tabGroup.windowId, tabGroup.id);
       return;
     }
@@ -498,6 +503,12 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
     }
 
     // 8
+    await updateActiveWindowTabGroup(otherUpdateProps);
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
+  }
+
+  async function updateActiveWindowTabGroup(otherUpdateProps: Partial<Types.ActiveWindowTabGroup> = {}) {
     await ActiveWindow.update(tabGroup.windowId, {
       tabGroups: activeWindow.tabGroups.map((otherTabGroup) =>
         otherTabGroup.id === tabGroup.id
@@ -505,8 +516,6 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
           : otherTabGroup
       ),
     });
-  } catch (error) {
-    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
