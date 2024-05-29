@@ -131,7 +131,7 @@ export async function initialize(onError: (error: any) => void) {
         const windowId = await windowIdOrPromisedWindowId;
         const [activeWindowBeforeQueueStart, activeWindowAfterQueueStart] = await Promise.all([getActiveWindowPromise, ActiveWindow.get(windowId)]);
         if (!activeWindowBeforeQueueStart || !activeWindowAfterQueueStart) {
-          logger.warn("queueOperationIfWindowIsActive::activeWindow not found, ignoring operation");
+          logger.warn("queueOperationIfWindowIsActive::activeWindow not found, ignoring operation: ", operation.toString().substring(0, 80));
           return;
         }
         myActiveWindowAfterQueueStart = activeWindowAfterQueueStart;
