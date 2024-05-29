@@ -349,8 +349,26 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
   // 5. focus the tab group
   // 6. activate the last active tab in the group
   // 7. update the ActiveWindowTabGroup
-  myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
+    const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tabGroup.id);
+    if (!activeWindowTabGroup) {
+      throw new Error(myLogger.getPrefixedMessage(`activeWindowTabGroup not found for tabGroup:${tabGroup.id}`));
+    }
+
+    const changeInfo = (function generateChangeInfo() {
+      const changeInfo: Partial<chrome.tabGroups.TabGroup> = {};
+      (Object.keys(tabGroup) as (keyof chrome.tabGroups.TabGroup)[]).forEach((key) => {
+        if (key === "id" || key === "windowId") return;
+        if (tabGroup[key] !== activeWindowTabGroup[key]) {
+          // @ts-ignore
+          changeInfo[key] = tabGroup[key];
+        }
+      });
+      return changeInfo;
+    })();
+
+    myLogger.log(`id: ${tabGroup.id}, title: ${tabGroup.title}, changeInfo:`, changeInfo);
+
     // 1
     // This is a workaround for when Chrome restores a window and fires a bunch of tabGroup.onUpdated events with these "psuedo" tab groups.
     // Note, for this to work, it relies on the fact that this is code path is async.
@@ -373,10 +391,6 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
     const focusedTabGroupId = activeTab.groupId;
     const isFocusedTabGroup = tabGroup.id === focusedTabGroupId;
 
-    const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tabGroup.id);
-    if (!activeWindowTabGroup) {
-      throw new Error(myLogger.getPrefixedMessage(`activeWindowTabGroup not found for tabGroup:${tabGroup.id}`));
-    }
     const wasCollapsed = tabGroup.collapsed && !activeWindowTabGroup.collapsed;
     const wasExpanded = !tabGroup.collapsed && activeWindowTabGroup.collapsed;
     const wasColorUpdated = tabGroup.color !== activeWindowTabGroup.color;
