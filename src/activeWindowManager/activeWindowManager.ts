@@ -67,6 +67,12 @@ export async function initialize(onError: (error: any) => void) {
   });
 
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+    // only handle these changeInfo properties
+    const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title"];
+    if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
+      return;
+    }
+
     // get the highlighted tabs right now because the highlighted tabs could change by the time the operation is executed
     const getHighlightedTabsPromise =
       changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE
@@ -623,29 +629,21 @@ export async function onTabUpdated(
   tab: chrome.tabs.Tab,
   getHighlightedTabsPromise: Promise<ChromeTabWithId[]> | undefined
 ) {
-  // 1. filter out events we dont care about using validChangeInfo. This is just for keeping the logs less verbose.
-  // 2. check if the tab still exists. This event gets fired even after with groupId set to -1 after the tab is removed.
-  // 3. if the tab was ungrouped, create a new group for it
-  // 4. if the tab's group changed and the tab is active, focus the tab's group
-
-  // 1
-  const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title"];
-  if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
-    return;
-  }
-
+  // 1. check if the tab still exists. This event gets fired even after with groupId set to -1 after the tab is removed.
+  // 2. if the tab was ungrouped, create a new group for it
+  // 3. if the tab's group changed and the tab is active, focus the tab's group
   const myLogger = logger.getNestedLogger("onTabUpdated");
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
   try {
-    // 2
+    // 1
     const tab = await ChromeWindowHelper.getIfTabExists(tabId);
     if (!tab || !tab.id) {
       return;
     }
 
     if (changeInfo.groupId !== undefined) {
-      // 3
+      // 2
       if (
         changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
         // check if the tab is still not in a group because of one of two possible reasons:
@@ -678,7 +676,7 @@ export async function onTabUpdated(
         }
       }
 
-      // 4
+      // 3
       if (tab.active) {
         await ChromeWindowHelper.focusTabGroup<true>(
           tab.groupId,
