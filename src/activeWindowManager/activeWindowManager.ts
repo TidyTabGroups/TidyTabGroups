@@ -124,32 +124,21 @@ export async function initialize(onError: (error: any) => void) {
     windowIdOrPromisedWindowId: ChromeWindowId | Promise<ChromeWindowId>,
     queueNext: boolean
   ) {
-    // capture the active window state promise now because it could change by the time the operation is executed
-    const getActiveWindowPromise = new Promise<Types.ActiveWindow | undefined>(async (resolve, reject) => {
-      try {
-        const windowId = await windowIdOrPromisedWindowId;
-        const activeWindow = await ActiveWindow.get(windowId);
-        resolve(activeWindow);
-      } catch (error) {
-        reject(error);
-      }
-    });
-
     queueOperation(async () => {
-      let myActiveWindowAfterQueueStart: Types.ActiveWindow;
+      let activeWindow: Types.ActiveWindow;
       try {
         const windowId = await windowIdOrPromisedWindowId;
-        const [activeWindowBeforeQueueStart, activeWindowAfterQueueStart] = await Promise.all([getActiveWindowPromise, ActiveWindow.get(windowId)]);
-        if (!activeWindowBeforeQueueStart || !activeWindowAfterQueueStart) {
+        const myActiveWindow = await ActiveWindow.get(windowId);
+        if (!myActiveWindow) {
           logger.warn("queueOperationIfWindowIsActive::activeWindow not found, ignoring operation: ", operation.toString().substring(0, 80));
           return;
         }
-        myActiveWindowAfterQueueStart = activeWindowAfterQueueStart;
+        activeWindow = myActiveWindow;
       } catch (error) {
         throw new Error(`queueOperationIfWindowIsActive::error trying to get active window for operation:${error}`);
       }
 
-      await operation(myActiveWindowAfterQueueStart);
+      await operation(activeWindow);
     }, queueNext);
   }
 
