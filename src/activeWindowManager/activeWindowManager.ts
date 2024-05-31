@@ -37,11 +37,11 @@ export async function initialize(onError: (error: any) => void) {
   });
 
   chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
-    queueOperationIfWindowIsActive(onWindowRemoved, windowId, true);
+    queueOperationIfWindowIsActive(onWindowRemoved, windowId, true, "onWindowRemoved");
   });
 
   chrome.windows.onFocusChanged.addListener((windowId: ChromeWindowId) => {
-    queueOperationIfWindowIsActive(onWindowFocusChanged, windowId, false);
+    queueOperationIfWindowIsActive(onWindowFocusChanged, windowId, false, "onWindowFocusChanged");
   });
 
   chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
@@ -54,16 +54,16 @@ export async function initialize(onError: (error: any) => void) {
       logger.warn("onMessage::sender windowId is not valid:", sender);
       return;
     }
-    queueOperationIfWindowIsActive((activeWindow) => onMessage(activeWindow, message, sender, sendResponse), windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onMessage(activeWindow, message, sender, sendResponse), windowId, false, "onMessage");
     return true;
   });
 
   chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
-    queueOperationIfWindowIsActive((activeWindow) => onTabCreated(activeWindow, tab), tab.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabCreated(activeWindow, tab), tab.windowId, false, "onTabCreated");
   });
 
   chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
-    queueOperationIfWindowIsActive((activeWindow) => onTabActivated(activeWindow, activeInfo), activeInfo.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabActivated(activeWindow, activeInfo), activeInfo.windowId, false, "onTabActivated");
   });
 
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
@@ -81,16 +81,17 @@ export async function initialize(onError: (error: any) => void) {
     queueOperationIfWindowIsActive(
       (activeWindow) => onTabUpdated(activeWindow, tabId, changeInfo, tab, getHighlightedTabsPromise),
       tab.windowId,
-      false
+      false,
+      "onTabUpdated"
     );
   });
 
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
-    queueOperationIfWindowIsActive((activeWindow) => onTabRemoved(activeWindow, tabId, removeInfo), removeInfo.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabRemoved(activeWindow, tabId, removeInfo), removeInfo.windowId, false, "onTabRemoved");
   });
 
   chrome.tabs.onMoved.addListener((tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) => {
-    queueOperationIfWindowIsActive((activeWindow) => onTabMoved(activeWindow, tabId, moveInfo), moveInfo.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabMoved(activeWindow, tabId, moveInfo), moveInfo.windowId, false, "onTabMoved");
   });
 
   chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
@@ -104,20 +105,21 @@ export async function initialize(onError: (error: any) => void) {
           reject(`onTabReplaced::addedTab not found for addedTabId: ${addedTabId}`);
         }
       }),
-      false
+      false,
+      "onTabReplaced"
     );
   });
 
   chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
-    queueOperationIfWindowIsActive((activeWindow) => onTabGroupCreated(activeWindow, tabGroup), tabGroup.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabGroupCreated(activeWindow, tabGroup), tabGroup.windowId, false, "onTabGroupCreated");
   });
 
   chrome.tabGroups.onRemoved.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
-    queueOperationIfWindowIsActive((activeWindow) => onTabGroupRemoved(activeWindow, tabGroup), tabGroup.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabGroupRemoved(activeWindow, tabGroup), tabGroup.windowId, false, "onTabGroupRemoved");
   });
 
   chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
-    queueOperationIfWindowIsActive((activeWindow) => onTabGroupUpdated(activeWindow, tabGroup), tabGroup.windowId, false);
+    queueOperationIfWindowIsActive((activeWindow) => onTabGroupUpdated(activeWindow, tabGroup), tabGroup.windowId, false, "onTabGroupUpdated");
   });
 
   type ActiveWindowQueuedEventOperation = (activeWindow: Types.ActiveWindow) => Promise<void>;
@@ -128,7 +130,8 @@ export async function initialize(onError: (error: any) => void) {
   function queueOperationIfWindowIsActive(
     operation: ActiveWindowQueuedEventOperation,
     windowIdOrPromisedWindowId: ChromeWindowId | Promise<ChromeWindowId>,
-    queueNext: boolean
+    next: boolean,
+    name: string
   ) {
     queueOperation(async () => {
       let activeWindow: Types.ActiveWindow;
@@ -136,7 +139,7 @@ export async function initialize(onError: (error: any) => void) {
         const windowId = await windowIdOrPromisedWindowId;
         const myActiveWindow = await ActiveWindow.get(windowId);
         if (!myActiveWindow) {
-          logger.warn("queueOperationIfWindowIsActive::activeWindow not found, ignoring operation: ", operation.toString().substring(0, 80));
+          logger.warn("queueOperationIfWindowIsActive::activeWindow not found, ignoring operation: ", name);
           return;
         }
         activeWindow = myActiveWindow;
@@ -145,18 +148,27 @@ export async function initialize(onError: (error: any) => void) {
       }
 
       await operation(activeWindow);
-    }, queueNext);
+    }, next);
   }
 
-  function queueOperation(operation: QueuedEventOperation, queueNext: boolean) {
-    if (queueNext) {
-      operationQueue.unshift(operation);
+  function queueOperation(operation: QueuedEventOperation, next: boolean) {
+    if (next) {
+      queueNext(operation);
     } else {
-      operationQueue.push(operation);
+      queueEnd(operation);
     }
+
     if (!isProcessingQueue) {
       processQueue();
     }
+  }
+
+  function queueNext(operation: QueuedEventOperation) {
+    operationQueue.unshift(operation);
+  }
+
+  function queueEnd(operation: QueuedEventOperation) {
+    operationQueue.push(operation);
   }
 
   async function processQueue(): Promise<void> {
