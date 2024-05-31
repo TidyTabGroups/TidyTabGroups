@@ -133,20 +133,20 @@ export async function initialize(onError: (error: any) => void) {
     next: boolean,
     name: string
   ) {
+    const myLogger = logger.getNestedLogger("queueOperationIfWindowIsActive");
     queueOperation(async () => {
       let activeWindow: Types.ActiveWindow;
       try {
         const windowId = await windowIdOrPromisedWindowId;
         const myActiveWindow = await ActiveWindow.get(windowId);
         if (!myActiveWindow) {
-          logger.warn("queueOperationIfWindowIsActive::activeWindow not found, ignoring operation: ", name);
+          myLogger.warn("activeWindow not found, ignoring operation: ", name);
           return;
         }
         activeWindow = myActiveWindow;
       } catch (error) {
-        throw new Error(`queueOperationIfWindowIsActive::error trying to get active window for operation:${error}`);
+        throw new Error(myLogger.getPrefixedMessage(`error trying to get active window for operation: ${name}: ${error}`));
       }
-
       await operation(activeWindow);
     }, next);
   }
