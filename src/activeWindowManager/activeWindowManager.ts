@@ -155,6 +155,10 @@ export async function initialize(onError: (error: any) => void) {
   }
 
   async function processQueue(): Promise<void> {
+    if (isProcessingQueue) {
+      throw new Error("processQueue::Queue is already being processed");
+    }
+
     isProcessingQueue = true;
     while (operationQueue.length > 0) {
       const currentOperation = operationQueue.shift();
