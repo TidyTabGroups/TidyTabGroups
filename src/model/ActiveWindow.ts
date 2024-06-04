@@ -431,6 +431,7 @@ export function chromeTabGroupToActiveWindowTabGroup(
 ) {
   const activeWindowTabGroup = {
     id: tabGroup.id,
+    windowId: tabGroup.windowId,
     color: tabGroup.color,
     collapsed: tabGroup.collapsed,
     ...otherProperties,
@@ -441,4 +442,75 @@ export function chromeTabGroupToActiveWindowTabGroup(
   }
 
   return activeWindowTabGroup;
+}
+
+export async function getActiveWindowTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  return (await getOrThrow(windowId)).tabGroups.find((tabGroup) => tabGroup.id === tabGroupId);
+}
+
+export async function getActiveWindowTabGroupOrThrow(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  const activeWindowTabGroup = await getActiveWindowTabGroup(windowId, tabGroupId);
+  if (!activeWindowTabGroup) {
+    throw new Error(`getActiveWindowTabGroupOrThrow::tabGroupId ${tabGroupId} not found in windowId ${windowId}`);
+  }
+
+  return activeWindowTabGroup;
+}
+
+export async function updateActiveWindowTabGroup(
+  windowId: ChromeWindowId,
+  tabGroupId: ChromeTabGroupId,
+  updateProps: Partial<Types.ActiveWindowTabGroup> = {}
+) {
+  const activeWindowTabGroups = (await get(windowId))?.tabGroups;
+  if (activeWindowTabGroups === undefined) {
+    throw new Error(`updateActiveWindowTabGroup::windowId ${windowId} not found`);
+  }
+
+  let updatedTabGroup: Types.ActiveWindowTabGroup | null = null;
+  const activeWindow = await update(windowId, {
+    tabGroups: activeWindowTabGroups.map((otherTabGroup) => {
+      if (otherTabGroup.id === tabGroupId) {
+        updatedTabGroup = Object.assign(otherTabGroup, updateProps);
+        return updatedTabGroup;
+      }
+      return otherTabGroup;
+    }),
+  });
+
+  if (updatedTabGroup === null) {
+    throw new Error(`updateActiveWindowTabGroup::tabGroupId ${tabGroupId} not found in windowId ${windowId}`);
+  }
+
+  return activeWindow;
+}
+
+export async function updateActiveWindowTabGroups(
+  windowId: ChromeWindowId,
+  updatePropsList: ({ id: Types.ActiveWindowTabGroup["id"] } & Partial<Types.ActiveWindowTabGroup>)[]
+) {
+  const activeWindowTabGroups = (await get(windowId))?.tabGroups;
+  if (activeWindowTabGroups === undefined) {
+    throw new Error(`updateActiveWindowTabGroups::windowId ${windowId} not found`);
+  }
+
+  const updatedTabGroups: Types.ActiveWindowTabGroup[] = [];
+  const newActiveWindowTabGroups = activeWindowTabGroups.map((otherTabGroup) => {
+    const updateProps = updatePropsList.find((updateProps) => updateProps.id === otherTabGroup.id);
+    if (updateProps !== undefined) {
+      const updatedTabGroup = Object.assign(otherTabGroup, updateProps);
+      updatedTabGroups.push(updatedTabGroup);
+      return updatedTabGroup;
+    }
+    return otherTabGroup;
+  });
+
+  if (updatedTabGroups.length !== updatePropsList.length) {
+    const notUpdatedTabGroupIds = updatePropsList
+      .map((updateProps) => updateProps.id)
+      .filter((id) => !activeWindowTabGroups.find((tabGroup) => tabGroup.id === id));
+    throw new Error(`updateActiveWindowTabGroups::tabGroupIds ${notUpdatedTabGroupIds} not found in windowId ${windowId}`);
+  }
+
+  return await update(windowId, { tabGroups: newActiveWindowTabGroups });
 }

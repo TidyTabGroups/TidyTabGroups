@@ -328,6 +328,7 @@ export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
       }
 
       if (Object.keys(updateProps).length > 0) {
+        // TODO: if this returns undefined, then we should resolve this method with void instead of (void | chrome.tabGroups.TabGroup)[]
         return await updateTabGroup<ShouldRetryCall>(tabGroup.id, updateProps, shouldRetryCallWhileWaitingForUserTabDragging);
       }
       return tabGroup;
