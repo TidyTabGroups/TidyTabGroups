@@ -551,6 +551,11 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
       return;
     }
 
+    if (!tab.active) {
+      myLogger.warn(`tab no longer active:`, tab.title);
+      return;
+    }
+
     myLogger.log(`title and groupId:`, tab.title, tab.groupId);
 
     // 1
