@@ -338,3 +338,12 @@ export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
 
 // FIXME: remove the "orange" explicit type once the chrome.tabGroups.ColorEnum type is updated
 export const TAB_GROUP_COLORS: Array<ChromeTabGroupColorEnum> = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
+
+export function tabGroupEquals(tabGroup: ChromeTabGroupWithId, tabGroupToCompare: ChromeTabGroupWithId) {
+  const keys = Object.keys(tabGroupToCompare) as (keyof chrome.tabGroups.TabGroup)[];
+  if (keys.length !== Object.keys(tabGroup).length || keys.find((key) => tabGroupToCompare[key] !== tabGroup[key])) {
+    return false;
+  }
+
+  return true;
+}

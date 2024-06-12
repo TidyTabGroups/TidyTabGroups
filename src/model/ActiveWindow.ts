@@ -514,3 +514,71 @@ export async function updateActiveWindowTabGroups(
 
   return await update(windowId, { tabGroups: newActiveWindowTabGroups });
 }
+
+export async function createActiveWindowTabGroup(activeWindow: Types.ActiveWindow, tabGroup: ChromeTabGroupWithId) {
+  const myLogger = logger.getNestedLogger("createActiveWindowTabGroup");
+  try {
+    let newActiveWindowTabGroup = { ...tabGroup, useTabTitle: false };
+
+    const activeTab = (await chrome.tabs.query({ windowId: tabGroup.windowId, active: true }))[0] as ChromeTabWithId | undefined;
+    let tabGroupUpToDate: ChromeTabGroupWithId | undefined = tabGroup;
+
+    // 1
+    const isFocusedTabGroup = activeTab && activeTab.groupId === tabGroup.id;
+    const { focusMode } = activeWindow;
+    if (focusMode) {
+      if (isFocusedTabGroup && focusMode.colors.focused !== tabGroupUpToDate.color) {
+        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.focused });
+      } else if (!isFocusedTabGroup && focusMode.colors.nonFocused !== tabGroupUpToDate.color) {
+        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.nonFocused });
+      }
+      newActiveWindowTabGroup.color = tabGroupUpToDate.color;
+    }
+
+    // 2
+    // TODO: check for `use tab title for blank tab groups` user preference
+    const useTabTitle = tabGroupUpToDate.title === undefined || tabGroupUpToDate.title === "";
+    if (useTabTitle) {
+      // FIXME: remove the timeout workaround once the chromium bug is resolved: https://issues.chromium.org/issues/334965868#comment4
+      await Misc.waitMs(30);
+
+      const newTitle = await (async function () {
+        const DEFAULT_TITLE = "New Group";
+        const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
+        if (tabsInGroup.length === 0) {
+          return DEFAULT_TITLE;
+        }
+
+        const tabsInGroupOrderedByLastAccessed = await ChromeWindowHelper.getTabsOrderedByLastAccessed(tabsInGroup);
+        if (tabsInGroupOrderedByLastAccessed.length === 0) {
+          throw new Error(myLogger.getPrefixedMessage(`tabsInGroupOrderedByLastAccessed is empty`));
+        }
+
+        const lastAccessedTab = tabsInGroupOrderedByLastAccessed[tabsInGroupOrderedByLastAccessed.length - 1];
+        if ((tabsInGroup.length === 1 || lastAccessedTab.lastAccessed !== undefined) && lastAccessedTab.title && lastAccessedTab.title !== "") {
+          return lastAccessedTab.title;
+        }
+
+        return DEFAULT_TITLE;
+      })();
+
+      tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
+      if (!tabGroupUpToDate) {
+        myLogger.warn(`(2) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
+        return;
+      }
+
+      if (tabGroupUpToDate.title === undefined || tabGroupUpToDate.title === "") {
+        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: newTitle });
+        newActiveWindowTabGroup = { ...newActiveWindowTabGroup, title: tabGroupUpToDate.title, useTabTitle: true };
+      }
+    }
+
+    // 3
+    await update(activeWindow.windowId, {
+      tabGroups: [...activeWindow.tabGroups, newActiveWindowTabGroup],
+    });
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
+  }
+}
