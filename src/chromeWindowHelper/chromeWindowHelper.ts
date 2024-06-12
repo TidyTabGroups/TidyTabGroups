@@ -310,33 +310,41 @@ export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
 
   const { collapseUnfocusedTabGroups, highlightColors } = options;
 
-  return await Promise.all(
-    tabGroups.map(async (tabGroup) => {
-      const updateProps: chrome.tabGroups.UpdateProperties = {};
+  return new Promise<ShouldRetryCall extends true ? ChromeTabGroupWithId[] | void : ChromeTabGroupWithId[]>(async (resolve, reject) => {
+    Promise.all(
+      tabGroups.map(async (tabGroup) => {
+        const updateProps: chrome.tabGroups.UpdateProperties = {};
 
-      if (tabGroup.id === tabGroupId) {
-        if (tabGroup.collapsed) {
-          updateProps.collapsed = false;
+        if (tabGroup.id === tabGroupId) {
+          if (tabGroup.collapsed) {
+            updateProps.collapsed = false;
+          }
+          if (highlightColors?.focused && highlightColors.focused !== tabGroup.color) {
+            updateProps.color = highlightColors.focused;
+          }
+        } else {
+          if (collapseUnfocusedTabGroups && !tabGroup.collapsed) {
+            updateProps.collapsed = true;
+          }
+          if (highlightColors?.nonFocused && highlightColors.nonFocused !== tabGroup.color) {
+            updateProps.color = highlightColors.nonFocused;
+          }
         }
-        if (highlightColors?.focused && highlightColors.focused !== tabGroup.color) {
-          updateProps.color = highlightColors.focused;
-        }
-      } else {
-        if (collapseUnfocusedTabGroups && !tabGroup.collapsed) {
-          updateProps.collapsed = true;
-        }
-        if (highlightColors?.nonFocused && highlightColors.nonFocused !== tabGroup.color) {
-          updateProps.color = highlightColors.nonFocused;
-        }
-      }
 
-      if (Object.keys(updateProps).length > 0) {
-        // TODO: if this returns undefined, then we should resolve this method with void instead of (void | chrome.tabGroups.TabGroup)[]
-        return await updateTabGroup<ShouldRetryCall>(tabGroup.id, updateProps, shouldRetryCallWhileWaitingForUserTabDragging);
-      }
-      return tabGroup;
-    })
-  );
+        if (Object.keys(updateProps).length > 0) {
+          const updatedTabGroup = await updateTabGroup<ShouldRetryCall>(tabGroup.id, updateProps, shouldRetryCallWhileWaitingForUserTabDragging);
+          if (updatedTabGroup === undefined) {
+            resolve(undefined as ShouldRetryCall extends true ? ChromeTabGroupWithId[] | void : ChromeTabGroupWithId[]);
+          }
+          return updatedTabGroup;
+        }
+        return tabGroup;
+      })
+    )
+      // @ts-ignore
+      .then((updatedTabGroups) => resolve(updatedTabGroups))
+      .catch(reject);
+  });
 }
 
 // FIXME: remove the "orange" explicit type once the chrome.tabGroups.ColorEnum type is updated
