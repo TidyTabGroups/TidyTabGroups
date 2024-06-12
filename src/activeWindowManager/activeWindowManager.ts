@@ -356,14 +356,43 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
 
     // 2
     // TODO: check for `use tab title for blank tab groups` user preference
-    useTabTitle = tabGroup.title === "";
-    if (useTabTitle && activeTab.url && new URL(activeTab.url).hostname !== "newtab") {
-      // FIXME: remove the setTimeout workaround once the chromium bug is resolved: https://issues.chromium.org/issues/334965868#comment4
-      tabGroup = await new Promise((resolve, reject) => {
-        setTimeout(() => {
-          ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: activeTab.title }).then(resolve).catch(reject);
-        }, 30);
-      });
+    const useTabTitle = tabGroupUpToDate.title === undefined || tabGroupUpToDate.title === "";
+    if (useTabTitle) {
+      // FIXME: remove the timeout workaround once the chromium bug is resolved: https://issues.chromium.org/issues/334965868#comment4
+      await Misc.waitMs(30);
+
+      const newTitle = await (async function () {
+        const DEFAULT_TITLE = "New Group";
+        const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
+        if (tabsInGroup.length === 0) {
+          Logger.attentionLogger.warn("tabsInGroup is empty");
+          return DEFAULT_TITLE;
+        }
+
+        const tabsInGroupOrderedByLastAccessed = await ChromeWindowHelper.getTabsOrderedByLastAccessed(tabsInGroup);
+        if (tabsInGroupOrderedByLastAccessed.length === 0) {
+          throw new Error(myLogger.getPrefixedMessage(`tabsInGroupOrderedByLastAccessed is empty`));
+        }
+
+        const lastAccessedTab = tabsInGroupOrderedByLastAccessed[tabsInGroupOrderedByLastAccessed.length - 1];
+        Logger.attentionLogger.log("lastAccessedTab.title: ", lastAccessedTab, lastAccessedTab.title, lastAccessedTab.lastAccessed);
+        if ((tabsInGroup.length === 1 || lastAccessedTab.lastAccessed !== undefined) && lastAccessedTab.title && lastAccessedTab.title !== "") {
+          return lastAccessedTab.title;
+        }
+
+        return DEFAULT_TITLE;
+      })();
+
+      tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
+      if (!tabGroupUpToDate) {
+        myLogger.warn(`(2) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
+        return;
+      }
+
+      if (tabGroupUpToDate.title === undefined || tabGroupUpToDate.title === "") {
+        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: newTitle });
+        newActiveWindowTabGroup = { ...newActiveWindowTabGroup, title: tabGroupUpToDate.title, useTabTitle: true };
+      }
     }
 
     // 3
