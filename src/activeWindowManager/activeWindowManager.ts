@@ -254,23 +254,35 @@ export async function onMessage(
     if (message.type === "pageFocused") {
       // 1. if the tab is pinned, ignore
       // 2. if the tab is active, set it as the primary tab
-      const { tab } = sender;
-      if (!tab || !tab.id) {
+      // 3. if the tab is active and the tab group's useTabTitle is true, update the tab group's title
+      if (!sender.tab || sender.tab.id === undefined) {
         myLogger.warn("pageFocused::sender.tab is not valid:", sender);
         return;
       }
 
-      // 1
-      if (tab.pinned) {
-        myLogger.warn("pageFocused::tab is pinned:", tab);
+      const tabUpToDate = await ChromeWindowHelper.getIfTabExists(sender.tab.id);
+      if (!tabUpToDate || !tabUpToDate.id) {
+        myLogger.warn("pageFocused::tabUpToDate is not valid:", tabUpToDate);
         return;
       }
 
-      // 2
-      if (tab.active) {
-        await ActiveWindow.focusTab(tab.windowId, tab.id);
+      // 1
+      if (tabUpToDate.pinned) {
+        myLogger.warn("pageFocused::tab is pinned:", tabUpToDate.title);
+        return;
+      }
+
+      if (tabUpToDate.active) {
+        // 2
+        await ActiveWindow.focusTab(tabUpToDate.windowId, tabUpToDate.id);
+        // 3
+        const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tabUpToDate.groupId);
+        if (activeWindowTabGroup?.useTabTitle) {
+          const tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabUpToDate.groupId, { title: tabUpToDate.title });
+          await ActiveWindow.updateActiveWindowTabGroup(tabUpToDate.windowId, tabUpToDate.groupId, { title: tabGroupUpToDate.title });
+        }
       } else {
-        myLogger.warn("pageFocused::tab is not active:", tab);
+        myLogger.warn("pageFocused::tab is not active:", tabUpToDate.title);
       }
     } else if (message.type === "getActiveWindow") {
       const { windowId } = message.data as { windowId: ChromeWindowId };
@@ -620,13 +632,6 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
       collapseUnfocusedTabGroups: tab.pinned,
       highlightColors: activeWindow.focusMode?.colors,
     });
-
-    // 2
-    // TODO: this is breaking in Edge when the user creates a new tab group
-    const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tab.groupId);
-    if (activeWindowTabGroup?.useTabTitle) {
-      await ChromeWindowHelper.updateTabGroup(tab.groupId, { title: tab.title });
-    }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
