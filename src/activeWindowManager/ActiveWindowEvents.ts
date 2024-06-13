@@ -379,11 +379,16 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
       (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
       {}
     );
-    const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => ({
-      ...activeWindowTabGroup,
-      collapsed: tabGroupsUpToDateById[activeWindowTabGroup.id].collapsed,
-      color: tabGroupsUpToDateById[activeWindowTabGroup.id].color,
-    }));
+    const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => {
+      if (tabGroupsUpToDateById[activeWindowTabGroup.id]) {
+        return {
+          ...activeWindowTabGroup,
+          collapsed: tabGroupsUpToDateById[activeWindowTabGroup.id].collapsed,
+          color: tabGroupsUpToDateById[activeWindowTabGroup.id].color,
+        };
+      }
+      return activeWindowTabGroup;
+    });
     await ActiveWindow.update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -464,24 +469,28 @@ export async function onTabUpdated(
           },
           async function shouldRetryCallWhileWaitingForUserTabDragging() {
             const tab = await ChromeWindowHelper.getIfTabExists(tabId);
+            // TODO: is checking for tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE correct?
+            //  should it not be checking for tab.groupId === changeInfo.groupId?
             return tab !== undefined && tab.active && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
           }
         );
 
         if (tabGroupsUpToDate !== undefined) {
-          const activeWindow = await ActiveWindow.get(tab.windowId);
-          if (activeWindow) {
-            const tabGroupsUpToDateById: { [tabGroupId: ChromeTabGroupId]: ChromeTabGroupWithId } = (
-              tabGroupsUpToDate as ChromeTabGroupWithId[]
-            ).reduce((acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }), {});
+          const tabGroupsUpToDateById: { [tabGroupId: ChromeTabGroupId]: ChromeTabGroupWithId } = (
+            tabGroupsUpToDate as ChromeTabGroupWithId[]
+          ).reduce((acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }), {});
 
-            const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => ({
-              ...activeWindowTabGroup,
-              collapsed: tabGroupsUpToDateById[activeWindowTabGroup.id].collapsed,
-              color: tabGroupsUpToDateById[activeWindowTabGroup.id].color,
-            }));
-            await ActiveWindow.update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
-          }
+          const newActiveWindowTabGroups = (await ActiveWindow.getOrThrow(tab.windowId)).tabGroups.map((activeWindowTabGroup) => {
+            if (tabGroupsUpToDateById[activeWindowTabGroup.id]) {
+              return {
+                ...activeWindowTabGroup,
+                collapsed: tabGroupsUpToDateById[activeWindowTabGroup.id].collapsed,
+                color: tabGroupsUpToDateById[activeWindowTabGroup.id].color,
+              };
+            }
+            return activeWindowTabGroup;
+          });
+          await ActiveWindow.update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
         }
       }
     }
