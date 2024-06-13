@@ -464,9 +464,7 @@ export async function onTabUpdated(
           },
           async function shouldRetryCallWhileWaitingForUserTabDragging() {
             const tab = await ChromeWindowHelper.getIfTabExists(tabId);
-            // TODO: is checking for tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE correct?
-            //  should it not be checking for tab.groupId === changeInfo.groupId?
-            return tab !== undefined && tab.active && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
+            return tab !== undefined && tab.active && tab.groupId === changeInfo.groupId;
           }
         );
 
