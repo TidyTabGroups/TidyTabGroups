@@ -424,11 +424,6 @@ export async function onTabUpdated(
       // 1
       if (
         changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
-        // check if the tab is still not in a group because of one of two possible reasons:
-        //   1. when a user moves a tab to another group, this event gets called with groupId set to -1, then it gets fired again with
-        //    groupId set to the group it actually got moved to
-        //   2. it could have been auto-grouped by the previous onTabUpdated event if it is one of the highlighted tabs.
-        tabUpToDate.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
         // check if the tab is pinned because this event gets called with groupId set to -1 when the tab gets pinned
         !tabUpToDate.pinned
       ) {
