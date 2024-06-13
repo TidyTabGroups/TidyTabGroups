@@ -15,8 +15,8 @@ chrome.action.onClicked.addListener(function (tab) {
   chrome.runtime.openOptionsPage();
 });
 
-async function onError(error: any) {
-  logger.error("onError::An error occurred in the background page. Will try to recover...", error);
+async function onError() {
+  logger.error("onError::An error occurred in the background page. Will try to recover...");
   chrome.runtime.reload();
 }
 

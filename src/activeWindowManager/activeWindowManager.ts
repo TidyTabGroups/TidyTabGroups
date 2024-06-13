@@ -8,7 +8,7 @@ import * as ActiveWindowEvents from "./ActiveWindowEvents";
 
 const logger = Logger.getLogger("activeWindowManager", { color: "#fcba03" });
 
-export async function initialize(onError: (error: any) => void) {
+export async function initialize(onError: () => void) {
   Storage.addChangeListener(async (changes) => {
     const { userPreferences } = changes;
     if (userPreferences && !userPreferences.oldValue?.collapseUnfocusedTabGroups && userPreferences.newValue?.collapseUnfocusedTabGroups) {
@@ -150,6 +150,7 @@ export async function initialize(onError: (error: any) => void) {
   type QueuedEventOperation = () => Promise<void>;
   let operationQueue: QueuedEventOperation[] = [];
   let isProcessingQueue = false;
+  let isQueueSuspended = false;
 
   function queueOperationIfWindowIsActive(
     operation: ActiveWindowQueuedEventOperation,
@@ -201,7 +202,7 @@ export async function initialize(onError: (error: any) => void) {
     }
 
     isProcessingQueue = true;
-    while (operationQueue.length > 0) {
+    while (operationQueue.length > 0 && !isQueueSuspended) {
       const currentOperation = operationQueue.shift();
       if (currentOperation) {
         const operationTimeoutId = setTimeout(() => {
@@ -221,16 +222,9 @@ export async function initialize(onError: (error: any) => void) {
     isProcessingQueue = false;
   }
 
-  async function onBackgroundEventError() {
-    // reset the process queue
-    operationQueue = [];
-    isProcessingQueue = false;
-
-    try {
-      await ActiveWindow.reactivateAllWindows();
-    } catch (error) {
-      onError(`error reactivating all windows: ${error}`);
-    }
+  function onBackgroundEventError() {
+    isQueueSuspended = true;
+    onError();
   }
 }
 
