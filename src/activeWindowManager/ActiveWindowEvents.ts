@@ -156,10 +156,9 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       if (wasTitleUpdated) {
         // 1
         // FIXME: this is a workaround for a chromium bug where updating the title of a newly created tab group
-        // causes the color to be reset back to its original (non-focus mode) color. We need to reset back
-        // to it's previous color, which is it's respective focus mode color.
+        // causes the color to be reset back to its original color. We need to reset back to it's previous color.
         // Remove once the Chromium bug is fixed: https://issues.chromium.org/issues/334965868
-        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: tabGroupUpToDate.color });
+        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: activeWindowTabGroup.color });
         newActiveWindowTabGroupsById[tabGroup.id] = { ...newActiveWindowTabGroupsById[tabGroup.id], color: tabGroupUpToDate.color };
       } else {
         const activeTab = (await chrome.tabs.query({ windowId: tabGroup.windowId, active: true }))[0] as ChromeTabWithId | undefined;
