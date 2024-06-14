@@ -34,18 +34,18 @@ export async function getTabGroupsOrdered(
 }
 
 export async function activateTab(tabId: ChromeTabId) {
-  return waitForUserTabDraggingUsingCall(() => chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>);
+  return callAfterUserIsDoneTabDragging(() => chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>);
 }
 
 export async function updateTabGroup<ShouldRetryCall extends boolean = false>(
   tabGroupId: ChromeTabGroupId,
   updatedProperties: ChromeTabGroupUpdateProperties,
-  shouldRetryCallWhileWaitingForUserTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
+  shouldRetryCallAfterUserIsDoneTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
 ) {
   try {
-    return await waitForUserTabDraggingUsingCall<ChromeTabGroupWithId, ShouldRetryCall>(
+    return await callAfterUserIsDoneTabDragging<ChromeTabGroupWithId, ShouldRetryCall>(
       () => chrome.tabGroups.update(tabGroupId, updatedProperties),
-      shouldRetryCallWhileWaitingForUserTabDragging
+      shouldRetryCallAfterUserIsDoneTabDragging
     );
   } catch (error) {
     // FIXME: remove this once saved tab groups are editable
@@ -60,24 +60,24 @@ export async function updateTabGroup<ShouldRetryCall extends boolean = false>(
 }
 
 export async function moveTab(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
-  return waitForUserTabDraggingUsingCall(() => chrome.tabs.move(tabId, moveProperties) as Promise<ChromeTabWithId>);
+  return callAfterUserIsDoneTabDragging(() => chrome.tabs.move(tabId, moveProperties) as Promise<ChromeTabWithId>);
 }
 
 export async function moveTabGroup(tabGroupId: ChromeTabGroupId, moveProperties: chrome.tabGroups.MoveProperties) {
-  return waitForUserTabDraggingUsingCall(() => chrome.tabGroups.move(tabGroupId, moveProperties) as Promise<ChromeTabGroupWithId>);
+  return callAfterUserIsDoneTabDragging(() => chrome.tabGroups.move(tabGroupId, moveProperties) as Promise<ChromeTabGroupWithId>);
 }
 
 export async function groupTabs<ShouldRetryCall extends boolean = false>(
   options: chrome.tabs.GroupOptions,
-  shouldRetryCallWhileWaitingForUserTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
+  shouldRetryCallAfterUserIsDoneTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
 ) {
-  return waitForUserTabDraggingUsingCall<ChromeTabGroupId, ShouldRetryCall>(
+  return callAfterUserIsDoneTabDragging<ChromeTabGroupId, ShouldRetryCall>(
     () => chrome.tabs.group(options),
-    shouldRetryCallWhileWaitingForUserTabDragging
+    shouldRetryCallAfterUserIsDoneTabDragging
   );
 }
 
-export async function waitForUserTabDraggingUsingCall<T, ShouldRetryCall extends boolean = false>(
+export async function callAfterUserIsDoneTabDragging<T, ShouldRetryCall extends boolean = false>(
   fn: () => Promise<T>,
   shouldRetryCall?: ShouldRetryCall extends true ? () => Promise<boolean> : never
 ): Promise<ShouldRetryCall extends true ? T | void : T> {
@@ -86,12 +86,12 @@ export async function waitForUserTabDraggingUsingCall<T, ShouldRetryCall extends
   } catch (error) {
     // @ts-ignore
     if (error?.message === "Tabs cannot be edited right now (user may be dragging a tab).") {
-      console.log(`waitForUserTabDraggingUsingCall::user may be dragging a tab: `, fn.toString());
+      console.log(`callAfterUserIsDoneTabDragging::user may be dragging a tab: `, fn.toString());
       return new Promise((resolve, reject) =>
         setTimeout(async () => {
           const shouldRetry = shouldRetryCall ? await shouldRetryCall() : true;
           if (shouldRetry) {
-            waitForUserTabDraggingUsingCall(fn, shouldRetryCall).then(resolve).catch(reject);
+            callAfterUserIsDoneTabDragging(fn, shouldRetryCall).then(resolve).catch(reject);
           } else {
             resolve(undefined as ShouldRetryCall extends true ? T | void : T);
           }
@@ -302,7 +302,7 @@ export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
     collapseUnfocusedTabGroups: boolean;
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
   },
-  shouldRetryCallWhileWaitingForUserTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
+  shouldRetryCallAfterUserIsDoneTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
 ) {
   const tabGroups = Array.isArray(tabGroupsOrWindowId)
     ? tabGroupsOrWindowId
@@ -332,7 +332,7 @@ export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
         }
 
         if (Object.keys(updateProps).length > 0) {
-          const updatedTabGroup = await updateTabGroup<ShouldRetryCall>(tabGroup.id, updateProps, shouldRetryCallWhileWaitingForUserTabDragging);
+          const updatedTabGroup = await updateTabGroup<ShouldRetryCall>(tabGroup.id, updateProps, shouldRetryCallAfterUserIsDoneTabDragging);
           if (updatedTabGroup === undefined) {
             resolve(undefined as ShouldRetryCall extends true ? ChromeTabGroupWithId[] | void : ChromeTabGroupWithId[]);
           }

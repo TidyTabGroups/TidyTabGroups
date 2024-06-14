@@ -437,7 +437,7 @@ export async function onTabUpdated(
             createProperties: { windowId: tab.windowId },
             tabIds: [tabUpToDate.id, ...highlightedTabs.map((highlightedTab) => highlightedTab.id)],
           },
-          async function shouldRetryCallWhileWaitingForUserTabDragging() {
+          async function shouldRetryCallAfterUserIsDoneTabDragging() {
             const tab = await ChromeWindowHelper.getIfTabExists(tabId);
             return tab !== undefined && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
           }
@@ -461,7 +461,7 @@ export async function onTabUpdated(
             collapseUnfocusedTabGroups: tabUpToDate.pinned,
             highlightColors: activeWindow.focusMode?.colors,
           },
-          async function shouldRetryCallWhileWaitingForUserTabDragging() {
+          async function shouldRetryCallAfterUserIsDoneTabDragging() {
             const tab = await ChromeWindowHelper.getIfTabExists(tabId);
             return tab !== undefined && tab.active && tab.groupId === changeInfo.groupId;
           }
