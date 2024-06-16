@@ -8,6 +8,14 @@ import * as ActiveWindowEvents from "./ActiveWindowEvents";
 
 const logger = Logger.getLogger("activeWindowManager", { color: "#fcba03" });
 
+const TAB_NOT_UP_TO_DATE_MESSAGE = (tabOrTabId: ChromeTabId | chrome.tabs.Tab) => {
+  if (typeof tabOrTabId === "number") {
+    return `tab is not up to date, tabId: ${tabOrTabId}`;
+  } else {
+    return `tabUpToDate not found - tabId: ${tabOrTabId.id}, tab.title: ${tabOrTabId.title}`;
+  }
+};
+
 export async function initialize(onError: () => void) {
   Storage.addChangeListener(async (changes) => {
     const { userPreferences } = changes;
@@ -79,6 +87,7 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+    const myLogger = logger.getNestedLogger("onUpdated");
     // only handle these changeInfo properties
     const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title"];
     if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
@@ -91,7 +100,21 @@ export async function initialize(onError: () => void) {
         ? (chrome.tabs.query({ highlighted: true }) as Promise<ChromeTabWithId[]>)
         : undefined;
     queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEvents.onTabUpdated(activeWindow, tabId, changeInfo, tab, getHighlightedTabsPromise),
+      async (activeWindow) => {
+        const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
+        if (!tabUpToDate) {
+          myLogger.warn(TAB_NOT_UP_TO_DATE_MESSAGE(tab));
+          return;
+        }
+
+        (Object.keys(changeInfo) as (keyof chrome.tabs.TabChangeInfo)[]).forEach((key) => {
+          if (tabUpToDate[key] !== changeInfo[key]) {
+            myLogger.warn(`tab is not up to date for changeInfo.key:${key}, tabId: ${tabId}, tab title: ${tab.title}`);
+            delete changeInfo[key];
+          }
+        });
+        await ActiveWindowEvents.onTabUpdated(activeWindow, tabUpToDate, changeInfo, getHighlightedTabsPromise);
+      },
       tab.windowId,
       false,
       "onTabUpdated"

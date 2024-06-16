@@ -3,7 +3,7 @@ import Logger from "../logger";
 import Misc from "../misc";
 import { ActiveWindow } from "../model";
 import Types from "../types";
-import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowWithId } from "../types/types";
+import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
 import * as Storage from "../storage";
 
 const logger = Logger.getLogger("activeWindowEvents", { color: "#4287f5" });
@@ -396,9 +396,8 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 
 export async function onTabUpdated(
   activeWindow: Types.ActiveWindow,
-  tabId: ChromeTabId,
+  tab: ChromeTabWithId,
   changeInfo: chrome.tabs.TabChangeInfo,
-  tab: chrome.tabs.Tab,
   getHighlightedTabsPromise: Promise<ChromeTabWithId[]> | undefined
 ) {
   // 1. if the tab was ungrouped, create a new group for it
@@ -407,27 +406,11 @@ export async function onTabUpdated(
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
   try {
-    const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
-    if (!tabUpToDate || tabUpToDate.id === undefined) {
-      return;
-    }
-
-    (Object.keys(changeInfo) as (keyof chrome.tabs.TabChangeInfo)[]).forEach((key) => {
-      if (tabUpToDate[key] !== changeInfo[key]) {
-        myLogger.warn(`tab is not up to date for key:${key}, tabId: ${tabId}`);
-        delete changeInfo[key];
-      }
-    });
-
     if (changeInfo.groupId !== undefined) {
       // 1
-      if (
-        changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
-        // check if the tab is pinned because this event gets called with groupId set to -1 when the tab gets pinned
-        !tabUpToDate.pinned
-      ) {
+      if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned) {
         // TODO: check for `automatically group created tabs` user preference
-        if (getHighlightedTabsPromise === undefined) {
+        if (!getHighlightedTabsPromise) {
           throw new Error(`getHighlightedTabsPromise is undefined`);
         }
         // get all the highlighted tabs in order to handle the case where multiple tabs are ungrouped together
