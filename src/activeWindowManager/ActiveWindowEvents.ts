@@ -413,64 +413,30 @@ export async function onTabUpdated(
         if (!getHighlightedTabsPromise) {
           throw new Error(`getHighlightedTabsPromise is undefined`);
         }
-        // get all the highlighted tabs in order to handle the case where multiple tabs are ungrouped together
         const highlightedTabs = await getHighlightedTabsPromise;
-        const newGroupId = await ChromeWindowHelper.groupTabs<true>(
-          {
-            createProperties: { windowId: tab.windowId },
-            tabIds: [tabUpToDate.id, ...highlightedTabs.map((highlightedTab) => highlightedTab.id)],
-          },
-          async function shouldRetryCallAfterUserIsDoneTabDragging() {
-            const tab = await ChromeWindowHelper.getIfTabExists(tabId);
-            return tab !== undefined && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
-          }
-        );
-
-        if (newGroupId) {
-          tabUpToDate.groupId = newGroupId;
-          const newTabGroup = await ChromeWindowHelper.getIfTabGroupExists(newGroupId);
-          if (newTabGroup) {
-            await ActiveWindow.createActiveWindowTabGroup(activeWindow, newTabGroup);
-          }
-        }
+        await ActiveWindow.groupHighlightedTabs(activeWindow.windowId, [tab.id, ...highlightedTabs.map((highlightedTab) => highlightedTab.id)]);
       }
 
       // 2
-      if (tabUpToDate.active) {
-        const tabGroupsUpToDate = await ChromeWindowHelper.focusTabGroup<true>(
-          tab.groupId,
-          tab.windowId,
-          {
-            collapseUnfocusedTabGroups: tabUpToDate.pinned,
-            highlightColors: activeWindow.focusMode?.colors,
-          },
-          async function shouldRetryCallAfterUserIsDoneTabDragging() {
-            const tab = await ChromeWindowHelper.getIfTabExists(tabId);
-            return tab !== undefined && tab.active && tab.groupId === changeInfo.groupId;
-          }
-        );
-
-        if (tabGroupsUpToDate !== undefined) {
-          const tabGroupsUpToDateById: { [tabGroupId: ChromeTabGroupId]: ChromeTabGroupWithId } = (
-            tabGroupsUpToDate as ChromeTabGroupWithId[]
-          ).reduce((acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }), {});
-
-          const newActiveWindowTabGroups = (await ActiveWindow.getOrThrow(tab.windowId)).tabGroups.map((activeWindowTabGroup) => {
-            if (tabGroupsUpToDateById[activeWindowTabGroup.id]) {
-              return {
-                ...activeWindowTabGroup,
-                collapsed: tabGroupsUpToDateById[activeWindowTabGroup.id].collapsed,
-                color: tabGroupsUpToDateById[activeWindowTabGroup.id].color,
-              };
-            }
-            return activeWindowTabGroup;
-          });
-          await ActiveWindow.update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
-        }
+      if (tab.active) {
+        await ActiveWindow.focusActiveTab(tab);
       }
     }
   } catch (error) {
     throw new Error(myLogger.throwPrefixed(`error:${error}`));
+  }
+}
+
+export async function onTabAttached(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId) {
+  const myLogger = logger.getNestedLogger("onTabAttached");
+  myLogger.log(`tab attached to windowId: ${tab.windowId}, tab title: ${tab.title}`);
+
+  try {
+    if (tab.active) {
+      await ActiveWindow.focusActiveTab(tab);
+    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 

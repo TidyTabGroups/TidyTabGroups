@@ -139,6 +139,34 @@ export async function initialize(onError: () => void) {
     );
   });
 
+  chrome.tabs.onAttached.addListener((tabId: ChromeTabId, attachInfo: chrome.tabs.TabAttachInfo) => {
+    const myLogger = logger.getNestedLogger("onAttached");
+    queueOperationIfWindowIsActive(
+      async (activeWindow) => {
+        const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
+        if (!tabUpToDate) {
+          myLogger.warn(TAB_NOT_UP_TO_DATE_MESSAGE(tabId));
+          return;
+        }
+
+        if (tabUpToDate.windowId !== attachInfo.newWindowId) {
+          myLogger.warn(`tabUpToDate is no longer attached to this window - windowId: ${activeWindow.windowId}, tabId`, {
+            activeWindowWindowId: activeWindow.windowId,
+            tabId,
+            tabUpToDateTitle: tabUpToDate.title,
+            tabUpToDateWindowId: tabUpToDate.windowId,
+          });
+          return;
+        }
+
+        await ActiveWindowEvents.onTabAttached(activeWindow, tabUpToDate);
+      },
+      attachInfo.newWindowId,
+      false,
+      "onTabAttached"
+    );
+  });
+
   chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
     queueOperationIfWindowIsActive(
       (activeWindow) => ActiveWindowEvents.onTabReplaced(activeWindow, addedTabId, removedTabId),
