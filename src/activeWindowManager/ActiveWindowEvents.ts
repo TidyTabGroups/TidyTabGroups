@@ -69,7 +69,7 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
       return;
     }
 
-    await ActiveWindow.createActiveWindowTabGroup(activeWindow, tabGroupUpToDate);
+    await ActiveWindow.createActiveWindowTabGroup(activeWindow.windowId, tabGroupUpToDate);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -337,7 +337,7 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
         if (createNewGroup) {
           const newTabGroup = await ChromeWindowHelper.getIfTabGroupExists(groupId);
           if (newTabGroup) {
-            await ActiveWindow.createActiveWindowTabGroup(activeWindow, newTabGroup);
+            await ActiveWindow.createActiveWindowTabGroup(activeWindow.windowId, newTabGroup);
           }
         }
       }

@@ -515,9 +515,10 @@ export async function updateActiveWindowTabGroups(
   return await update(windowId, { tabGroups: newActiveWindowTabGroups });
 }
 
-export async function createActiveWindowTabGroup(activeWindow: Types.ActiveWindow, tabGroup: ChromeTabGroupWithId) {
+export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGroup: ChromeTabGroupWithId) {
   const myLogger = logger.getNestedLogger("createActiveWindowTabGroup");
   try {
+    const activeWindow = await getOrThrow(windowId);
     let newActiveWindowTabGroup = { ...tabGroup, useTabTitle: false };
 
     const activeTab = (await chrome.tabs.query({ windowId: tabGroup.windowId, active: true }))[0] as ChromeTabWithId | undefined;
