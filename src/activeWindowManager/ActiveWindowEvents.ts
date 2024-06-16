@@ -494,31 +494,15 @@ export async function onTabUpdated(
 export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
   const myLogger = logger.getNestedLogger("onTabRemoved");
   myLogger.log(`tabId:`, tabId, removeInfo);
-  try {
-    if (removeInfo.isWindowClosing) {
-      myLogger.log(`window is closing, nothing to do:`, tabId);
-      return;
-    }
-  } catch (error) {
-    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
+  if (removeInfo.isWindowClosing) {
+    myLogger.log(`window is closing, nothing to do:`, tabId);
+    return;
   }
 }
 
 export async function onTabMoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) {
   const myLogger = logger.getNestedLogger("onTabMoved");
   myLogger.log(`tabId and moveInfo:`, tabId, moveInfo);
-
-  try {
-    const tab = await ChromeWindowHelper.getIfTabExists(tabId);
-    if (!tab || !tab.id) {
-      myLogger.warn(`tab not found for tabId:`, tabId);
-      return;
-    }
-
-    myLogger.log(`title and groupId:`, tab.title, tab.groupId);
-  } catch (error) {
-    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
-  }
 }
 
 export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId: ChromeTabId, removedTabId: ChromeTabId) {
