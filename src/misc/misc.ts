@@ -73,3 +73,8 @@ export function lazyCall<T>(fn: () => Promise<T>) {
     return value;
   };
 }
+
+const awokenTime = new Date();
+export function serviceWorkerJustWokeUp() {
+  return new Date().getTime() - awokenTime.getTime() < 500;
+}

@@ -8,11 +8,6 @@ import * as Storage from "../storage";
 
 const logger = Logger.getLogger("activeWindowEvents", { color: "#4287f5" });
 
-const awokenTime = new Date();
-function justWokeUp() {
-  return new Date().getTime() - awokenTime.getTime() < 500;
-}
-
 export async function onWindowCreated(window: ChromeWindowWithId) {
   logger.log(`onWindowCreated::window:`, window);
 
@@ -237,7 +232,7 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
         chrome.tabs.update(tabToActivate.id, { url: tabToActivate.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
       }
       // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
-      const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
+      const timeToWaitBeforeActivation = Misc.serviceWorkerJustWokeUp() ? 100 : 250;
       await Misc.waitMs(timeToWaitBeforeActivation);
 
       tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
