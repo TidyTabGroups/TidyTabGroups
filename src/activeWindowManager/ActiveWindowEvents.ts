@@ -173,11 +173,11 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
             // 3
             newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: tabGroupUpToDate.color };
             // this will effectively update the color of all other non-focused tab groups
-            const tabGroupsUpToDate = await ChromeWindowHelper.focusTabGroup(focusedTabGroupId, tabGroup.windowId, {
+            const updatedTabGroups = await ChromeWindowHelper.focusTabGroup(focusedTabGroupId, tabGroup.windowId, {
               collapseUnfocusedTabGroups: false,
               highlightColors: newFocusModeColors,
             });
-            tabGroupsUpToDate.forEach((tabGroup) => {
+            updatedTabGroups.forEach((tabGroup) => {
               newActiveWindowTabGroupsById[tabGroup.id] = {
                 ...newActiveWindowTabGroupsById[tabGroup.id],
                 color: tabGroup.color,
@@ -197,8 +197,7 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       }
     }
 
-    let tabGroupsUpToDate = await chrome.tabGroups.query({ windowId: tabGroup.windowId });
-    tabGroupUpToDate = tabGroupsUpToDate.find((otherTabGroup) => otherTabGroup.id === tabGroup.id);
+    tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
     if (!tabGroupUpToDate) {
       myLogger.warn(`(2) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
       return;
@@ -206,11 +205,11 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
 
     if (wasExpanded && !tabGroupUpToDate.collapsed && (await getUserPreferences()).activateTabInFocusedTabGroup) {
       // 4
-      tabGroupsUpToDate = await ChromeWindowHelper.focusTabGroup(tabGroup.id, tabGroupsUpToDate, {
+      const updatedTabGroups = await ChromeWindowHelper.focusTabGroup(tabGroup.id, tabGroup.windowId, {
         collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
         highlightColors: activeWindow.focusMode?.colors,
       });
-      tabGroupsUpToDate.forEach((updatedTabGroup) => {
+      updatedTabGroups.forEach((updatedTabGroup) => {
         newActiveWindowTabGroupsById[updatedTabGroup.id] = {
           ...newActiveWindowTabGroupsById[updatedTabGroup.id],
           collapsed: updatedTabGroup.collapsed,

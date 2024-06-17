@@ -310,11 +310,12 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
     useTabTitleForGroupId = newGroupId;
   }
 
-  const tabGroups = await ChromeWindowHelper.focusTabGroup(selectedTab.groupId, windowId, {
+  await ChromeWindowHelper.focusTabGroup(selectedTab.groupId, windowId, {
     collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
     highlightColors: newFocusModeColors ?? undefined,
   });
 
+  const tabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
   let newFocusMode = newFocusModeColors
     ? {
         colors: newFocusModeColors,

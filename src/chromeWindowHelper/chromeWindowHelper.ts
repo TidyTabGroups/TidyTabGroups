@@ -310,7 +310,7 @@ export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
 
   const { collapseUnfocusedTabGroups, highlightColors } = options;
 
-  const updatedTabGroups = await Promise.all(
+  const updatedTabGroups = (await Promise.all(
     tabGroups.map(async (tabGroup) => {
       const updateProps: chrome.tabGroups.UpdateProperties = {};
 
@@ -331,15 +331,10 @@ export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
       }
 
       if (Object.keys(updateProps).length > 0) {
-        const updatedTabGroup = await updateTabGroup<ShouldRetryCall>(tabGroup.id, updateProps, shouldRetryCallAfterUserIsDoneTabDragging);
-        if (updatedTabGroup === undefined) {
-          return await getIfTabGroupExists(tabGroup.id);
-        }
-        return updatedTabGroup;
+        return await updateTabGroup<ShouldRetryCall>(tabGroup.id, updateProps, shouldRetryCallAfterUserIsDoneTabDragging);
       }
-      return tabGroup;
     })
-  );
+  )) as (ChromeTabGroupWithId | undefined)[];
 
   return updatedTabGroups.filter((tabGroup) => !!tabGroup) as ChromeTabGroupWithId[];
 }
