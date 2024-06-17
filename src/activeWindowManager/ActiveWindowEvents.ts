@@ -437,7 +437,7 @@ export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId
 
 export async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: ChromeTabId) {
   // 1. if the tab is pinned, ignore
-  // 2. if the tab is active, set it as the primary tab
+  // 2. if the tab is active, reposition it
   // 3. if the tab is active and the tab group's useTabTitle is true, update the tab group's title
   const myLogger = logger.getNestedLogger("onPageFocused");
   const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
@@ -454,7 +454,7 @@ export async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: Chr
 
   if (tabUpToDate.active) {
     // 2
-    await ActiveWindow.focusTab(tabUpToDate.windowId, tabUpToDate.id);
+    await ActiveWindow.repositionTab(tabUpToDate.windowId, tabUpToDate.id);
     // 3
     // FIXME: this needs to check if the tab is still active
     const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tabUpToDate.groupId);

@@ -368,13 +368,13 @@ export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
   return tabGroupsOrdered.length > 0 ? tabGroupsOrdered[tabGroupsOrdered.length - 1] : null;
 }
 
-export async function focusTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
+export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
   const activeWindow = await getOrThrow(windowId);
 
   const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
   const tab = tabs.find((tab) => tab.id === tabId);
   if (!tab) {
-    throw new Error(`focusTab::tabId ${tabId} not found in windowId ${windowId}`);
+    throw new Error(`repositionTab::tabId ${tabId} not found in windowId ${windowId}`);
   }
 
   const getUserPreferences = Misc.lazyCall(async () => {
@@ -403,12 +403,6 @@ export async function focusTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
       await ChromeWindowHelper.moveTab(tabId, { index: lastRelativeTabIndex });
     }
   }
-
-  // FIXME: this needs to update the active window's tab groups
-  await ChromeWindowHelper.focusTabGroup(tab.groupId, windowId, {
-    collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
-    highlightColors: activeWindow.focusMode?.colors,
-  });
 }
 
 export async function collapseUnFocusedTabGroups(tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId, focusedTabGroupId: ChromeTabGroupId) {
