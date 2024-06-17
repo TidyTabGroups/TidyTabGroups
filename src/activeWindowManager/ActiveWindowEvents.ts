@@ -95,8 +95,8 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
   //      due to a chromium bug when creating new tab groups
   // 2. if the tab group is focused, update the active window's focus mode focused color
   // 3. if the tab group is NOT focused, update the active window's focus mode nonFocused color
-  // 4. focus the tab group
-  // 5. activate the last active tab in the group
+  // 4. if the tab group was expanded, focus the tab group
+  // 5. if the tab group was expanded, activate the last active tab in the group
   // 6. if the tab group's title is updated, then set it's useSetTabTitle to false
   // 7. update the ActiveWindowTabGroup
   try {
@@ -203,7 +203,12 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       return;
     }
 
-    if (wasExpanded && !tabGroupUpToDate.collapsed && (await getUserPreferences()).activateTabInFocusedTabGroup) {
+    if (
+      wasExpanded &&
+      !tabGroupUpToDate.collapsed &&
+      (await getUserPreferences()).activateTabInFocusedTabGroup &&
+      !(await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id, active: true }))[0]
+    ) {
       // 4
       const updatedTabGroups = await ChromeWindowHelper.focusTabGroup(tabGroup.id, tabGroup.windowId, {
         collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
