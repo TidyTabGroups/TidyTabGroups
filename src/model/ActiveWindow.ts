@@ -593,7 +593,7 @@ export async function focusActiveTab(tab: ChromeTabWithId) {
     originalGroupId,
     originalWindowId,
     {
-      collapseUnfocusedTabGroups: tab.pinned && (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
+      collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
       highlightColors: activeWindow.focusMode?.colors,
     },
     async function shouldRetryCallAfterUserIsDoneTabDragging() {
