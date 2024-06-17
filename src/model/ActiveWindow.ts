@@ -403,6 +403,7 @@ export async function focusTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
     }
   }
 
+  // FIXME: this needs to update the active window's tab groups
   await ChromeWindowHelper.focusTabGroup(tab.groupId, windowId, {
     collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
     highlightColors: activeWindow.focusMode?.colors,
@@ -586,96 +587,107 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
 
 export async function focusActiveTab(tab: ChromeTabWithId) {
   const activeWindow = await getOrThrow(tab.windowId);
+  const { groupId: originalGroupId, windowId: originalWindowId } = tab;
   const tabGroupsUpToDate = await ChromeWindowHelper.focusTabGroup<true>(
-    tab.groupId,
-    tab.windowId,
+    originalGroupId,
+    originalWindowId,
     {
-      collapseUnfocusedTabGroups: tab.pinned,
+      collapseUnfocusedTabGroups: tab.pinned && (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
       highlightColors: activeWindow.focusMode?.colors,
     },
     async function shouldRetryCallAfterUserIsDoneTabDragging() {
-      const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tab.id);
-      return tabUpToDate !== undefined && tabUpToDate.active && tabUpToDate.windowId === activeWindow.windowId && tabUpToDate.groupId === tab.groupId;
+      const [tabUpToDate, tabGroupUpToDate] = await Promise.all([
+        ChromeWindowHelper.getIfTabExists(tab.id),
+        originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE ? undefined : ChromeWindowHelper.getIfTabGroupExists(originalGroupId),
+      ]);
+      return (
+        !!tabUpToDate &&
+        tabUpToDate.active &&
+        tabUpToDate.windowId === originalWindowId &&
+        tabUpToDate.groupId === originalGroupId &&
+        (originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE || !!tabGroupUpToDate)
+      );
     }
   );
 
-  if (tabGroupsUpToDate !== undefined) {
-    const tabGroupsUpToDateById: { [tabGroupId: ChromeTabGroupId]: ChromeTabGroupWithId } = (tabGroupsUpToDate as ChromeTabGroupWithId[]).reduce(
-      (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
-      {}
-    );
+  const tabGroupsUpToDateById: { [tabGroupId: ChromeTabGroupId]: ChromeTabGroupWithId } = (tabGroupsUpToDate as ChromeTabGroupWithId[]).reduce(
+    (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
+    {}
+  );
 
-    const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => {
-      if (tabGroupsUpToDateById[activeWindowTabGroup.id]) {
-        return {
-          ...activeWindowTabGroup,
-          collapsed: tabGroupsUpToDateById[activeWindowTabGroup.id].collapsed,
-          color: tabGroupsUpToDateById[activeWindowTabGroup.id].color,
-        };
-      }
-      return activeWindowTabGroup;
-    });
-    await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
-  }
+  const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => {
+    if (tabGroupsUpToDateById[activeWindowTabGroup.id]) {
+      return {
+        ...activeWindowTabGroup,
+        collapsed: tabGroupsUpToDateById[activeWindowTabGroup.id].collapsed,
+        color: tabGroupsUpToDateById[activeWindowTabGroup.id].color,
+      };
+    }
+    return activeWindowTabGroup;
+  });
+  await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
 }
 
 export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: ChromeTabId[]) {
   const myLogger = logger.getNestedLogger("groupHighlightedTabs");
-  // whatever happens to the up-to-date version of this tab in the retry callbacks is assumed to have happened to all tabs.
-  // That is why this method is called "group(Highlighted)Tabs", because it assumes that tabIds are a traditional browser's
-  //  highlighted tabs, or some other set of tabs with the same behaviour as highlighted tabs
-  const tabId = tabIds[0];
-  if (tabId === undefined) {
-    return;
-  }
+  try {
+    // whatever happens to the up-to-date version of tabId in the retry callbacks is assumed
+    //  to have happened to all the highlighted tabs.
+    const tabId = tabIds[0];
+    if (tabId === undefined) {
+      return;
+    }
 
-  const newGroupId = await (async function groupTabsRec(windowId: ChromeWindowId) {
-    return new Promise<ChromeTabGroupId | void>(async (resolve, reject) => {
-      try {
-        resolve(
-          await ChromeWindowHelper.groupTabs<true>(
-            {
-              createProperties: { windowId },
-              tabIds,
-            },
-            async function shouldRetryCallAfterUserIsDoneTabDragging() {
-              const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
+    const newGroupId = await (async function groupTabsRec(windowId: ChromeWindowId) {
+      return new Promise<ChromeTabGroupId | void>(async (resolve, reject) => {
+        try {
+          resolve(
+            await ChromeWindowHelper.groupTabs<true>(
+              {
+                createProperties: { windowId },
+                tabIds,
+              },
+              async function shouldRetryCallAfterUserIsDoneTabDragging() {
+                const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
 
-              if (!tabUpToDate) {
-                return false;
-              }
-
-              if (tabUpToDate.windowId !== windowId) {
-                // FIXME: if the tab was moved to a non-active window, then moved to an active window,
-                //  the grouping operation will not be retried, which is not correct behavior. This is a limitation
-                //  of the retry mechanism
-                if (await get(tabUpToDate.windowId)) {
-                  resolve(await groupTabsRec(tabUpToDate.windowId));
+                if (!tabUpToDate) {
+                  return false;
                 }
-                return false;
+
+                if (tabUpToDate.windowId !== windowId) {
+                  // FIXME: if the tab was moved to a non-active window, then moved to an active window,
+                  //  the grouping operation will not be retried, which is not correct behavior. This is a limitation
+                  //  of the retry mechanism
+                  if (await get(tabUpToDate.windowId)) {
+                    resolve(await groupTabsRec(tabUpToDate.windowId));
+                  }
+                  return false;
+                }
+
+                return tabUpToDate.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
               }
+            )
+          );
+        } catch (error) {
+          reject(error);
+        }
+      });
+    })(windowId);
 
-              return tabUpToDate.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
-            }
-          )
-        );
-      } catch (error) {
-        reject(error);
+    if (newGroupId) {
+      const newTabGroup = await ChromeWindowHelper.getIfTabGroupExists(newGroupId);
+      if (!newTabGroup) {
+        throw new Error(myLogger.getPrefixedMessage(`newTabGroup not found - newGroupId: ${newGroupId}`));
       }
-    });
-  })(windowId);
 
-  if (newGroupId) {
-    const newTabGroup = await ChromeWindowHelper.getIfTabGroupExists(newGroupId);
-    if (!newTabGroup) {
-      throw new Error(myLogger.getPrefixedMessage(`newTabGroup not found - newGroupId: ${newGroupId}`));
+      // use try catch just for more descriptive error message
+      try {
+        await createActiveWindowTabGroup(newTabGroup.windowId, newTabGroup);
+      } catch (error) {
+        throw new Error(myLogger.getPrefixedMessage(`createActiveWindowTabGroup::${error}`));
+      }
     }
-
-    // use try catch just for more descriptive error message
-    try {
-      await createActiveWindowTabGroup(newTabGroup.windowId, newTabGroup);
-    } catch (error) {
-      throw new Error(myLogger.getPrefixedMessage(`createActiveWindowTabGroup::${error}`));
-    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }

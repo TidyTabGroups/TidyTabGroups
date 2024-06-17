@@ -204,9 +204,8 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       return;
     }
 
-    if (wasExpanded && !tabGroupUpToDate.collapsed) {
+    if (wasExpanded && !tabGroupUpToDate.collapsed && (await getUserPreferences()).activateTabInFocusedTabGroup) {
       // 4
-      // FIXME: only focus the tab group if the "activateTabInFocusedTabGroup" user preference is enabled
       tabGroupsUpToDate = await ChromeWindowHelper.focusTabGroup(tabGroup.id, tabGroupsUpToDate, {
         collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
         highlightColors: activeWindow.focusMode?.colors,
@@ -220,33 +219,31 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       });
 
       // 5
-      if ((await getUserPreferences()).activateTabInFocusedTabGroup) {
-        const tabsUpToDate = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
-        const tabsInGroup = tabsUpToDate.filter((tab) => tab.groupId === tabGroup.id);
-        if (tabsInGroup.length === 0) {
-          throw new Error(myLogger.getPrefixedMessage(`no tabs found in tab group:${tabGroup.id}`));
-        }
+      const tabsUpToDate = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
+      const tabsInGroup = tabsUpToDate.filter((tab) => tab.groupId === tabGroup.id);
+      if (tabsInGroup.length === 0) {
+        throw new Error(myLogger.getPrefixedMessage(`no tabs found in tab group:${tabGroup.id}`));
+      }
 
-        const lastAccessedTabInTabGroup = ChromeWindowHelper.getLastAccessedTab(tabsInGroup);
-        const tabToActivate = lastAccessedTabInTabGroup ? lastAccessedTabInTabGroup : tabsInGroup[tabsInGroup.length - 1];
+      const lastAccessedTabInTabGroup = ChromeWindowHelper.getLastAccessedTab(tabsInGroup);
+      const tabToActivate = lastAccessedTabInTabGroup ? lastAccessedTabInTabGroup : tabsInGroup[tabsInGroup.length - 1];
 
-        // start loading the tab now (before waiting for the animations to finish)
-        if (tabToActivate.status === "unloaded") {
-          chrome.tabs.update(tabToActivate.id, { url: tabToActivate.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
-        }
-        // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
-        const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
-        await Misc.waitMs(timeToWaitBeforeActivation);
+      // start loading the tab now (before waiting for the animations to finish)
+      if (tabToActivate.status === "unloaded") {
+        chrome.tabs.update(tabToActivate.id, { url: tabToActivate.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
+      }
+      // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
+      const timeToWaitBeforeActivation = justWokeUp() ? 100 : 250;
+      await Misc.waitMs(timeToWaitBeforeActivation);
 
-        tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
-        if (!tabGroupUpToDate) {
-          myLogger.warn(`(3) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
-          return;
-        }
+      tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
+      if (!tabGroupUpToDate) {
+        myLogger.warn(`(3) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
+        return;
+      }
 
-        if (!tabGroupUpToDate.collapsed) {
-          await ChromeWindowHelper.activateTab(tabToActivate.id);
-        }
+      if (!tabGroupUpToDate.collapsed) {
+        await ChromeWindowHelper.activateTab(tabToActivate.id);
       }
     }
 
@@ -350,14 +347,13 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
 export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInfo: chrome.tabs.TabActiveInfo) {
   const myLogger = logger.getNestedLogger("onTabActivated");
   // 1. focus the tab's group
-  // 2. if it's tab group's useSetTabTitle is true, set the tab group's title to the tab's title
 
-  myLogger.log(``, activeInfo.tabId);
+  myLogger.log(`activeInfo.tabId: `, activeInfo.tabId);
 
   try {
     const tabUpToDate = await ChromeWindowHelper.getIfTabExists(activeInfo.tabId);
     if (!tabUpToDate || !tabUpToDate.id) {
-      myLogger.warn(`tatabUpToDateb not found for tabId:`, activeInfo.tabId);
+      myLogger.warn(`tabUpToDate not found for tabId:`, activeInfo.tabId);
       return;
     }
 
@@ -369,37 +365,13 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
     myLogger.log(`title and groupId:`, tabUpToDate.title, tabUpToDate.groupId);
 
     // 1
-    const tabGroupsUpToDate = await ChromeWindowHelper.focusTabGroup(tabUpToDate.groupId, tabUpToDate.windowId, {
-      collapseUnfocusedTabGroups: tabUpToDate.pinned,
-      highlightColors: activeWindow.focusMode?.colors,
-    });
-
-    const tabGroupsUpToDateById: { [tabGroupId: ChromeTabGroupId]: ChromeTabGroupWithId } = tabGroupsUpToDate.reduce(
-      (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
-      {}
-    );
-    const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => {
-      if (tabGroupsUpToDateById[activeWindowTabGroup.id]) {
-        return {
-          ...activeWindowTabGroup,
-          collapsed: tabGroupsUpToDateById[activeWindowTabGroup.id].collapsed,
-          color: tabGroupsUpToDateById[activeWindowTabGroup.id].color,
-        };
-      }
-      return activeWindowTabGroup;
-    });
-    await ActiveWindow.update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
+    await ActiveWindow.focusActiveTab(tabUpToDate);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
-export async function onTabUpdated(
-  activeWindow: Types.ActiveWindow,
-  tab: ChromeTabWithId,
-  changeInfo: chrome.tabs.TabChangeInfo,
-  getHighlightedTabsPromise: Promise<ChromeTabWithId[]> | undefined
-) {
+export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId, changeInfo: chrome.tabs.TabChangeInfo) {
   // 1. if the tab was ungrouped, create a new group for it
   // 2. if the tab's group changed and the tab is active, focus the tab's group
   const myLogger = logger.getNestedLogger("onTabUpdated");
@@ -410,11 +382,16 @@ export async function onTabUpdated(
       // 1
       if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned) {
         // TODO: check for `automatically group created tabs` user preference
-        if (!getHighlightedTabsPromise) {
-          throw new Error(`getHighlightedTabsPromise is undefined`);
-        }
-        const highlightedTabs = await getHighlightedTabsPromise;
-        await ActiveWindow.groupHighlightedTabs(activeWindow.windowId, [tab.id, ...highlightedTabs.map((highlightedTab) => highlightedTab.id)]);
+        // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
+        //  selecting "remove from group" on the tab of this event), it will be apart of highlightedTabs, which is undesired behavior.
+        //  In order to fix this, we need to properly identify which other tabs the user explicitly ungrouped
+        const highlightedTabs = (await chrome.tabs.query({
+          windowId: tab.windowId,
+          highlighted: true,
+          groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
+        })) as ChromeTabWithId[];
+        Logger.attentionLogger.log(`highlightedTabs:`, [tab.id, ...highlightedTabs.map((tab) => tab.id)]);
+        await ActiveWindow.groupHighlightedTabs(tab.windowId, [tab.id, ...highlightedTabs.map((tab) => tab.id)]);
       }
 
       // 2
@@ -480,6 +457,7 @@ export async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: Chr
     // 2
     await ActiveWindow.focusTab(tabUpToDate.windowId, tabUpToDate.id);
     // 3
+    // FIXME: this needs to check if the tab is still active
     const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tabUpToDate.groupId);
     if (activeWindowTabGroup?.useTabTitle) {
       const tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabUpToDate.groupId, { title: tabUpToDate.title });

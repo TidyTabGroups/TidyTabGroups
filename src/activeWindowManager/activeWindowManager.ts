@@ -87,18 +87,13 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-    const myLogger = logger.getNestedLogger("onUpdated");
+    const myLogger = logger.getNestedLogger("tabs.onUpdated");
     // only handle these changeInfo properties
     const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title"];
     if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
       return;
     }
 
-    // get the highlighted tabs right now because the highlighted tabs could change by the time the operation is executed
-    const getHighlightedTabsPromise =
-      changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE
-        ? (chrome.tabs.query({ highlighted: true }) as Promise<ChromeTabWithId[]>)
-        : undefined;
     queueOperationIfWindowIsActive(
       async (activeWindow) => {
         const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
@@ -113,7 +108,7 @@ export async function initialize(onError: () => void) {
             delete changeInfo[key];
           }
         });
-        await ActiveWindowEvents.onTabUpdated(activeWindow, tabUpToDate, changeInfo, getHighlightedTabsPromise);
+        await ActiveWindowEvents.onTabUpdated(activeWindow, tabUpToDate, changeInfo);
       },
       tab.windowId,
       false,
@@ -140,7 +135,7 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabs.onAttached.addListener((tabId: ChromeTabId, attachInfo: chrome.tabs.TabAttachInfo) => {
-    const myLogger = logger.getNestedLogger("onAttached");
+    const myLogger = logger.getNestedLogger("tabs.onAttached");
     queueOperationIfWindowIsActive(
       async (activeWindow) => {
         const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
