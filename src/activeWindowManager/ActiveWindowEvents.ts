@@ -379,6 +379,7 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
   try {
     if (changeInfo.groupId !== undefined) {
       // 1
+      let didAutoGroupTab = false;
       if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned) {
         // TODO: check for `automatically group created tabs` user preference
         // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
@@ -389,12 +390,22 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
           highlighted: true,
           groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
         })) as ChromeTabWithId[];
-        Logger.attentionLogger.log(`highlightedTabs:`, [tab.id, ...highlightedTabs.map((tab) => tab.id)]);
-        await ActiveWindow.groupHighlightedTabs(tab.windowId, [tab.id, ...highlightedTabs.map((tab) => tab.id)]);
+        const newGroupId = await ActiveWindow.groupHighlightedTabs(tab.windowId, [tab.id, ...highlightedTabs.map((tab) => tab.id)]);
+        didAutoGroupTab = newGroupId !== undefined;
       }
 
       // 2
       if (tab.active) {
+        if (didAutoGroupTab) {
+          const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tab.id);
+          if (!tabUpToDate) {
+            myLogger.warn(`tabUpToDate not found for tabId:`, tab.id);
+            return;
+          }
+          tab = tabUpToDate;
+          // wait for the tab group creation animation to finish before focusing the tab group
+          await Misc.waitMs(350);
+        }
         await ActiveWindow.focusActiveTab(tab);
       }
     }

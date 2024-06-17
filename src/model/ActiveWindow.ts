@@ -682,6 +682,7 @@ export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: Chr
         throw new Error(myLogger.getPrefixedMessage(`createActiveWindowTabGroup::${error}`));
       }
     }
+    return newGroupId;
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
