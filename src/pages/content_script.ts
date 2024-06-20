@@ -6,7 +6,7 @@ import ContentHelper from "../contentHelper";
 const isMainFrame = window === window.top;
 
 // Ping-pong message to check if the content script is running
-if(isMainFrame) {
+if (isMainFrame) {
   chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (msg.type === "ping") {
       sendResponse();
@@ -24,26 +24,26 @@ if (isPDFViewer) {
 // user page focus detection
 let listenToPageFocusEvents = true;
 let pageFocusTimeoutId: number | null = null;
-let initialMousePosition: { x: number, y: number } | null = null;
-const MINIMUM_MOUSE_MOVEMENT_PX = 2
+let initialMousePosition: { x: number; y: number } | null = null;
+const MINIMUM_MOUSE_MOVEMENT_PX = 2;
 
-window.addEventListener("message", event => {
-  if(event.data.type === "startPageFocusTimeout") {
+window.addEventListener("message", (event) => {
+  if (event.data.type === "startPageFocusTimeout") {
     // this message is sent only to the main frame by a nested frame when it wants to start the page focus timeout
-    if(!isMainFrame) {
+    if (!isMainFrame) {
       console.warn("the startPageFocusTimeout message should only be sent to the main frame");
       return;
     }
-    startPageFocusTimeout()
-  } else if(event.data.type === "clearPageFocusTimeout") {
+    startPageFocusTimeout();
+  } else if (event.data.type === "clearPageFocusTimeout") {
     // this message is sent by the main frame to all nested frames when it wants to clear the page focus timeout
-    if(isMainFrame) {
+    if (isMainFrame) {
       console.warn("the clearPageFocusTimeout message should not be sent to the main frame");
       return;
     }
-    clearPageFocusTimeout()
+    clearPageFocusTimeout();
   }
-})
+});
 
 // the events that start the page focus timeout (all frames):
 // 1. mouse down
@@ -56,73 +56,105 @@ window.addEventListener("message", event => {
 // 6. visibility change to hidden
 
 // 1
-DetachableDOM.addEventListener(window, "mousedown", () => {
-  if(listenToPageFocusEvents) {
-    startPageFocusTimeout()
-  }
-}, true)
+DetachableDOM.addEventListener(
+  window,
+  "mousedown",
+  () => {
+    if (listenToPageFocusEvents) {
+      startPageFocusTimeout();
+    }
+  },
+  true
+);
 
 // 2
-DetachableDOM.addEventListener(window, "click", () => {
-  if(listenToPageFocusEvents) {
-    startPageFocusTimeout()
-  }
-}, true)
+DetachableDOM.addEventListener(
+  window,
+  "click",
+  () => {
+    if (listenToPageFocusEvents) {
+      startPageFocusTimeout();
+    }
+  },
+  true
+);
 
 // 3
-DetachableDOM.addEventListener(window, "keydown", () => {
-  if(listenToPageFocusEvents) {
-    startPageFocusTimeout()
-  }
-}, true)
+DetachableDOM.addEventListener(
+  window,
+  "keydown",
+  () => {
+    if (listenToPageFocusEvents) {
+      startPageFocusTimeout();
+    }
+  },
+  true
+);
 
 // 4
-DetachableDOM.addEventListener(window, "mousemove", async event => {
-  // @ts-ignore
-  const { screenX, screenY } = event;
+DetachableDOM.addEventListener(
+  window,
+  "mousemove",
+  async (event) => {
+    // @ts-ignore
+    const { screenX, screenY } = event;
 
-  if(initialMousePosition === null) {
-    initialMousePosition = { x: screenX, y: screenY }
-  }
-
-  const hasMovedMouseMinimum = Math.abs(screenX - initialMousePosition.x) > MINIMUM_MOUSE_MOVEMENT_PX || Math.abs(screenY - initialMousePosition.y) > MINIMUM_MOUSE_MOVEMENT_PX;
-  if(hasMovedMouseMinimum && listenToPageFocusEvents) {
-    startPageFocusTimeout()
-  }
-}, true)
-
-if(isMainFrame) {
-  // 5
-  DetachableDOM.addEventListener(document, "mouseleave", event => {
-    if(event.target !== document) {
-      return
+    if (initialMousePosition === null) {
+      initialMousePosition = { x: screenX, y: screenY };
     }
 
-    clearPageFocusTimeout()
-  }, true)
+    const hasMovedMouseMinimum =
+      Math.abs(screenX - initialMousePosition.x) > MINIMUM_MOUSE_MOVEMENT_PX ||
+      Math.abs(screenY - initialMousePosition.y) > MINIMUM_MOUSE_MOVEMENT_PX;
+    if (hasMovedMouseMinimum && listenToPageFocusEvents) {
+      startPageFocusTimeout();
+    }
+  },
+  true
+);
+
+if (isMainFrame) {
+  // 5
+  DetachableDOM.addEventListener(
+    document,
+    "mouseleave",
+    (event) => {
+      if (event.target !== document) {
+        return;
+      }
+
+      clearPageFocusTimeout();
+    },
+    true
+  );
 
   // 6
-  DetachableDOM.addEventListener(window, "visibilitychange", event => {
-    if (document.visibilityState === "hidden") {
-      clearPageFocusTimeout();
-    }
-  }, true)
+  DetachableDOM.addEventListener(
+    window,
+    "visibilitychange",
+    (event) => {
+      if (document.visibilityState === "hidden") {
+        clearPageFocusTimeout();
+      }
+    },
+    true
+  );
 }
 
 function startPageFocusTimeout() {
   listenToPageFocusEvents = false;
 
-  if(isPDFViewer && PDFViewerOverlay.attached()) {
+  if (isPDFViewer && PDFViewerOverlay.attached()) {
     PDFViewerOverlay.remove();
   }
 
-  if(!isMainFrame) {
+  if (!isMainFrame) {
     // let the main frame do the rest
-    if(window.top) {
+    if (window.top) {
       window.top.postMessage({ type: "startPageFocusTimeout" }, "*");
     } else {
       // FIXME: in which cases is window.top null?
-      console.warn("window.top is null, cannot send message to top frame")
+      console.warn("window.top is null, cannot send message to top frame");
     }
 
     return;
@@ -135,24 +167,24 @@ function startPageFocusTimeout() {
 }
 
 function clearPageFocusTimeout() {
-  if(isMainFrame) {
+  if (isMainFrame) {
     // let all child frames know to stop
     Misc.callAsync(() => {
-      ContentHelper.forEachNestedFrame(frame => {
+      ContentHelper.forEachNestedFrame((frame) => {
         frame.postMessage({ type: "clearPageFocusTimeout" }, "*");
-      })
-    })
+      });
+    });
   }
 
   initialMousePosition = null;
-  listenToPageFocusEvents = true
+  listenToPageFocusEvents = true;
 
-  if(pageFocusTimeoutId !== null) {
-    DetachableDOM.clearTimeout(pageFocusTimeoutId)
+  if (pageFocusTimeoutId !== null) {
+    DetachableDOM.clearTimeout(pageFocusTimeoutId);
     pageFocusTimeoutId = null;
   }
 
-  if(isPDFViewer && !PDFViewerOverlay.attached()) {
-    PDFViewerOverlay.attach()
+  if (isPDFViewer && !PDFViewerOverlay.attached()) {
+    PDFViewerOverlay.attach();
   }
 }
