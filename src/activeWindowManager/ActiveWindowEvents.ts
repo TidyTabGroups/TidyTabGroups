@@ -371,15 +371,22 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 }
 
 export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId, changeInfo: chrome.tabs.TabChangeInfo) {
-  // 1. if the tab was ungrouped, create a new group for it
-  // 2. if the tab's group changed and the tab is active, focus the tab's group
+  // 1. if the tab's group changed and the tab is active, focus the tab's group
+  // 2. if the tab was ungrouped, create a new group for it
   const myLogger = logger.getNestedLogger("onTabUpdated");
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
   try {
     if (changeInfo.groupId !== undefined) {
       // 1
-      let didAutoGroupTab = false;
+      if (tab.active) {
+        await ActiveWindow.focusActiveTab(tab);
+        // wait for the potential tab group collapse animation of other groups to finish before doing anything else.
+        // Note, this can be changed to run conditionally based on whether the any tab group was actually collapsed.
+        await Misc.waitMs(350);
+      }
+
+      // 2
       if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned) {
         // TODO: check for `automatically group created tabs` user preference
         // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
@@ -391,22 +398,6 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
           groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
         })) as ChromeTabWithId[];
         const newGroupId = await ActiveWindow.groupHighlightedTabs(tab.windowId, [tab.id, ...highlightedTabs.map((tab) => tab.id)]);
-        didAutoGroupTab = newGroupId !== undefined;
-      }
-
-      // 2
-      if (tab.active) {
-        if (didAutoGroupTab) {
-          const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tab.id);
-          if (!tabUpToDate) {
-            myLogger.warn(`tabUpToDate not found for tabId:`, tab.id);
-            return;
-          }
-          tab = tabUpToDate;
-          // wait for the tab group creation animation to finish before focusing the tab group
-          await Misc.waitMs(350);
-        }
-        await ActiveWindow.focusActiveTab(tab);
       }
     }
   } catch (error) {
