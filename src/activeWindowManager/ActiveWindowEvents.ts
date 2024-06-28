@@ -38,19 +38,21 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
   }
 }
 
-export async function onWindowFocusChanged(activeWindow: Types.ActiveWindow) {
+export async function onWindowFocusChanged(windowId: ChromeWindowId) {
   // 1. update the lastSeenFocusModeColors
   // 2. use tab title for focused tab groups of all the non-focused windows
   const myLogger = Logger.getLogger("onWindowFocusChanged");
-  const { windowId } = activeWindow;
   myLogger.log(`windowId: ${windowId}`);
   try {
     // 1
-    let keys: Partial<Types.LocalStorageShape> = {};
-    if (activeWindow.focusMode) {
-      keys = { ...keys, lastSeenFocusModeColors: activeWindow.focusMode.colors };
+    const activeWindow = await ActiveWindow.get(windowId);
+    if (activeWindow) {
+      let keys: Partial<Types.LocalStorageShape> = {};
+      if (activeWindow.focusMode) {
+        keys = { ...keys, lastSeenFocusModeColors: activeWindow.focusMode.colors };
+      }
+      await Storage.setItems({ ...keys, lastFocusedWindowHadFocusMode: activeWindow.focusMode !== null });
     }
-    await Storage.setItems({ ...keys, lastFocusedWindowHadFocusMode: activeWindow.focusMode !== null });
 
     // 2
     const activeTabs = (await chrome.tabs.query({ active: true })) as ChromeTabWithId[];

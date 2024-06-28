@@ -70,7 +70,7 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.windows.onFocusChanged.addListener((windowId: ChromeWindowId) => {
-    queueOperationIfWindowIsActive(ActiveWindowEvents.onWindowFocusChanged, windowId, false, "onWindowFocusChanged");
+    queueOperation(() => ActiveWindowEvents.onWindowFocusChanged(windowId), false);
   });
 
   chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
