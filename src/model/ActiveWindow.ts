@@ -688,36 +688,61 @@ export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: Chr
   }
 }
 
-export async function useTabTitleForActiveWindowTabGroup(tabId: ChromeTabId, defaultTitle?: string | undefined) {
-  const myLogger = logger.getNestedLogger("useTabTitleForActiveWindowTabGroup");
+export async function useTabTitleForEligebleTabGroups() {
+  const myLogger = logger.getNestedLogger("autoNameAllTabGroups");
   try {
-    const tab = await ChromeWindowHelper.getIfTabExists(tabId);
-    if (!tab || !tab.active || tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-      return;
-    }
+    const [activeWindows, windows] = await Promise.all([
+      getAll(),
+      chrome.windows.getAll({ windowTypes: ["normal"], populate: true }) as Promise<(ChromeWindowWithId & { tabs: ChromeTabWithId[] })[]>,
+    ]);
+    const activeWindowsSet = new Set(activeWindows.map((activeWindow) => activeWindow.windowId));
+    const mouseInPage = MouseInPageTracker.isInPage();
 
-    const title = tab.title && tab.title?.length > 0 ? tab.title : defaultTitle;
-    if (!title || title.length === 0) {
-      return;
-    }
+    await Promise.all(
+      windows.map(async (window) => {
+        if (!activeWindowsSet.has(window.id) || (!mouseInPage && window.focused)) {
+          return;
+        }
 
-    if (MouseInPageTracker.isInPage() || (await isWindowNonFocused(tab.windowId))) {
-      const [tabGroup, activeWindowTabGroup] = await Promise.all([
-        ChromeWindowHelper.getIfTabGroupExists(tab.groupId),
-        getActiveWindowTabGroupOrThrow(tab.windowId, tab.groupId),
-      ]);
-      if (tabGroup && activeWindowTabGroup.useTabTitle) {
-        await getActiveWindowTabGroupOrThrow(tab.windowId, tabGroup.id);
-        const tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: tab.title });
-        await updateActiveWindowTabGroup(tabGroupUpToDate.windowId, tabGroup.id, { title: tabGroupUpToDate.title });
-      }
-    }
+        const lastAccessedTabByGroupId: { [groupId: number]: ChromeTabWithId } = (window.tabs as ChromeTabWithId[]).reduce((acc, tab) => {
+          if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+            const currentLastAccessedTab = acc[tab.groupId];
+            if (
+              (!currentLastAccessedTab ||
+                (!currentLastAccessedTab.active &&
+                  // prioritize by the active tab in it's window
+                  // FIXME: since comparing the lastAccessed property, there is no need to check the active property. However,
+                  //  we are currently doing so as a fallback for correctness due to the instability with the lastAccessed property.
+                  //  See https://issues.chromium.org/issues/326678907.
+                  (tab.active ||
+                    // then prioritize by lastAccessed
+                    (tab.lastAccessed && (!currentLastAccessedTab.lastAccessed || tab.lastAccessed > currentLastAccessedTab.lastAccessed)) ||
+                    // then prioritize by index if there is no lastAccessed on either tab
+                    (!currentLastAccessedTab.lastAccessed && tab.index > currentLastAccessedTab.index)))) &&
+              tab.title &&
+              tab.title.length > 0
+            ) {
+              acc[tab.groupId] = tab;
+            }
+          }
+          return acc;
+        }, {} as { [groupId: number]: ChromeTabWithId });
+
+        await Promise.all(
+          Object.entries(lastAccessedTabByGroupId).map(async ([groupId, tab]) => {
+            const activeWindowTabGroup = await getActiveWindowTabGroup(tab.windowId, parseInt(groupId));
+            if (!activeWindowTabGroup) {
+              return;
+            }
+            if (activeWindowTabGroup.useTabTitle && activeWindowTabGroup.title !== tab.title) {
+              const updatedTabGroup = await ChromeWindowHelper.updateTabGroup(activeWindowTabGroup.id, { title: tab.title });
+              await updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, { title: updatedTabGroup.title });
+            }
+          })
+        );
+      })
+    );
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
-  }
-
-  async function isWindowNonFocused(windowId: ChromeWindowId) {
-    const window = await ChromeWindowHelper.getIfWindowExists(windowId);
-    return !window ? false : !window.focused;
   }
 }
