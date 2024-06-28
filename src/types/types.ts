@@ -81,3 +81,5 @@ export interface LastGroupedTabInfo {
 
 export type YesOrNo = "yes" | "no";
 export type YesOrNoOrNA = "yes" | "no" | "n/a";
+
+export type MouseInPageStatus = "entered" | "focused" | "left";

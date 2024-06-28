@@ -3,7 +3,15 @@ import Logger from "../logger";
 import Misc from "../misc";
 import { ActiveWindow } from "../model";
 import Types from "../types";
-import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
+import {
+  ChromePopulatedWindowWithId,
+  ChromeTabGroupId,
+  ChromeTabGroupWithId,
+  ChromeTabId,
+  ChromeTabWithId,
+  ChromeWindowId,
+  ChromeWindowWithId,
+} from "../types/types";
 import * as Storage from "../storage";
 
 const logger = Logger.getLogger("activeWindowEvents", { color: "#4287f5" });
@@ -31,15 +39,30 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
 }
 
 export async function onWindowFocusChanged(activeWindow: Types.ActiveWindow) {
+  // 1. update the lastSeenFocusModeColors
+  // 2. use tab title for focused tab groups of all the non-focused windows
   const myLogger = Logger.getLogger("onWindowFocusChanged");
   const { windowId } = activeWindow;
   myLogger.log(`windowId: ${windowId}`);
   try {
+    // 1
     let keys: Partial<Types.LocalStorageShape> = {};
     if (activeWindow.focusMode) {
       keys = { ...keys, lastSeenFocusModeColors: activeWindow.focusMode.colors };
     }
     await Storage.setItems({ ...keys, lastFocusedWindowHadFocusMode: activeWindow.focusMode !== null });
+
+    // 2
+    const activeTabs = (await chrome.tabs.query({ active: true })) as ChromeTabWithId[];
+    await Promise.all(
+      activeTabs.map(async (activeTab) => {
+        if (!(await ActiveWindow.get(activeTab.windowId))) {
+          return;
+        }
+
+        await ActiveWindow.useTabTitleForActiveWindowTabGroup(activeTab.id);
+      })
+    );
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -373,6 +396,7 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
 export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId, changeInfo: chrome.tabs.TabChangeInfo) {
   // 1. if the tab's group changed and the tab is active, focus the tab's group
   // 2. if the tab was ungrouped, create a new group for it
+  // 3. if the tab's title or group was changed, use the title for it's group
   const myLogger = logger.getNestedLogger("onTabUpdated");
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
@@ -399,6 +423,11 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
         })) as ChromeTabWithId[];
         const newGroupId = await ActiveWindow.groupHighlightedTabs(tab.windowId, [tab.id, ...highlightedTabs.map((tab) => tab.id)]);
       }
+    }
+
+    if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {
+      // 3
+      await ActiveWindow.useTabTitleForActiveWindowTabGroup(tab.id);
     }
   } catch (error) {
     throw new Error(myLogger.throwPrefixed(`error:${error}`));
@@ -437,10 +466,10 @@ export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId
   myLogger.log(`addedTabId and removedTabId:`, addedTabId, removedTabId);
 }
 
-export async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: ChromeTabId) {
+async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: ChromeTabId) {
   // 1. if the tab is pinned, ignore
   // 2. if the tab is active, reposition it
-  // 3. if the tab is active and the tab group's useTabTitle is true, update the tab group's title
+  // 3. use tab's title for it's group
   const myLogger = logger.getNestedLogger("onPageFocused");
   const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
   if (!tabUpToDate || !tabUpToDate.id) {
@@ -458,13 +487,18 @@ export async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: Chr
     // 2
     await ActiveWindow.repositionTab(tabUpToDate.windowId, tabUpToDate.id);
     // 3
-    // FIXME: this needs to check if the tab is still active
-    const activeWindowTabGroup = activeWindow.tabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.id === tabUpToDate.groupId);
-    if (activeWindowTabGroup?.useTabTitle) {
-      const tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabUpToDate.groupId, { title: tabUpToDate.title });
-      await ActiveWindow.updateActiveWindowTabGroup(tabUpToDate.windowId, tabUpToDate.groupId, { title: tabGroupUpToDate.title });
-    }
+    await ActiveWindow.useTabTitleForActiveWindowTabGroup(tabId);
   } else {
     myLogger.warn("pageFocused::tab is not active:", tabUpToDate.title);
+  }
+}
+
+export async function onMouseInPageStatusChanged(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId, status: Types.MouseInPageStatus) {
+  const myLogger = logger.getNestedLogger("onMouseInPageStatusChanged");
+  myLogger.log(`tabId:`, tab.id, status);
+  if (status === "entered") {
+    await ActiveWindow.useTabTitleForActiveWindowTabGroup(tab.id);
+  } else if (status === "focused") {
+    await onPageFocused(activeWindow, tab.id);
   }
 }

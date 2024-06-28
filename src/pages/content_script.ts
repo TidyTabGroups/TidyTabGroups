@@ -2,6 +2,7 @@ import DetachableDOM from "../detachableDOM";
 import { PDFViewerOverlay } from "../DOM";
 import Misc from "../misc";
 import ContentHelper from "../contentHelper";
+import { MouseInPageStatus } from "../types/types";
 
 const isMainFrame = window === window.top;
 
@@ -21,11 +22,68 @@ if (isPDFViewer) {
   PDFViewerOverlay.attach();
 }
 
-// user page focus detection
+// Mouse In Page Tracker:
+// the events that start the page focus timeout (all frames):
+// - mouse down
+// - click
+// - keydown
+// - mouse move (if the mouse moves more than 2px)
+// the events that clear the page focus timeout (main frame only):
+// - mouse leave
+// - visibility change to hidden
+
 let listenToPageFocusEvents = true;
 let pageFocusTimeoutId: number | null = null;
 let initialMousePosition: { x: number; y: number } | null = null;
 const MINIMUM_MOUSE_MOVEMENT_PX = 2;
+let mouseInPageStatus: MouseInPageStatus = "left";
+
+if (isMainFrame) {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === "getMouseInPageStatus") {
+      sendResponse(mouseInPageStatus);
+    }
+  });
+
+  DetachableDOM.addEventListener(
+    document,
+    "mouseenter",
+    (event) => {
+      if (event.target !== document) {
+        return;
+      }
+      mouseInPageStatus = "entered";
+      chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
+    },
+    true
+  );
+
+  DetachableDOM.addEventListener(
+    document,
+    "mouseleave",
+    (event) => {
+      if (event.target !== document) {
+        return;
+      }
+      mouseInPageStatus = "left";
+      chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
+
+      clearPageFocusTimeout();
+    },
+    true
+  );
+
+  DetachableDOM.addEventListener(
+    window,
+    "visibilitychange",
+    (event) => {
+      if (document.visibilityState === "hidden") {
+        clearPageFocusTimeout();
+      }
+    },
+    true
+  );
+}
 
 window.addEventListener("message", (event) => {
   if (event.data.type === "startPageFocusTimeout") {
@@ -45,17 +103,6 @@ window.addEventListener("message", (event) => {
   }
 });
 
-// the events that start the page focus timeout (all frames):
-// 1. mouse down
-// 2. click
-// 3. keydown
-// 4. mouse move (if the mouse moves more than 2px)
-
-// the events that clear the page focus timeout (main frame only):
-// 5. mouse leave
-// 6. visibility change to hidden
-
-// 1
 DetachableDOM.addEventListener(
   window,
   "mousedown",
@@ -67,7 +114,6 @@ DetachableDOM.addEventListener(
   true
 );
 
-// 2
 DetachableDOM.addEventListener(
   window,
   "click",
@@ -79,7 +125,6 @@ DetachableDOM.addEventListener(
   true
 );
 
-// 3
 DetachableDOM.addEventListener(
   window,
   "keydown",
@@ -91,7 +136,6 @@ DetachableDOM.addEventListener(
   true
 );
 
-// 4
 DetachableDOM.addEventListener(
   window,
   "mousemove",
@@ -113,34 +157,6 @@ DetachableDOM.addEventListener(
   true
 );
 
-if (isMainFrame) {
-  // 5
-  DetachableDOM.addEventListener(
-    document,
-    "mouseleave",
-    (event) => {
-      if (event.target !== document) {
-        return;
-      }
-
-      clearPageFocusTimeout();
-    },
-    true
-  );
-
-  // 6
-  DetachableDOM.addEventListener(
-    window,
-    "visibilitychange",
-    (event) => {
-      if (document.visibilityState === "hidden") {
-        clearPageFocusTimeout();
-      }
-    },
-    true
-  );
-}
-
 function startPageFocusTimeout() {
   listenToPageFocusEvents = false;
 
@@ -161,7 +177,8 @@ function startPageFocusTimeout() {
   }
 
   pageFocusTimeoutId = DetachableDOM.setTimeout(() => {
-    chrome.runtime.sendMessage({ type: "pageFocused" });
+    mouseInPageStatus = "focused";
+    chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
     pageFocusTimeoutId = null;
   }, 2500);
 }

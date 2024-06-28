@@ -78,3 +78,5 @@ const awokenTime = new Date();
 export function serviceWorkerJustWokeUp() {
   return new Date().getTime() - awokenTime.getTime() < 500;
 }
+
+export const DEFAULT_TAB_GROUP_TITLE = "New Group";

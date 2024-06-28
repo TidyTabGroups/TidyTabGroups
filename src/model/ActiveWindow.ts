@@ -14,6 +14,7 @@ import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
 import * as Storage from "../storage";
+import * as MouseInPageTracker from "../activeWindowManager/MouseInPageTracker";
 
 const logger = Logger.getLogger("ActiveWindow", { color: "#b603fc" });
 
@@ -540,10 +541,9 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
       await Misc.waitMs(30);
 
       const newTitle = await (async function () {
-        const DEFAULT_TITLE = "New Group";
         const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
         if (tabsInGroup.length === 0) {
-          return DEFAULT_TITLE;
+          return Misc.DEFAULT_TAB_GROUP_TITLE;
         }
 
         const tabsInGroupOrderedByLastAccessed = await ChromeWindowHelper.getTabsOrderedByLastAccessed(tabsInGroup);
@@ -556,7 +556,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
           return lastAccessedTab.title;
         }
 
-        return DEFAULT_TITLE;
+        return Misc.DEFAULT_TAB_GROUP_TITLE;
       })();
 
       tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
@@ -685,5 +685,39 @@ export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: Chr
     return newGroupId;
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
+  }
+}
+
+export async function useTabTitleForActiveWindowTabGroup(tabId: ChromeTabId, defaultTitle?: string | undefined) {
+  const myLogger = logger.getNestedLogger("useTabTitleForActiveWindowTabGroup");
+  try {
+    const tab = await ChromeWindowHelper.getIfTabExists(tabId);
+    if (!tab || !tab.active || tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      return;
+    }
+
+    const title = tab.title && tab.title?.length > 0 ? tab.title : defaultTitle;
+    if (!title || title.length === 0) {
+      return;
+    }
+
+    if (MouseInPageTracker.isInPage() || (await isWindowNonFocused(tab.windowId))) {
+      const [tabGroup, activeWindowTabGroup] = await Promise.all([
+        ChromeWindowHelper.getIfTabGroupExists(tab.groupId),
+        getActiveWindowTabGroupOrThrow(tab.windowId, tab.groupId),
+      ]);
+      if (tabGroup && activeWindowTabGroup.useTabTitle) {
+        await getActiveWindowTabGroupOrThrow(tab.windowId, tabGroup.id);
+        const tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: tab.title });
+        await updateActiveWindowTabGroup(tabGroupUpToDate.windowId, tabGroup.id, { title: tabGroupUpToDate.title });
+      }
+    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
+  }
+
+  async function isWindowNonFocused(windowId: ChromeWindowId) {
+    const window = await ChromeWindowHelper.getIfWindowExists(windowId);
+    return !window ? false : !window.focused;
   }
 }

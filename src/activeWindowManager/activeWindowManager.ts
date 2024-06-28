@@ -5,6 +5,7 @@ import Logger from "../logger";
 import Types from "../types";
 import * as Storage from "../storage";
 import * as ActiveWindowEvents from "./ActiveWindowEvents";
+import * as MouseInPageTracker from "./MouseInPageTracker";
 
 const logger = Logger.getLogger("activeWindowManager", { color: "#fcba03" });
 
@@ -17,6 +18,32 @@ const TAB_NOT_UP_TO_DATE_MESSAGE = (tabOrTabId: ChromeTabId | chrome.tabs.Tab) =
 };
 
 export async function initialize(onError: () => void) {
+  let asyncInitializationSteps = new Promise<void>(async (resolve, reject) => {
+    const myLogger = logger.getNestedLogger("initialize::asyncInitializationSteps");
+    try {
+      await MouseInPageTracker.initialize();
+      MouseInPageTracker.addOnChangeListener((status, tab: ChromeTabWithId) => {
+        queueOperationIfWindowIsActive(
+          async (activeWindow) => {
+            const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tab.id);
+            if (!tabUpToDate) {
+              logger.warn(TAB_NOT_UP_TO_DATE_MESSAGE(tab));
+              return;
+            }
+
+            await ActiveWindowEvents.onMouseInPageStatusChanged(activeWindow, tabUpToDate, status);
+          },
+          tab.windowId,
+          false,
+          "onMouseEnterPage"
+        );
+      });
+      resolve();
+    } catch (error) {
+      reject(myLogger.getPrefixedMessage(`error initializing: ${error}`));
+    }
+  });
+
   Storage.addChangeListener(async (changes) => {
     const { userPreferences } = changes;
     if (userPreferences && !userPreferences.oldValue?.collapseUnfocusedTabGroups && userPreferences.newValue?.collapseUnfocusedTabGroups) {
@@ -247,6 +274,14 @@ export async function initialize(onError: () => void) {
       throw new Error("processQueue::Queue is already being processed");
     }
 
+    try {
+      await asyncInitializationSteps;
+    } catch (error) {
+      logger.error("processQueue::Error during asyncInitializationSteps:", error);
+      onBackgroundEventError();
+      return;
+    }
+
     isProcessingQueue = true;
     while (operationQueue.length > 0 && !isQueueSuspended) {
       const currentOperation = operationQueue.shift();
@@ -308,14 +343,7 @@ export async function onMessage(
   myLogger.log(`message:`, message);
 
   try {
-    if (message.type === "pageFocused") {
-      if (!sender.tab || sender.tab.id === undefined) {
-        myLogger.warn("pageFocused::sender.tab is not valid:", sender);
-        return;
-      }
-
-      await ActiveWindowEvents.onPageFocused(activeWindow, sender.tab.id);
-    } else if (message.type === "getActiveWindow") {
+    if (message.type === "getActiveWindow") {
       const { windowId } = message.data as { windowId: ChromeWindowId };
       const activeWindow = await ActiveWindow.get(windowId);
       sendResponse({ activeWindow });
