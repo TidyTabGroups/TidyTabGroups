@@ -43,6 +43,7 @@ let pageFocusTimeoutId: number | null = null;
 let initialMousePosition: { x: number; y: number } | null = null;
 const MINIMUM_MOUSE_MOVEMENT_PX = 2;
 let mouseInPageStatus: MouseInPageStatus = "left";
+let didNotifyMainFrameAboutMouseEnter = false;
 
 if (isMainFrame) {
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -120,6 +121,7 @@ DetachableDOM.addEventListener(
   window,
   "mousedown",
   () => {
+    onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
@@ -131,6 +133,7 @@ DetachableDOM.addEventListener(
   window,
   "click",
   () => {
+    onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
@@ -142,6 +145,7 @@ DetachableDOM.addEventListener(
   window,
   "keydown",
   () => {
+    onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
@@ -153,6 +157,7 @@ DetachableDOM.addEventListener(
   window,
   "mousemove",
   async (event) => {
+    onMouseEnterRelatedEvent();
     // @ts-ignore
     const { screenX, screenY } = event;
 
@@ -215,4 +220,14 @@ function clearPageFocusTimeout() {
 function setMouseInPageStatus(status: MouseInPageStatus) {
   mouseInPageStatus = status;
   chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
+}
+
+// this method handles the cases where the cursor is already entered in the page by the time this content script has ran
+function onMouseEnterRelatedEvent() {
+  if (isMainFrame && mouseInPageStatus === "left") {
+    setMouseInPageStatus("entered");
+  } else if (!isMainFrame && !didNotifyMainFrameAboutMouseEnter) {
+    didNotifyMainFrameAboutMouseEnter = true;
+    window.top?.postMessage({ type: "mouseEnteredRelatedEvent" }, "*");
+  }
 }
