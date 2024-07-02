@@ -51,6 +51,7 @@ if (isMainFrame) {
     }
   });
 
+  // FIXME: in PDFs, this handler runs twice when run_at is set to document_start because of PDFViewerOverlay
   DetachableDOM.addEventListener(
     document,
     "mouseenter",
