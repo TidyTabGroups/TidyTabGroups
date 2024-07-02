@@ -319,7 +319,6 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   logger.log(`onInstalled::reactivated all windows:`, newActiveWindows);
 
   // inject the content script into all tabs
-  // TODO: only do this if the user has the repositionTabs or repositionTabGroups preferences enabled
   const tabs = (await chrome.tabs.query({})) as ChromeTabWithId[];
   for (const tab of tabs) {
     chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["js/content_script.js"] });
