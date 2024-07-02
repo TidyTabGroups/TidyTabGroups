@@ -540,24 +540,8 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
       // FIXME: remove the timeout workaround once the chromium bug is resolved: https://issues.chromium.org/issues/334965868#comment4
       await Misc.waitMs(30);
 
-      const newTitle = await (async function () {
-        const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
-        if (tabsInGroup.length === 0) {
-          return Misc.DEFAULT_TAB_GROUP_TITLE;
-        }
-
-        const tabsInGroupOrderedByLastAccessed = await ChromeWindowHelper.getTabsOrderedByLastAccessed(tabsInGroup);
-        if (tabsInGroupOrderedByLastAccessed.length === 0) {
-          throw new Error(myLogger.getPrefixedMessage(`tabsInGroupOrderedByLastAccessed is empty`));
-        }
-
-        const lastAccessedTab = tabsInGroupOrderedByLastAccessed[tabsInGroupOrderedByLastAccessed.length - 1];
-        if ((tabsInGroup.length === 1 || lastAccessedTab.lastAccessed !== undefined) && lastAccessedTab.title && lastAccessedTab.title !== "") {
-          return lastAccessedTab.title;
-        }
-
-        return Misc.DEFAULT_TAB_GROUP_TITLE;
-      })();
+      const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
+      const newTitle = getTabTitleForUseTabTitle(tabsInGroup) ?? Misc.DEFAULT_TAB_GROUP_TITLE;
 
       tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
       if (!tabGroupUpToDate) {
@@ -704,39 +688,27 @@ export async function useTabTitleForEligebleTabGroups() {
           return;
         }
 
-        const lastAccessedTabByGroupId: { [groupId: number]: ChromeTabWithId } = (window.tabs as ChromeTabWithId[]).reduce((acc, tab) => {
+        const tabsByGroupId = (window.tabs as ChromeTabWithId[]).reduce((acc, tab) => {
           if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-            const currentLastAccessedTab = acc[tab.groupId];
-            if (
-              (!currentLastAccessedTab ||
-                (!currentLastAccessedTab.active &&
-                  // prioritize by the active tab in it's window
-                  // FIXME: since comparing the lastAccessed property, there is no need to check the active property. However,
-                  //  we are currently doing so as a fallback for correctness due to the instability with the lastAccessed property.
-                  //  See https://issues.chromium.org/issues/326678907.
-                  (tab.active ||
-                    // then prioritize by lastAccessed
-                    (tab.lastAccessed && (!currentLastAccessedTab.lastAccessed || tab.lastAccessed > currentLastAccessedTab.lastAccessed)) ||
-                    // then prioritize by index if there is no lastAccessed on either tab
-                    (!currentLastAccessedTab.lastAccessed && tab.index > currentLastAccessedTab.index)))) &&
-              tab.title &&
-              tab.title.length > 0
-            ) {
-              acc[tab.groupId] = tab;
-            }
+            acc[tab.groupId] = acc[tab.groupId] || [];
+            acc[tab.groupId].push(tab);
           }
           return acc;
-        }, {} as { [groupId: number]: ChromeTabWithId });
+        }, {} as { [groupId: number]: ChromeTabWithId[] });
 
         await Promise.all(
-          Object.entries(lastAccessedTabByGroupId).map(async ([groupId, tab]) => {
-            const activeWindowTabGroup = await getActiveWindowTabGroup(tab.windowId, parseInt(groupId));
-            if (!activeWindowTabGroup) {
-              return;
-            }
-            if (activeWindowTabGroup.useTabTitle && activeWindowTabGroup.title !== tab.title) {
-              const updatedTabGroup = await ChromeWindowHelper.updateTabGroup(activeWindowTabGroup.id, { title: tab.title });
-              await updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, { title: updatedTabGroup.title });
+          Object.entries(tabsByGroupId).map(async ([groupId, tabsInGroup]) => {
+            const tabTitle = getTabTitleForUseTabTitle(tabsInGroup);
+            if (tabTitle) {
+              const activeWindowTabGroup = await getActiveWindowTabGroup(window.id, parseInt(groupId));
+              if (!activeWindowTabGroup) {
+                return;
+              }
+
+              if (activeWindowTabGroup.useTabTitle && activeWindowTabGroup.title !== tabTitle) {
+                const updatedTabGroup = await ChromeWindowHelper.updateTabGroup(activeWindowTabGroup.id, { title: tabTitle });
+                await updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, { title: updatedTabGroup.title });
+              }
             }
           })
         );
@@ -745,4 +717,29 @@ export async function useTabTitleForEligebleTabGroups() {
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
+}
+
+function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
+  let candidateTab: ChromeTabWithId | undefined;
+  tabsInGroup.forEach((tab) => {
+    if (
+      (!candidateTab ||
+        (!candidateTab.active &&
+          // prioritize by the active tab in it's window
+          // FIXME: since the lastAccessed property is being compared, there is no need to check the tab.active property. However,
+          //  we are currently doing so as a fallback for correctness due to the instability with the lastAccessed property.
+          //  See https://issues.chromium.org/issues/326678907.
+          (tab.active ||
+            // then prioritize by lastAccessed
+            (tab.lastAccessed && (!candidateTab.lastAccessed || tab.lastAccessed > candidateTab.lastAccessed)) ||
+            // then prioritize by index if there is no lastAccessed on either tab
+            (!candidateTab.lastAccessed && tab.index > candidateTab.index)))) &&
+      tab.title &&
+      tab.title.length > 0
+    ) {
+      candidateTab = tab;
+    }
+  });
+
+  return candidateTab?.title;
 }

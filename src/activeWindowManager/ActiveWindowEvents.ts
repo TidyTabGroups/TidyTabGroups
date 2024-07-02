@@ -3,15 +3,7 @@ import Logger from "../logger";
 import Misc from "../misc";
 import { ActiveWindow } from "../model";
 import Types from "../types";
-import {
-  ChromePopulatedWindowWithId,
-  ChromeTabGroupId,
-  ChromeTabGroupWithId,
-  ChromeTabId,
-  ChromeTabWithId,
-  ChromeWindowId,
-  ChromeWindowWithId,
-} from "../types/types";
+import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
 import * as Storage from "../storage";
 
 const logger = Logger.getLogger("activeWindowEvents", { color: "#4287f5" });
