@@ -16,11 +16,22 @@ if (isMainFrame) {
 }
 
 // PDF Viewer Overlay
-// @ts-ignore
-const isPDFViewer = document.body.childNodes.values().find((node) => node.tagName === "EMBED" && node.type === "application/pdf");
-if (isPDFViewer) {
-  PDFViewerOverlay.attach();
-}
+const isPDFViewerNonRejectablePromise = new Misc.NonRejectablePromise<boolean>();
+const isPDFViewer = isPDFViewerNonRejectablePromise.getPromise();
+DetachableDOM.addEventListener(
+  window,
+  "DOMContentLoaded",
+  () => {
+    // @ts-ignore
+    const isPDFViewer = document.body.childNodes.values().find((node) => node.tagName === "EMBED" && node.type === "application/pdf");
+    if (isPDFViewer) {
+      PDFViewerOverlay.attach();
+    }
+
+    isPDFViewerNonRejectablePromise.resolve(!!isPDFViewer);
+  },
+  true
+);
 
 // Mouse In Page Tracker:
 // the events that start the page focus timeout (all frames):
@@ -37,7 +48,6 @@ let pageFocusTimeoutId: number | null = null;
 let initialMousePosition: { x: number; y: number } | null = null;
 const MINIMUM_MOUSE_MOVEMENT_PX = 2;
 let mouseInPageStatus: MouseInPageStatus = "left";
-let didNotifyMainFrameAboutMouseEnter = false;
 
 if (isMainFrame) {
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -114,7 +124,6 @@ DetachableDOM.addEventListener(
   window,
   "mousedown",
   () => {
-    onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
@@ -126,7 +135,6 @@ DetachableDOM.addEventListener(
   window,
   "click",
   () => {
-    onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
@@ -138,7 +146,6 @@ DetachableDOM.addEventListener(
   window,
   "keydown",
   () => {
-    onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
@@ -150,7 +157,6 @@ DetachableDOM.addEventListener(
   window,
   "mousemove",
   async (event) => {
-    onMouseEnterRelatedEvent();
     // @ts-ignore
     const { screenX, screenY } = event;
 
@@ -168,10 +174,10 @@ DetachableDOM.addEventListener(
   true
 );
 
-function startPageFocusTimeout() {
+async function startPageFocusTimeout() {
   listenToPageFocusEvents = false;
 
-  if (isPDFViewer && PDFViewerOverlay.attached()) {
+  if ((await isPDFViewer) && PDFViewerOverlay.attached()) {
     PDFViewerOverlay.remove();
   }
 
@@ -187,7 +193,7 @@ function startPageFocusTimeout() {
   }, 2500);
 }
 
-function clearPageFocusTimeout() {
+async function clearPageFocusTimeout() {
   if (isMainFrame) {
     // let all child frames know to stop
     Misc.callAsync(() => {
@@ -205,7 +211,7 @@ function clearPageFocusTimeout() {
     pageFocusTimeoutId = null;
   }
 
-  if (isPDFViewer && !PDFViewerOverlay.attached()) {
+  if ((await isPDFViewer) && !PDFViewerOverlay.attached()) {
     PDFViewerOverlay.attach();
   }
 }
@@ -213,14 +219,4 @@ function clearPageFocusTimeout() {
 function setMouseInPageStatus(status: MouseInPageStatus) {
   mouseInPageStatus = status;
   chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
-}
-
-function onMouseEnterRelatedEvent() {
-  // this method exists because a mouseenter event isnt fired when the cursor is already in the page when the page loads
-  if (isMainFrame && mouseInPageStatus === "left") {
-    setMouseInPageStatus("entered");
-  } else if (!isMainFrame && !didNotifyMainFrameAboutMouseEnter) {
-    didNotifyMainFrameAboutMouseEnter = true;
-    window.top?.postMessage({ type: "mouseEnteredRelatedEvent" }, "*");
-  }
 }

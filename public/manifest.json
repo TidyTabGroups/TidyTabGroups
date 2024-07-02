@@ -16,7 +16,8 @@
     {
       "matches": ["<all_urls>"],
       "all_frames": true,
-      "js": ["js/vendor.js", "js/content_script.js"]
+      "js": ["js/vendor.js", "js/content_script.js"],
+      "run_at": "document_start"
     }
   ],
 
