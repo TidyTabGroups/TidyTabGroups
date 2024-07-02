@@ -37,6 +37,7 @@ let pageFocusTimeoutId: number | null = null;
 let initialMousePosition: { x: number; y: number } | null = null;
 const MINIMUM_MOUSE_MOVEMENT_PX = 2;
 let mouseInPageStatus: MouseInPageStatus = "left";
+let didNotifyMainFrameAboutMouseEnter = false;
 
 if (isMainFrame) {
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -97,6 +98,15 @@ window.addEventListener("message", (event) => {
       return;
     }
     clearPageFocusTimeout();
+  } else if (event.data.type === "mouseEnteredRelatedEvent") {
+    if (!isMainFrame) {
+      console.warn("the mouseEnteredRelatedEvent message should only be sent to the main frame");
+      return;
+    }
+
+    if (mouseInPageStatus === "left") {
+      setMouseInPageStatus("entered");
+    }
   }
 });
 
@@ -104,6 +114,7 @@ DetachableDOM.addEventListener(
   window,
   "mousedown",
   () => {
+    onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
@@ -115,6 +126,7 @@ DetachableDOM.addEventListener(
   window,
   "click",
   () => {
+    onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
@@ -126,6 +138,7 @@ DetachableDOM.addEventListener(
   window,
   "keydown",
   () => {
+    onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
@@ -137,6 +150,7 @@ DetachableDOM.addEventListener(
   window,
   "mousemove",
   async (event) => {
+    onMouseEnterRelatedEvent();
     // @ts-ignore
     const { screenX, screenY } = event;
 
@@ -199,4 +213,14 @@ function clearPageFocusTimeout() {
 function setMouseInPageStatus(status: MouseInPageStatus) {
   mouseInPageStatus = status;
   chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
+}
+
+function onMouseEnterRelatedEvent() {
+  // this method exists because a mouseenter event isnt fired when the cursor is already in the page when the page loads
+  if (isMainFrame && mouseInPageStatus === "left") {
+    setMouseInPageStatus("entered");
+  } else if (!isMainFrame && !didNotifyMainFrameAboutMouseEnter) {
+    didNotifyMainFrameAboutMouseEnter = true;
+    window.top?.postMessage({ type: "mouseEnteredRelatedEvent" }, "*");
+  }
 }
