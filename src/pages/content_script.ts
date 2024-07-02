@@ -16,22 +16,17 @@ if (isMainFrame) {
 }
 
 // PDF Viewer Overlay
-const isPDFViewerNonRejectablePromise = new Misc.NonRejectablePromise<boolean>();
-const isPDFViewer = isPDFViewerNonRejectablePromise.getPromise();
-DetachableDOM.addEventListener(
-  window,
-  "DOMContentLoaded",
-  () => {
-    // @ts-ignore
-    const isPDFViewer = document.body.childNodes.values().find((node) => node.tagName === "EMBED" && node.type === "application/pdf");
-    if (isPDFViewer) {
+const isPDFViewer = document.contentType === "application/pdf";
+if (isPDFViewer) {
+  DetachableDOM.addEventListener(
+    document,
+    "DOMContentLoaded",
+    () => {
       PDFViewerOverlay.attach();
-    }
-
-    isPDFViewerNonRejectablePromise.resolve(!!isPDFViewer);
-  },
-  true
-);
+    },
+    true
+  );
+}
 
 // Mouse In Page Tracker:
 // the events that start the page focus timeout (all frames):
@@ -174,10 +169,10 @@ DetachableDOM.addEventListener(
   true
 );
 
-async function startPageFocusTimeout() {
+function startPageFocusTimeout() {
   listenToPageFocusEvents = false;
 
-  if ((await isPDFViewer) && PDFViewerOverlay.attached()) {
+  if (isPDFViewer && PDFViewerOverlay.attached()) {
     PDFViewerOverlay.remove();
   }
 
@@ -193,7 +188,7 @@ async function startPageFocusTimeout() {
   }, 2500);
 }
 
-async function clearPageFocusTimeout() {
+function clearPageFocusTimeout() {
   if (isMainFrame) {
     // let all child frames know to stop
     Misc.callAsync(() => {
@@ -211,7 +206,7 @@ async function clearPageFocusTimeout() {
     pageFocusTimeoutId = null;
   }
 
-  if ((await isPDFViewer) && !PDFViewerOverlay.attached()) {
+  if (isPDFViewer && !PDFViewerOverlay.attached()) {
     PDFViewerOverlay.attach();
   }
 }
