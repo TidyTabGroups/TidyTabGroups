@@ -52,8 +52,7 @@ if (isMainFrame) {
       if (event.target !== document) {
         return;
       }
-      mouseInPageStatus = "entered";
-      chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
+      setMouseInPageStatus("entered");
     },
     true
   );
@@ -65,9 +64,7 @@ if (isMainFrame) {
       if (event.target !== document) {
         return;
       }
-      mouseInPageStatus = "left";
-      chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
-
+      setMouseInPageStatus("left");
       clearPageFocusTimeout();
     },
     true
@@ -166,19 +163,12 @@ function startPageFocusTimeout() {
 
   if (!isMainFrame) {
     // let the main frame do the rest
-    if (window.top) {
-      window.top.postMessage({ type: "startPageFocusTimeout" }, "*");
-    } else {
-      // FIXME: in which cases is window.top null?
-      console.warn("window.top is null, cannot send message to top frame");
-    }
-
+    window.top?.postMessage({ type: "startPageFocusTimeout" }, "*");
     return;
   }
 
   pageFocusTimeoutId = DetachableDOM.setTimeout(() => {
-    mouseInPageStatus = "focused";
-    chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
+    setMouseInPageStatus("focused");
     pageFocusTimeoutId = null;
   }, 2500);
 }
@@ -204,4 +194,9 @@ function clearPageFocusTimeout() {
   if (isPDFViewer && !PDFViewerOverlay.attached()) {
     PDFViewerOverlay.attach();
   }
+}
+
+function setMouseInPageStatus(status: MouseInPageStatus) {
+  mouseInPageStatus = status;
+  chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
 }
