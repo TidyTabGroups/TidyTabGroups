@@ -52,7 +52,6 @@ if (isMainFrame) {
     }
   });
 
-  // FIXME: in PDFs, this handler runs twice when run_at is set to document_start because of PDFViewerOverlay
   DetachableDOM.addEventListener(
     document,
     "mouseenter",
@@ -60,6 +59,12 @@ if (isMainFrame) {
       if (event.target !== document) {
         return;
       }
+
+      // FIXME: in PDFs, this handler runs twice when run_at is set to document_start because of PDFViewerOverlay
+      if (mouseInPageStatus === "entered") {
+        return;
+      }
+
       setMouseInPageStatus("entered");
     },
     true
@@ -218,6 +223,10 @@ function clearPageFocusTimeout() {
 }
 
 function setMouseInPageStatus(status: MouseInPageStatus) {
+  if (mouseInPageStatus === status) {
+    console.warn("setMouseInPageStatus::cannot set the same mouseInPageStatus: ", status);
+    return;
+  }
   mouseInPageStatus = status;
   chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
 }
