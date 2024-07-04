@@ -70,7 +70,17 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.windows.onFocusChanged.addListener((windowId: ChromeWindowId) => {
-    queueOperation(() => ActiveWindowEvents.onWindowFocusChanged(windowId), false);
+    queueOperation(async () => {
+      // check the up-to-date focused window because it could have changed
+      const lastFocusedWindow = (await chrome.windows.getLastFocused()) as ChromeWindowWithId;
+      if (windowId === chrome.windows.WINDOW_ID_NONE ? lastFocusedWindow.focused : lastFocusedWindow.id !== windowId) {
+        logger.warn(
+          `onFocusChanged::focused window not up to date - windowId: ${windowId}, lastFocusedWindow: ${lastFocusedWindow.id}, lastFocusedWindow.focused: ${lastFocusedWindow.focused}`
+        );
+        return;
+      }
+      await ActiveWindowEvents.onWindowFocusChanged(windowId);
+    }, false);
   });
 
   chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
