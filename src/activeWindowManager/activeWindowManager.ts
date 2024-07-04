@@ -206,16 +206,40 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-    let windowId: ChromeWindowId;
-    if (sender.tab) {
-      windowId = sender.tab.windowId;
-    } else if (message.data?.windowId) {
-      windowId = message.data.windowId;
-    } else {
-      logger.warn("onMessage::sender windowId is not valid:", sender);
+    const myLogger = logger.getNestedLogger("onMessage");
+    if (!message || !message.type) {
+      myLogger.warn(`message is not valid - message: ${message}, sender: ${sender}`);
       return;
     }
-    queueOperationIfWindowIsActive((activeWindow) => onMessage(activeWindow, message, sender, sendResponse), windowId, false, "onMessage");
+
+    myLogger.log(`message:`, message);
+
+    const messageTypes = ["getActiveWindow", "updateActiveWindow"];
+    if (!messageTypes.includes(message.type)) {
+      return;
+    }
+
+    queueOperation(async () => {
+      try {
+        if (message.type === messageTypes[0]) {
+          const { windowId } = message.data as { windowId: ChromeWindowId };
+          const activeWindow = await ActiveWindow.get(windowId);
+          sendResponse({ activeWindow });
+        } else if (message.type === messageTypes[1]) {
+          const { windowId, updateProps } = message.data as { windowId: Types.ActiveWindow["windowId"]; updateProps: Partial<Types.ActiveWindow> };
+          const updatedActiveWindow = await ActiveWindow.update(windowId, updateProps);
+          sendResponse({ activeWindow: updatedActiveWindow });
+        } else {
+          throw new Error("message type is invalid");
+        }
+      } catch (error) {
+        const errorMessage = myLogger.getPrefixedMessage(`error processing message:${error}`);
+        sendResponse({ error: errorMessage });
+        throw new Error(errorMessage);
+      }
+    }, true);
+
+    // return true for the asynchronous response
     return true;
   });
 
@@ -325,35 +349,4 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   }
 
   // Misc.openDummyTab();
-}
-
-export async function onMessage(
-  activeWindow: Types.ActiveWindow,
-  message: any,
-  sender: chrome.runtime.MessageSender,
-  sendResponse: (response?: any) => void
-) {
-  const myLogger = logger.getNestedLogger("onMessage");
-  if (!message || !message.type) {
-    myLogger.warn("message is not valid:", message);
-    return;
-  }
-
-  myLogger.log(`message:`, message);
-
-  try {
-    if (message.type === "getActiveWindow") {
-      const { windowId } = message.data as { windowId: ChromeWindowId };
-      const activeWindow = await ActiveWindow.get(windowId);
-      sendResponse({ activeWindow });
-    } else if (message.type === "updateActiveWindow") {
-      const { windowId, updateProps } = message.data as { windowId: Types.ActiveWindow["windowId"]; updateProps: Partial<Types.ActiveWindow> };
-      const updatedActiveWindow = await ActiveWindow.update(windowId, updateProps);
-      sendResponse({ activeWindow: updatedActiveWindow });
-    }
-  } catch (error) {
-    const errorMessage = myLogger.getPrefixedMessage(`error processing message:${error}`);
-    sendResponse({ error: errorMessage });
-    throw new Error(errorMessage);
-  }
 }
