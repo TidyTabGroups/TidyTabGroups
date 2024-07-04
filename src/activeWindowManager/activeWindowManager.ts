@@ -126,7 +126,7 @@ export async function initialize(onError: () => void) {
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
     const myLogger = logger.getNestedLogger("tabs.onUpdated");
     // only handle these changeInfo properties
-    const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title"];
+    const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title", "pinned"];
     if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
       return;
     }
