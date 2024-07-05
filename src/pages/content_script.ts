@@ -3,7 +3,20 @@ import { PDFViewerOverlay } from "../DOM";
 import Misc from "../misc";
 import ContentHelper from "../contentHelper";
 import { MouseInPageStatus } from "../types/types";
+import Logger from "../logger";
 
+// Mouse In Page Tracker
+// regarding non-moving cursors that are already in a document:
+// 1. An already loaded document becomes visible: mouseenter/mousemove events DO get dispatched. If the cursor is
+//  in a subframe, the main frame will not receive the events.
+// 2. A document gets loaded: mouseenter/mousemove events DO NOT get dispatched when a document loads. Once the mouse is moved, both the main frame
+//   and the subframe (if exists) will receive both events. Regarding the mousemove events, the main frame only receives
+//   it onces; subsequent mousemove events in a subframe are only received by the subframe.
+// Note: this was observed on stable Chrome 126.0.6478.127 on July 4th 2024
+
+// FIXME: There might be cases where the main frame is not accessible, but the subframes are. In this case, the mouse tracker logic will not work.
+
+const logger = Logger.getLogger("content_script");
 const isMainFrame = window === window.top;
 
 // Ping-pong message to check if the content script is running
@@ -15,7 +28,7 @@ if (isMainFrame) {
   });
 }
 
-// PDF Viewer Overlay
+// For PDFs, an overlay element is attached to the document to detect mousemove events. It is then detached after the events are handled.
 const isPDFViewer = document.contentType === "application/pdf";
 if (isPDFViewer) {
   DetachableDOM.addEventListener(
@@ -28,22 +41,12 @@ if (isPDFViewer) {
   );
 }
 
-// Mouse In Page Tracker:
-// the events that start the page focus timeout (all frames):
-// - mouse down
-// - click
-// - keydown
-// - mouse move (if the mouse moves more than 2px)
-// the events that clear the page focus timeout (main frame only):
-// - mouse leave
-// - visibility change to hidden
-
 let listenToPageFocusEvents = true;
 let pageFocusTimeoutId: number | null = null;
 let initialMousePosition: { x: number; y: number } | null = null;
 const MINIMUM_MOUSE_MOVEMENT_PX = 2;
 let mouseInPageStatus: MouseInPageStatus = "left";
-let didNotifyMainFrameAboutMouseEnter = false;
+let notifyMainFrameAboutMouseEnter = true;
 
 if (isMainFrame) {
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -79,6 +82,7 @@ if (isMainFrame) {
       }
       setMouseInPageStatus("left");
       clearPageFocusTimeout();
+      enableNotifyMainFrameAboutMouseEnterForSubframes();
     },
     true
   );
@@ -89,36 +93,57 @@ if (isMainFrame) {
     (event) => {
       if (document.visibilityState === "hidden") {
         clearPageFocusTimeout();
+        enableNotifyMainFrameAboutMouseEnterForSubframes();
       }
     },
     true
   );
+
+  function enableNotifyMainFrameAboutMouseEnterForSubframes() {
+    ContentHelper.forEachNestedFrame((frame) => {
+      frame.postMessage({ type: "enableNotifyMainFrameAboutMouseEnter" }, "*");
+    });
+  }
 }
 
 window.addEventListener("message", (event) => {
+  const myLogger = logger.getNestedLogger("message");
   if (event.data.type === "startPageFocusTimeout") {
     // this message is sent only to the main frame by a nested frame when it wants to start the page focus timeout
     if (!isMainFrame) {
-      console.warn("the startPageFocusTimeout message should only be sent to the main frame");
+      myLogger.warn("the startPageFocusTimeout message should only be sent to the main frame");
       return;
     }
-    startPageFocusTimeout();
+
+    if (listenToPageFocusEvents) {
+      startPageFocusTimeout();
+    }
   } else if (event.data.type === "clearPageFocusTimeout") {
     // this message is sent by the main frame to all nested frames when it wants to clear the page focus timeout
     if (isMainFrame) {
-      console.warn("the clearPageFocusTimeout message should not be sent to the main frame");
+      myLogger.warn("the clearPageFocusTimeout message should not be sent to the main frame");
       return;
     }
-    clearPageFocusTimeout();
+
+    if (!listenToPageFocusEvents) {
+      clearPageFocusTimeout();
+    }
   } else if (event.data.type === "mouseEnteredRelatedEvent") {
     if (!isMainFrame) {
-      console.warn("the mouseEnteredRelatedEvent message should only be sent to the main frame");
+      myLogger.warn("the mouseEnteredRelatedEvent message should only be sent to the main frame");
       return;
     }
 
     if (mouseInPageStatus === "left") {
       setMouseInPageStatus("entered");
     }
+  } else if (event.data.type === "enableNotifyMainFrameAboutMouseEnter") {
+    if (isMainFrame) {
+      myLogger.warn("enableNotifyMainFrameAboutMouseEnter should only be sent to subframes");
+      return;
+    }
+
+    notifyMainFrameAboutMouseEnter = true;
   }
 });
 
@@ -161,7 +186,7 @@ DetachableDOM.addEventListener(
 DetachableDOM.addEventListener(
   window,
   "mousemove",
-  async (event) => {
+  (event) => {
     onMouseEnterRelatedEvent();
     // @ts-ignore
     const { screenX, screenY } = event;
@@ -170,26 +195,39 @@ DetachableDOM.addEventListener(
       initialMousePosition = { x: screenX, y: screenY };
     }
 
-    const hasMovedMouseMinimum =
-      Math.abs(screenX - initialMousePosition.x) > MINIMUM_MOUSE_MOVEMENT_PX ||
-      Math.abs(screenY - initialMousePosition.y) > MINIMUM_MOUSE_MOVEMENT_PX;
-    if (hasMovedMouseMinimum && listenToPageFocusEvents) {
-      startPageFocusTimeout();
+    if (listenToPageFocusEvents) {
+      const hasMovedMouseMinimum =
+        Math.abs(screenX - initialMousePosition.x) > MINIMUM_MOUSE_MOVEMENT_PX ||
+        Math.abs(screenY - initialMousePosition.y) > MINIMUM_MOUSE_MOVEMENT_PX;
+      if (hasMovedMouseMinimum) {
+        startPageFocusTimeout();
+      }
     }
   },
   true
 );
 
 function startPageFocusTimeout() {
+  const myLogger = Logger.getLogger("startPageFocusTimeout");
+  if (!listenToPageFocusEvents) {
+    myLogger.warn("should not be called when listenToPageFocusEvents is false - isMainFrame: ", isMainFrame);
+    return;
+  }
+
   listenToPageFocusEvents = false;
 
-  if (isPDFViewer && PDFViewerOverlay.attached()) {
+  if (isPDFViewer) {
     PDFViewerOverlay.remove();
   }
 
   if (!isMainFrame) {
     // let the main frame do the rest
     window.top?.postMessage({ type: "startPageFocusTimeout" }, "*");
+    return;
+  }
+
+  if (pageFocusTimeoutId !== null) {
+    myLogger.warn("pageFocusTimeoutId should be null");
     return;
   }
 
@@ -200,43 +238,55 @@ function startPageFocusTimeout() {
 }
 
 function clearPageFocusTimeout() {
+  const myLogger = logger.getNestedLogger("clearPageFocusTimeout");
+  if (listenToPageFocusEvents) {
+    myLogger.warn("should not be called when listenToPageFocusEvents is true - isMainFrame: ", isMainFrame);
+    return;
+  }
+
+  initialMousePosition = null;
+  listenToPageFocusEvents = true;
+
+  if (isPDFViewer) {
+    PDFViewerOverlay.attach();
+  }
+
   if (isMainFrame) {
-    // let all child frames know to stop
+    if (pageFocusTimeoutId !== null) {
+      DetachableDOM.clearTimeout(pageFocusTimeoutId);
+      pageFocusTimeoutId = null;
+    }
+
+    // let all child frames know to clear
     Misc.callAsync(() => {
       ContentHelper.forEachNestedFrame((frame) => {
         frame.postMessage({ type: "clearPageFocusTimeout" }, "*");
       });
     });
   }
-
-  initialMousePosition = null;
-  listenToPageFocusEvents = true;
-
-  if (pageFocusTimeoutId !== null) {
-    DetachableDOM.clearTimeout(pageFocusTimeoutId);
-    pageFocusTimeoutId = null;
-  }
-
-  if (isPDFViewer && !PDFViewerOverlay.attached()) {
-    PDFViewerOverlay.attach();
-  }
 }
 
 function setMouseInPageStatus(status: MouseInPageStatus) {
-  if (mouseInPageStatus === status) {
-    console.warn("setMouseInPageStatus::cannot set the same mouseInPageStatus: ", status);
+  const myLogger = logger.getNestedLogger("setMouseInPageStatus");
+  if (!isMainFrame) {
+    myLogger.warn("should only be called in the main frame");
     return;
   }
+
+  if (mouseInPageStatus === status) {
+    myLogger.warn("cannot set the same mouseInPageStatus: ", status);
+    return;
+  }
+
   mouseInPageStatus = status;
   chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
 }
 
-// this method handles the cases where the cursor is already entered in the page by the time this content script has ran
 function onMouseEnterRelatedEvent() {
   if (isMainFrame && mouseInPageStatus === "left") {
     setMouseInPageStatus("entered");
-  } else if (!isMainFrame && !didNotifyMainFrameAboutMouseEnter) {
-    didNotifyMainFrameAboutMouseEnter = true;
+  } else if (!isMainFrame && notifyMainFrameAboutMouseEnter) {
+    notifyMainFrameAboutMouseEnter = false;
     window.top?.postMessage({ type: "mouseEnteredRelatedEvent" }, "*");
   }
 }
