@@ -33,7 +33,7 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
 export async function onWindowFocusChanged(windowId: ChromeWindowId) {
   // 1. update the lastSeenFocusModeColors
   // 2. use tab title for eligeble tab groups
-  const myLogger = Logger.getLogger("onWindowFocusChanged");
+  const myLogger = logger.getNestedLogger("onWindowFocusChanged");
   myLogger.log(`windowId: ${windowId}`);
   try {
     // 1
