@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import { UserPreference } from "./userPreference";
 import { App } from "./app";
+import { UserPreferenceCard } from "./userPreference/UserPreferenceCard";
 
 Storage.start();
 
@@ -60,55 +61,49 @@ const UserPreferences = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ height: "100vh", padding: "24px" }}>
-      <Typography variant="h6" component={"h1"} gutterBottom color="GrayText">
-        Behaviour
-      </Typography>
-      <Card sx={{ borderRadius: "10px" }}>
-        <CardContent sx={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          <UserPreference
-            control={<Switch checked={userPreferences.repositionTabs} onChange={(e) => updatePreferences({ repositionTabs: e.target.checked })} />}
-            name="Reposition focused Tabs to the end"
-          />
-          <Divider />
-          <UserPreference
-            control={
+    <Container maxWidth="md" sx={{ height: "100vh", padding: "24px", gap: "20px", display: "flex", flexDirection: "column" }}>
+      <UserPreferenceCard
+        userPreferences={[
+          {
+            name: "Reposition focused Tabs to the end",
+            control: <Switch checked={userPreferences.repositionTabs} onChange={(e) => updatePreferences({ repositionTabs: e.target.checked })} />,
+          },
+          {
+            name: "Reposition focused Tab Groups to the end",
+            control: (
               <Switch checked={userPreferences.repositionTabGroups} onChange={(e) => updatePreferences({ repositionTabGroups: e.target.checked })} />
-            }
-            name="Reposition focused Tab Groups to the end"
-          />
-          <Divider />
-          <UserPreference
-            control={
+            ),
+          },
+          {
+            name: "Automatically place new Tabs in focused Tab Group",
+            control: (
               <Switch
                 checked={userPreferences.addNewTabToFocusedTabGroup}
                 onChange={(e) => updatePreferences({ addNewTabToFocusedTabGroup: e.target.checked })}
               />
-            }
-            name="Automatically place new Tabs in focused Tab Group"
-          />
-          <Divider />
-          <UserPreference
-            control={
+            ),
+          },
+          {
+            name: "Automatically collapse unfocused Tab Groups",
+            control: (
               <Switch
                 checked={userPreferences.collapseUnfocusedTabGroups}
                 onChange={(e) => updatePreferences({ collapseUnfocusedTabGroups: e.target.checked })}
               />
-            }
-            name="Automatically collapse unfocused Tab Groups"
-          />
-          <Divider />
-          <UserPreference
-            control={
+            ),
+          },
+          {
+            name: "Automatically activate Tab in focused Tab Group",
+            control: (
               <Switch
                 checked={userPreferences.activateTabInFocusedTabGroup}
                 onChange={(e) => updatePreferences({ activateTabInFocusedTabGroup: e.target.checked })}
               />
-            }
-            name="Automatically activate Tab in focused Tab Group"
-          />
-        </CardContent>
-      </Card>
+            ),
+          },
+        ]}
+        title="Behaviour"
+      />
     </Container>
   );
 };
