@@ -30,11 +30,12 @@ async function initializeStorage() {
     await chrome.storage.local.set(newItems);
     Storage.start();
   } catch (error) {
+    // TODO: log the error
     throw new Error(`initializeStorage::An error occurred while initializing the storage: ${error}`);
   }
 }
 
-async function getLocalStorageDefaultValues() {
+async function getLocalStorageDefaultValues(): Promise<LocalStorageShape> {
   try {
     const currentWindow = (await chrome.windows.getCurrent()) as ChromeWindowWithId;
     const activeWindow = await ActiveWindow.get(currentWindow.id);
