@@ -106,9 +106,15 @@ if (isMainFrame) {
   }
 }
 
-window.addEventListener("message", (event) => {
+DetachableDOM.addEventListener(window, "message", (event) => {
+  // @ts-ignore
+  const { type } = event.data;
+  if (!type) {
+    return;
+  }
+
   const myLogger = logger.getNestedLogger("message");
-  if (event.data.type === "startPageFocusTimeout") {
+  if (type === "startPageFocusTimeout") {
     // this message is sent only to the main frame by a nested frame when it wants to start the page focus timeout
     if (!isMainFrame) {
       myLogger.warn("the startPageFocusTimeout message should only be sent to the main frame");
@@ -118,7 +124,7 @@ window.addEventListener("message", (event) => {
     if (listenToPageFocusEvents) {
       startPageFocusTimeout();
     }
-  } else if (event.data.type === "clearPageFocusTimeout") {
+  } else if (type === "clearPageFocusTimeout") {
     // this message is sent by the main frame to all nested frames when it wants to clear the page focus timeout
     if (isMainFrame) {
       myLogger.warn("the clearPageFocusTimeout message should not be sent to the main frame");
@@ -128,7 +134,7 @@ window.addEventListener("message", (event) => {
     if (!listenToPageFocusEvents) {
       clearPageFocusTimeout();
     }
-  } else if (event.data.type === "mouseEnteredRelatedEvent") {
+  } else if (type === "mouseEnteredRelatedEvent") {
     if (!isMainFrame) {
       myLogger.warn("the mouseEnteredRelatedEvent message should only be sent to the main frame");
       return;
@@ -137,7 +143,7 @@ window.addEventListener("message", (event) => {
     if (mouseInPageStatus === "left") {
       setMouseInPageStatus("entered");
     }
-  } else if (event.data.type === "enableNotifyMainFrameAboutMouseEnter") {
+  } else if (type === "enableNotifyMainFrameAboutMouseEnter") {
     if (isMainFrame) {
       myLogger.warn("enableNotifyMainFrameAboutMouseEnter should only be sent to subframes");
       return;
