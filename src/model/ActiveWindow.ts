@@ -417,6 +417,7 @@ export async function collapseUnFocusedTabGroups(tabGroupsOrWindowId: ChromeTabG
   const unfocusedTabGroups = tabGroups.filter((tabGroup) => tabGroup.id !== focusedTabGroupId);
   await Promise.all(
     unfocusedTabGroups.map(async (unfocusedTabGroup) => {
+      // TODO: update the ActiveWindowTabGroup
       await ChromeWindowHelper.updateTabGroup(unfocusedTabGroup.id, { collapsed: true });
     })
   );
