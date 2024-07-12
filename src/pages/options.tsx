@@ -104,6 +104,20 @@ const UserPreferences = () => {
         ]}
         title="Behaviour"
       />
+      <UserPreferenceCard
+        userPreferences={[
+          {
+            name: "Enable Content Script Logger",
+            control: (
+              <Switch
+                checked={userPreferences.enableContentScriptLogger}
+                onChange={(e) => updatePreferences({ enableContentScriptLogger: e.target.checked })}
+              />
+            ),
+          },
+        ]}
+        title="Other"
+      />
     </Container>
   );
 };

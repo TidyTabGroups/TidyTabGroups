@@ -72,6 +72,7 @@ export interface UserPreferences {
   addNewTabToFocusedTabGroup: boolean;
   collapseUnfocusedTabGroups: boolean;
   activateTabInFocusedTabGroup: boolean;
+  enableContentScriptLogger: boolean;
 }
 
 export interface LastGroupedTabInfo {

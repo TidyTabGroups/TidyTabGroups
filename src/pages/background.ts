@@ -47,6 +47,7 @@ async function getLocalStorageDefaultValues(): Promise<LocalStorageShape> {
         addNewTabToFocusedTabGroup: true,
         collapseUnfocusedTabGroups: true,
         activateTabInFocusedTabGroup: true,
+        enableContentScriptLogger: false,
       },
       lastSeenFocusModeColors: activeWindow?.focusMode?.colors || { focused: "pink", nonFocused: "purple" },
       lastFocusedWindowHadFocusMode: activeWindow?.focusMode ? true : false,
