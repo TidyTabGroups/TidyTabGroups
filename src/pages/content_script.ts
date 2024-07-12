@@ -4,6 +4,7 @@ import Misc from "../misc";
 import ContentHelper from "../contentHelper";
 import { MouseInPageStatus } from "../types/types";
 import Logger from "../logger";
+import * as Storage from "../storage";
 
 // Mouse In Page Tracker
 // regarding non-moving cursors that are already in a document:
@@ -16,8 +17,24 @@ import Logger from "../logger";
 
 // FIXME: There might be cases where the main frame is not accessible, but the subframes are. In this case, the mouse tracker logic will not work.
 
-const logger = Logger.createLogger("content_script");
+const loggerNonRejectablePromise = new Misc.NonRejectablePromise<Logger.Logger>();
+const logger = loggerNonRejectablePromise.getPromise();
 const isMainFrame = window === window.top;
+Storage.start();
+
+(async function () {
+  const { enableContentScriptLogger } = (await Storage.getItems("userPreferences")).userPreferences;
+  const resolvedLogger = Logger.createLogger("content_script", { enableLogging: enableContentScriptLogger });
+
+  Storage.addChangeListener((changes) => {
+    const { userPreferences } = changes;
+    if (userPreferences && userPreferences.newValue.enableContentScriptLogger !== userPreferences.oldValue.enableContentScriptLogger) {
+      resolvedLogger.setEnableLogging(userPreferences.newValue.enableContentScriptLogger);
+    }
+  });
+
+  loggerNonRejectablePromise.resolve(resolvedLogger);
+})();
 
 // Ping-pong message to check if the content script is running
 if (isMainFrame) {
@@ -58,7 +75,7 @@ if (isMainFrame) {
   DetachableDOM.addEventListener(
     document,
     "mouseenter",
-    (event) => {
+    async (event) => {
       if (event.target !== document) {
         return;
       }
@@ -68,7 +85,7 @@ if (isMainFrame) {
         return;
       }
 
-      setMouseInPageStatus("entered");
+      await setMouseInPageStatus("entered");
     },
     true
   );
@@ -76,12 +93,12 @@ if (isMainFrame) {
   DetachableDOM.addEventListener(
     document,
     "mouseleave",
-    (event) => {
+    async (event) => {
       if (event.target !== document) {
         return;
       }
-      setMouseInPageStatus("left");
-      clearPageFocusTimeout();
+      await setMouseInPageStatus("left");
+      await clearPageFocusTimeout();
       enableNotifyMainFrameAboutMouseEnterForSubframes();
     },
     true
@@ -90,9 +107,9 @@ if (isMainFrame) {
   DetachableDOM.addEventListener(
     window,
     "visibilitychange",
-    (event) => {
+    async (event) => {
       if (document.visibilityState === "hidden") {
-        clearPageFocusTimeout();
+        await clearPageFocusTimeout();
         enableNotifyMainFrameAboutMouseEnterForSubframes();
       }
     },
@@ -106,14 +123,14 @@ if (isMainFrame) {
   }
 }
 
-DetachableDOM.addEventListener(window, "message", (event) => {
+DetachableDOM.addEventListener(window, "message", async (event) => {
   // @ts-ignore
   const { type } = event.data;
   if (!type) {
     return;
   }
 
-  const myLogger = logger.createNestedLogger("message");
+  const myLogger = (await logger).createNestedLogger("message");
   if (type === "startPageFocusTimeout") {
     // this message is sent only to the main frame by a nested frame when it wants to start the page focus timeout
     if (!isMainFrame) {
@@ -122,7 +139,7 @@ DetachableDOM.addEventListener(window, "message", (event) => {
     }
 
     if (listenToPageFocusEvents) {
-      startPageFocusTimeout();
+      await startPageFocusTimeout();
     }
   } else if (type === "clearPageFocusTimeout") {
     // this message is sent by the main frame to all nested frames when it wants to clear the page focus timeout
@@ -141,7 +158,7 @@ DetachableDOM.addEventListener(window, "message", (event) => {
     }
 
     if (mouseInPageStatus === "left") {
-      setMouseInPageStatus("entered");
+      await setMouseInPageStatus("entered");
     }
   } else if (type === "enableNotifyMainFrameAboutMouseEnter") {
     if (isMainFrame) {
@@ -156,10 +173,10 @@ DetachableDOM.addEventListener(window, "message", (event) => {
 DetachableDOM.addEventListener(
   window,
   "mousedown",
-  () => {
+  async () => {
     onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
-      startPageFocusTimeout();
+      await startPageFocusTimeout();
     }
   },
   true
@@ -168,10 +185,10 @@ DetachableDOM.addEventListener(
 DetachableDOM.addEventListener(
   window,
   "click",
-  () => {
+  async () => {
     onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
-      startPageFocusTimeout();
+      await startPageFocusTimeout();
     }
   },
   true
@@ -180,10 +197,10 @@ DetachableDOM.addEventListener(
 DetachableDOM.addEventListener(
   window,
   "keydown",
-  () => {
+  async () => {
     onMouseEnterRelatedEvent();
     if (listenToPageFocusEvents) {
-      startPageFocusTimeout();
+      await startPageFocusTimeout();
     }
   },
   true
@@ -192,7 +209,7 @@ DetachableDOM.addEventListener(
 DetachableDOM.addEventListener(
   window,
   "mousemove",
-  (event) => {
+  async (event) => {
     onMouseEnterRelatedEvent();
     // @ts-ignore
     const { screenX, screenY } = event;
@@ -206,15 +223,15 @@ DetachableDOM.addEventListener(
         Math.abs(screenX - initialMousePosition.x) > MINIMUM_MOUSE_MOVEMENT_PX ||
         Math.abs(screenY - initialMousePosition.y) > MINIMUM_MOUSE_MOVEMENT_PX;
       if (hasMovedMouseMinimum) {
-        startPageFocusTimeout();
+        await startPageFocusTimeout();
       }
     }
   },
   true
 );
 
-function startPageFocusTimeout() {
-  const myLogger = logger.createNestedLogger("startPageFocusTimeout");
+async function startPageFocusTimeout() {
+  const myLogger = (await logger).createNestedLogger("startPageFocusTimeout");
   if (!listenToPageFocusEvents) {
     myLogger.warn("should not be called when listenToPageFocusEvents is false - isMainFrame: ", isMainFrame);
     return;
@@ -237,14 +254,14 @@ function startPageFocusTimeout() {
     return;
   }
 
-  pageFocusTimeoutId = DetachableDOM.setTimeout(() => {
-    setMouseInPageStatus("focused");
+  pageFocusTimeoutId = DetachableDOM.setTimeout(async () => {
     pageFocusTimeoutId = null;
+    await setMouseInPageStatus("focused");
   }, 2500);
 }
 
-function clearPageFocusTimeout() {
-  const myLogger = logger.createNestedLogger("clearPageFocusTimeout");
+async function clearPageFocusTimeout() {
+  const myLogger = (await logger).createNestedLogger("clearPageFocusTimeout");
   if (listenToPageFocusEvents) {
     myLogger.warn("should not be called when listenToPageFocusEvents is true - isMainFrame: ", isMainFrame);
     return;
@@ -272,8 +289,8 @@ function clearPageFocusTimeout() {
   }
 }
 
-function setMouseInPageStatus(status: MouseInPageStatus) {
-  const myLogger = logger.createNestedLogger("setMouseInPageStatus");
+async function setMouseInPageStatus(status: MouseInPageStatus) {
+  const myLogger = (await logger).createNestedLogger("setMouseInPageStatus");
   if (!isMainFrame) {
     myLogger.warn("should only be called in the main frame");
     return;
@@ -288,9 +305,9 @@ function setMouseInPageStatus(status: MouseInPageStatus) {
   chrome.runtime.sendMessage({ type: "mouseInPageStatusChanged", data: mouseInPageStatus });
 }
 
-function onMouseEnterRelatedEvent() {
+async function onMouseEnterRelatedEvent() {
   if (isMainFrame && mouseInPageStatus === "left") {
-    setMouseInPageStatus("entered");
+    await setMouseInPageStatus("entered");
   } else if (!isMainFrame && notifyMainFrameAboutMouseEnter) {
     notifyMainFrameAboutMouseEnter = false;
     window.top?.postMessage({ type: "mouseEnteredRelatedEvent" }, "*");
