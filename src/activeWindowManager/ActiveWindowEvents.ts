@@ -6,7 +6,7 @@ import Types from "../types";
 import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
 import * as Storage from "../storage";
 
-const logger = Logger.getLogger("activeWindowEvents", { color: "#4287f5" });
+const logger = Logger.createLogger("activeWindowEvents", { color: "#4287f5" });
 
 export async function onWindowCreated(window: ChromeWindowWithId) {
   logger.log(`onWindowCreated::window:`, window);
@@ -33,7 +33,7 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
 export async function onWindowFocusChanged(windowId: ChromeWindowId) {
   // 1. update the lastSeenFocusModeColors
   // 2. use tab title for eligeble tab groups
-  const myLogger = logger.getNestedLogger("onWindowFocusChanged");
+  const myLogger = logger.createNestedLogger("onWindowFocusChanged");
   myLogger.log(`windowId: ${windowId}`);
   try {
     // 1
@@ -54,7 +54,7 @@ export async function onWindowFocusChanged(windowId: ChromeWindowId) {
 }
 
 export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
-  const myLogger = logger.getNestedLogger("onTabGroupCreated");
+  const myLogger = logger.createNestedLogger("onTabGroupCreated");
   // 1. adjust the tab group's color based on the active window's focus mode
   // 2. if the tab group's title is empty, set the ActiveWindowTabGroup's useTabTitle to true
   // 3. add the ActiveWindowTabGroup
@@ -79,7 +79,7 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
 }
 
 export async function onTabGroupRemoved(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
-  const myLogger = logger.getNestedLogger("onTabGroupRemoved");
+  const myLogger = logger.createNestedLogger("onTabGroupRemoved");
   // 1. remove the ActiveWindowTabGroup
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
@@ -93,7 +93,7 @@ export async function onTabGroupRemoved(activeWindow: Types.ActiveWindow, tabGro
 }
 
 export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
-  const myLogger = logger.getNestedLogger("onTabGroupUpdated");
+  const myLogger = logger.createNestedLogger("onTabGroupUpdated");
   // 1. handle the case where the tab group's focus mode color is overridden
   //      due to a chromium bug when creating new tab groups
   // 2. if the tab group is focused, update the active window's focus mode focused color
@@ -270,7 +270,7 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
 }
 
 export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome.tabs.Tab) {
-  const myLogger = logger.getNestedLogger("onTabCreated");
+  const myLogger = logger.createNestedLogger("onTabCreated");
   // 1. check if the the tab was updated or removed
   // 2. get the lastActiveTab
   // 3. if the tab is not pinned nor in a group, and the last active tab was in a group, add the tab to the last active tab group
@@ -340,7 +340,7 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
 }
 
 export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInfo: chrome.tabs.TabActiveInfo) {
-  const myLogger = logger.getNestedLogger("onTabActivated");
+  const myLogger = logger.createNestedLogger("onTabActivated");
   // 1. focus the tab's group
 
   myLogger.log(`activeInfo.tabId: `, activeInfo.tabId);
@@ -370,7 +370,7 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
   // 1. if the tab's group changed and the tab is active, focus the tab's group
   // 2. if the tab was ungrouped or unpinned, create a new group for it
   // 3. if the tab's title or group was changed, use tab title for eligeble tab groups
-  const myLogger = logger.getNestedLogger("onTabUpdated");
+  const myLogger = logger.createNestedLogger("onTabUpdated");
   myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
 
   try {
@@ -409,7 +409,7 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
 }
 
 export async function onTabAttached(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId) {
-  const myLogger = logger.getNestedLogger("onTabAttached");
+  const myLogger = logger.createNestedLogger("onTabAttached");
   myLogger.log(`tab attached to windowId: ${tab.windowId}, tab title: ${tab.title}`);
 
   try {
@@ -422,7 +422,7 @@ export async function onTabAttached(activeWindow: Types.ActiveWindow, tab: Chrom
 }
 
 export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
-  const myLogger = logger.getNestedLogger("onTabRemoved");
+  const myLogger = logger.createNestedLogger("onTabRemoved");
   myLogger.log(`tabId:`, tabId, removeInfo);
   if (removeInfo.isWindowClosing) {
     myLogger.log(`window is closing, nothing to do:`, tabId);
@@ -431,12 +431,12 @@ export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: Chro
 }
 
 export async function onTabMoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) {
-  const myLogger = logger.getNestedLogger("onTabMoved");
+  const myLogger = logger.createNestedLogger("onTabMoved");
   myLogger.log(`tabId and moveInfo:`, tabId, moveInfo);
 }
 
 export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId: ChromeTabId, removedTabId: ChromeTabId) {
-  const myLogger = logger.getNestedLogger("onTabReplaced");
+  const myLogger = logger.createNestedLogger("onTabReplaced");
   myLogger.log(`addedTabId and removedTabId:`, addedTabId, removedTabId);
 }
 
@@ -444,7 +444,7 @@ async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: ChromeTabI
   // 1. if the tab is pinned, ignore
   // 2. if the tab is active, reposition it
   // 3. use tab title for eligeble tab groups
-  const myLogger = logger.getNestedLogger("onPageFocused");
+  const myLogger = logger.createNestedLogger("onPageFocused");
   const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
   if (!tabUpToDate || !tabUpToDate.id) {
     myLogger.warn("pageFocused::tabUpToDate is not valid:", tabUpToDate);
@@ -468,7 +468,7 @@ async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: ChromeTabI
 }
 
 export async function onMouseInPageStatusChanged(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId, status: Types.MouseInPageStatus) {
-  const myLogger = logger.getNestedLogger("onMouseInPageStatusChanged");
+  const myLogger = logger.createNestedLogger("onMouseInPageStatusChanged");
   myLogger.log(`tabId:`, tab.id, status);
   if (status === "entered") {
     await ActiveWindow.useTabTitleForEligebleTabGroups();

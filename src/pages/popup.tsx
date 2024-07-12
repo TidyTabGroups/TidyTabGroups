@@ -10,12 +10,12 @@ import Logger from "../logger";
 import Misc from "../misc";
 import { ChromeTabGroupColorEnum } from "../types/types";
 
-const logger = Logger.getLogger("popup");
+const logger = Logger.createLogger("popup");
 
 Storage.start();
 
 const Popup = () => {
-  const myLogger = logger.getNestedLogger("Popup");
+  const myLogger = logger.createNestedLogger("Popup");
   const [activeWindow, setActiveWindow] = useState<Types.ActiveWindow | undefined | null>(null);
   const isLoading = activeWindow === null;
   const noActiveWindow = activeWindow === undefined;

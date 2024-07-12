@@ -16,7 +16,7 @@ import Logger from "../logger";
 
 // FIXME: There might be cases where the main frame is not accessible, but the subframes are. In this case, the mouse tracker logic will not work.
 
-const logger = Logger.getLogger("content_script");
+const logger = Logger.createLogger("content_script");
 const isMainFrame = window === window.top;
 
 // Ping-pong message to check if the content script is running
@@ -113,7 +113,7 @@ DetachableDOM.addEventListener(window, "message", (event) => {
     return;
   }
 
-  const myLogger = logger.getNestedLogger("message");
+  const myLogger = logger.createNestedLogger("message");
   if (type === "startPageFocusTimeout") {
     // this message is sent only to the main frame by a nested frame when it wants to start the page focus timeout
     if (!isMainFrame) {
@@ -214,7 +214,7 @@ DetachableDOM.addEventListener(
 );
 
 function startPageFocusTimeout() {
-  const myLogger = Logger.getLogger("startPageFocusTimeout");
+  const myLogger = logger.createNestedLogger("startPageFocusTimeout");
   if (!listenToPageFocusEvents) {
     myLogger.warn("should not be called when listenToPageFocusEvents is false - isMainFrame: ", isMainFrame);
     return;
@@ -244,7 +244,7 @@ function startPageFocusTimeout() {
 }
 
 function clearPageFocusTimeout() {
-  const myLogger = logger.getNestedLogger("clearPageFocusTimeout");
+  const myLogger = logger.createNestedLogger("clearPageFocusTimeout");
   if (listenToPageFocusEvents) {
     myLogger.warn("should not be called when listenToPageFocusEvents is true - isMainFrame: ", isMainFrame);
     return;
@@ -273,7 +273,7 @@ function clearPageFocusTimeout() {
 }
 
 function setMouseInPageStatus(status: MouseInPageStatus) {
-  const myLogger = logger.getNestedLogger("setMouseInPageStatus");
+  const myLogger = logger.createNestedLogger("setMouseInPageStatus");
   if (!isMainFrame) {
     myLogger.warn("should only be called in the main frame");
     return;

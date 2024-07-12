@@ -20,7 +20,7 @@ import { DBSchema, IDBPDatabase, IDBPTransaction, IndexNames, StoreNames, openDB
 import { ModelDataBase } from "../types/types";
 import Logger from "../logger";
 
-const logger = Logger.getLogger("Database", { color: "blue" });
+const logger = Logger.createLogger("Database", { color: "blue" });
 
 const schemas = {
   model: {

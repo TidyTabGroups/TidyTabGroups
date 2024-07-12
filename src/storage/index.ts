@@ -1,5 +1,6 @@
 import Misc from "../misc";
 import { LocalStorageShape } from "../types/types";
+
 let readyPromise = new Misc.NonRejectablePromise<void>();
 let ready = readyPromise.getPromise();
 

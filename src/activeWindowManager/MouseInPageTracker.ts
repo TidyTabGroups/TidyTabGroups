@@ -1,6 +1,6 @@
 import Logger from "../logger";
 import { ChromeTabWithId, MouseInPageStatus } from "../types/types";
-const logger = Logger.getLogger("MouseInPageTracker");
+const logger = Logger.createLogger("MouseInPageTracker");
 
 type OnChangeListener = (mouseInPageStatus: MouseInPageStatus, tab: ChromeTabWithId) => void;
 
@@ -9,7 +9,7 @@ let m_didInitialize = false;
 let m_onChangeListeners: OnChangeListener[] = [];
 
 export async function initialize() {
-  const myLogger = logger.getNestedLogger("initialize");
+  const myLogger = logger.createNestedLogger("initialize");
   if (m_didInitialize) {
     throw new Error(myLogger.getPrefixedMessage("MouseInPageTracker already initialized"));
   }

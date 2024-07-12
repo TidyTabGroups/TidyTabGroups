@@ -1,5 +1,5 @@
 export interface Logger {
-  getNestedLogger: (nestedPrefix?: string, filter?: (message: string) => boolean) => Logger;
+  createNestedLogger: (nestedPrefix?: string, filter?: (message: string) => boolean) => Logger;
   getPrefixedMessage: (message: string) => string;
   setEnableLogging: (value: boolean) => void;
   log: (message: any, ...args: any[]) => void;
@@ -11,8 +11,7 @@ export interface Logger {
   throwPrefixed: (message?: string | undefined) => void;
 }
 
-// TODO: change name to createLogger
-export function getLogger(
+export function createLogger(
   prefix?: string,
   options?: { enableLogging?: boolean; color?: string; divider?: string; filter?: (message: string) => boolean },
   extraArgs?: any[]
@@ -35,7 +34,7 @@ export function getLogger(
 
   const nestedColors = ["#E57373", "#81C784", "#64B5F6", "#FFB74D", "#9575CD", "#A1887F", "#4DD0E1", "#BA68C8", "#F48FB1", "#26A69A", "#FFF176"];
   let currentColorIndex = 0;
-  function getNestedLogger(nestedPrefix?: string, filter?: (message: string) => boolean) {
+  function createNestedLogger(nestedPrefix?: string, filter?: (message: string) => boolean) {
     const nestedColor = nestedColors[currentColorIndex];
     currentColorIndex = (currentColorIndex + 1) % nestedColors.length;
 
@@ -44,7 +43,7 @@ export function getLogger(
       ? [getCSSColorText(options.color), getCSSColorText("initial"), ...formattedPrefixData[1]]
       : formattedPrefixData[1];
 
-    return getLogger(resultingPrefixString + formattedPrefixData[0], { filter, enableLogging }, cssColors);
+    return createLogger(resultingPrefixString + formattedPrefixData[0], { filter, enableLogging }, cssColors);
   }
 
   function getPrefixedMessage(message: string) {
@@ -71,8 +70,7 @@ export function getLogger(
   }
 
   return {
-    // TODO: change name to createNestedLogger
-    getNestedLogger,
+    createNestedLogger,
     getPrefixedMessage,
     setEnableLogging: (value: boolean) => {
       enableLogging = value;
@@ -101,7 +99,7 @@ export function getLogger(
   };
 }
 
-export const attentionLogger = getLogger("ATTENTION", { color: "#ff0f0f" });
+export const attentionLogger = createLogger("ATTENTION", { color: "#ff0f0f" });
 
 function wrapTextWithColor(text: string) {
   return `%c${text}%c`;

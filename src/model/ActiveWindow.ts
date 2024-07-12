@@ -16,7 +16,7 @@ import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
 import * as Storage from "../storage";
 import * as MouseInPageTracker from "../activeWindowManager/MouseInPageTracker";
 
-const logger = Logger.getLogger("ActiveWindow", { color: "#b603fc" });
+const logger = Logger.createLogger("ActiveWindow", { color: "#b603fc" });
 
 let activeWindows: Types.ActiveWindow[] = [];
 
@@ -514,7 +514,7 @@ export async function updateActiveWindowTabGroups(
 }
 
 export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGroup: ChromeTabGroupWithId) {
-  const myLogger = logger.getNestedLogger("createActiveWindowTabGroup");
+  const myLogger = logger.createNestedLogger("createActiveWindowTabGroup");
   try {
     const activeWindow = await getOrThrow(windowId);
     let newActiveWindowTabGroup = { ...tabGroup, useTabTitle: false };
@@ -609,7 +609,7 @@ export async function focusActiveTab(tab: ChromeTabWithId) {
 }
 
 export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: ChromeTabId[]) {
-  const myLogger = logger.getNestedLogger("groupHighlightedTabs");
+  const myLogger = logger.createNestedLogger("groupHighlightedTabs");
   try {
     // whatever happens to the up-to-date version of tabId in the retry callbacks is assumed
     //  to have happened to all the highlighted tabs.
@@ -674,7 +674,7 @@ export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: Chr
 }
 
 export async function useTabTitleForEligebleTabGroups() {
-  const myLogger = logger.getNestedLogger("autoNameAllTabGroups");
+  const myLogger = logger.createNestedLogger("autoNameAllTabGroups");
   try {
     const [activeWindows, windows] = await Promise.all([
       getAll(),

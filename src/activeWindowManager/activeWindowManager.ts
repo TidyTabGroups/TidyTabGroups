@@ -7,7 +7,7 @@ import * as Storage from "../storage";
 import * as ActiveWindowEvents from "./ActiveWindowEvents";
 import * as MouseInPageTracker from "./MouseInPageTracker";
 
-const logger = Logger.getLogger("activeWindowManager", { color: "#fcba03" });
+const logger = Logger.createLogger("activeWindowManager", { color: "#fcba03" });
 
 const TAB_NOT_UP_TO_DATE_MESSAGE = (tabOrTabId: ChromeTabId | chrome.tabs.Tab) => {
   if (typeof tabOrTabId === "number") {
@@ -19,7 +19,7 @@ const TAB_NOT_UP_TO_DATE_MESSAGE = (tabOrTabId: ChromeTabId | chrome.tabs.Tab) =
 
 export async function initialize(onError: () => void) {
   let asyncInitializationSteps = new Promise<void>(async (resolve, reject) => {
-    const myLogger = logger.getNestedLogger("initialize::asyncInitializationSteps");
+    const myLogger = logger.createNestedLogger("initialize::asyncInitializationSteps");
     try {
       await MouseInPageTracker.initialize();
       MouseInPageTracker.addOnChangeListener((status, tab: ChromeTabWithId) => {
@@ -124,7 +124,7 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-    const myLogger = logger.getNestedLogger("tabs.onUpdated");
+    const myLogger = logger.createNestedLogger("tabs.onUpdated");
     // only handle these changeInfo properties
     const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title", "pinned"];
     if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
@@ -172,7 +172,7 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabs.onAttached.addListener((tabId: ChromeTabId, attachInfo: chrome.tabs.TabAttachInfo) => {
-    const myLogger = logger.getNestedLogger("tabs.onAttached");
+    const myLogger = logger.createNestedLogger("tabs.onAttached");
     queueOperationIfWindowIsActive(
       async (activeWindow) => {
         const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
@@ -216,7 +216,7 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-    const myLogger = logger.getNestedLogger("onMessage");
+    const myLogger = logger.createNestedLogger("onMessage");
     if (!message || !message.type) {
       myLogger.warn(`message is not valid - message: ${message}, sender: ${sender}`);
       return;
@@ -265,7 +265,7 @@ export async function initialize(onError: () => void) {
     next: boolean,
     name: string
   ) {
-    const myLogger = logger.getNestedLogger("queueOperationIfWindowIsActive");
+    const myLogger = logger.createNestedLogger("queueOperationIfWindowIsActive");
     queueOperation(async () => {
       let activeWindow: Types.ActiveWindow;
       try {

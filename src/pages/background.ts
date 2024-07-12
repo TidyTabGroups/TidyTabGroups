@@ -5,7 +5,7 @@ import { ActiveWindow } from "../model";
 import * as Storage from "../storage";
 import { LocalStorageShape, ChromeWindowWithId } from "../types/types";
 
-const logger = Logger.getLogger("Background", { color: "pink" });
+const logger = Logger.createLogger("Background", { color: "pink" });
 
 Database.initializeDatabaseConnection("model").catch(onError);
 ActiveWindowManager.initialize(onError);
