@@ -102,7 +102,7 @@ const UserPreferences = () => {
             ),
           },
         ]}
-        title="Behaviour"
+        title="Functionality"
       />
     </Container>
   );
