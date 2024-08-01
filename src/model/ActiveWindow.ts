@@ -302,10 +302,19 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
   let useTabTitleForGroupId: ChromeTabGroupId | null = null;
   // TODO: check for `automatically group created tabs` user preference
   if (selectedTab && selectedTab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tabs.length === 1) {
-    const newGroupId = await ChromeWindowHelper.groupTabs({ createProperties: { windowId }, tabIds: selectedTab.id });
-    selectedTab.groupId = newGroupId;
-    // TODO: check for `use tab title for blank tab groups` user preference
-    useTabTitleForGroupId = newGroupId;
+    const newGroupId = await ChromeWindowHelper.groupTabs<true>({ createProperties: { windowId }, tabIds: selectedTab.id }, async () => {
+      const [windowUpToDate, tabsUpToDate] = await Promise.all([
+        ChromeWindowHelper.getIfWindowExists(windowId),
+        ChromeWindowHelper.queryTabsIfWindowExists(windowId),
+      ]);
+      return !!(windowUpToDate && tabsUpToDate && tabsUpToDate.length === 1 && tabsUpToDate[0].id === selectedTab.id);
+    });
+
+    if (newGroupId) {
+      selectedTab.groupId = newGroupId;
+      // TODO: check for `use tab title for blank tab groups` user preference
+      useTabTitleForGroupId = newGroupId;
+    }
   }
 
   await ChromeWindowHelper.focusTabGroup(selectedTab ? selectedTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE, windowId, {

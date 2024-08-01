@@ -231,6 +231,12 @@ export async function getIfWindowExists(windowId: ChromeWindowId) {
   } catch (error) {}
 }
 
+export async function queryTabsIfWindowExists(windowId: ChromeWindowId) {
+  try {
+    return (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
+  } catch (error) {}
+}
+
 export async function doesWindowExist(windowId: ChromeWindowId) {
   const window = await getIfWindowExists(windowId);
   return !!window;
