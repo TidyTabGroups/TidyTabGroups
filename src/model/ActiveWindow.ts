@@ -299,24 +299,6 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
     await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors, lastFocusedWindowHadFocusMode: true });
   }
 
-  let useTabTitleForGroupId: ChromeTabGroupId | null = null;
-  // TODO: check for `automatically group created tabs` user preference
-  if (selectedTab && selectedTab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tabs.length === 1) {
-    const newGroupId = await ChromeWindowHelper.groupTabs<true>({ createProperties: { windowId }, tabIds: selectedTab.id }, async () => {
-      const [windowUpToDate, tabsUpToDate] = await Promise.all([
-        ChromeWindowHelper.getIfWindowExists(windowId),
-        ChromeWindowHelper.queryTabsIfWindowExists(windowId),
-      ]);
-      return !!(windowUpToDate && tabsUpToDate && tabsUpToDate.length === 1 && tabsUpToDate[0].id === selectedTab.id);
-    });
-
-    if (newGroupId) {
-      selectedTab.groupId = newGroupId;
-      // TODO: check for `use tab title for blank tab groups` user preference
-      useTabTitleForGroupId = newGroupId;
-    }
-  }
-
   await ChromeWindowHelper.focusTabGroup(selectedTab ? selectedTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE, windowId, {
     collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
     highlightColors: newFocusModeColors ?? undefined,
@@ -332,9 +314,8 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
   const newActiveWindow = {
     windowId,
     focusMode: newFocusMode,
-    // TODO: need to allow the caller to pass in other ActiveWindowTabGroup properties like useTabTitle
     tabGroups: tabGroups.map((tabGroup) => {
-      return chromeTabGroupToActiveWindowTabGroup(tabGroup, { useTabTitle: tabGroup.id === useTabTitleForGroupId });
+      return chromeTabGroupToActiveWindowTabGroup(tabGroup);
     }),
   } as Types.ActiveWindow;
 
@@ -438,6 +419,7 @@ export function chromeTabGroupToActiveWindowTabGroup(
     windowId: tabGroup.windowId,
     color: tabGroup.color,
     collapsed: tabGroup.collapsed,
+    useTabTitle: false,
     ...otherProperties,
   } as Types.ActiveWindowTabGroup;
 
