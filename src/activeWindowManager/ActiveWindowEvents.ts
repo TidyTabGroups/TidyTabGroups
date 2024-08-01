@@ -385,7 +385,7 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
     // 2
     if (
       (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned) ||
-      (changeInfo.pinned === false && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE)
+      (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && changeInfo.pinned === false)
     ) {
       // TODO: check for `automatically group created tabs` user preference
       // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
