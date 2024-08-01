@@ -283,9 +283,6 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
 
   const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
   const selectedTab = tabs.find((tab) => tab.active);
-  if (!selectedTab) {
-    throw new Error(`activateWindow::window with id ${windowId} has no active tab`);
-  }
 
   let newFocusModeColors: ActiveWindowFocusModeColors | null = null;
   if (focusModeColors) {
@@ -302,16 +299,16 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
     await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors, lastFocusedWindowHadFocusMode: true });
   }
 
-  // TODO: check for `automatically group created tabs` user preference
   let useTabTitleForGroupId: ChromeTabGroupId | null = null;
-  if (tabs.length === 1 && selectedTab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+  // TODO: check for `automatically group created tabs` user preference
+  if (selectedTab && selectedTab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tabs.length === 1) {
     const newGroupId = await ChromeWindowHelper.groupTabs({ createProperties: { windowId }, tabIds: selectedTab.id });
     selectedTab.groupId = newGroupId;
     // TODO: check for `use tab title for blank tab groups` user preference
     useTabTitleForGroupId = newGroupId;
   }
 
-  await ChromeWindowHelper.focusTabGroup(selectedTab.groupId, windowId, {
+  await ChromeWindowHelper.focusTabGroup(selectedTab ? selectedTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE, windowId, {
     collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
     highlightColors: newFocusModeColors ?? undefined,
   });
