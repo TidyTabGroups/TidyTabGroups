@@ -57,12 +57,21 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.windows.onCreated.addListener((window: chrome.windows.Window) => {
-    if (!window.id || window.type !== "normal") {
-      logger.warn("onWindowCreated::window is not valid:", window);
+    const myLogger = logger.createNestedLogger("windows.onCreated");
+    const windowId = window.id;
+    if (windowId === undefined || window.type !== "normal") {
+      myLogger.warn("window is not valid:", window);
       return;
     }
 
-    queueOperation(() => ActiveWindowEvents.onWindowCreated(window as ChromeWindowWithId), true);
+    queueOperation(async () => {
+      const windowUpToDate = await ChromeWindowHelper.getIfWindowExists(windowId);
+      if (!windowUpToDate) {
+        myLogger.warn("windowUpToDate not found - window.id: ", windowId);
+        return;
+      }
+      await ActiveWindowEvents.onWindowCreated(window as ChromeWindowWithId);
+    }, true);
   });
 
   chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
