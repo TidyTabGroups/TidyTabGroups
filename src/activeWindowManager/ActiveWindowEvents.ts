@@ -383,10 +383,9 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
     }
 
     // 2
-    if (
-      (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned) ||
-      (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && changeInfo.pinned === false)
-    ) {
+    const wasUngrouped = changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned;
+    const wasUnpinned = changeInfo.pinned === false && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
+    if (wasUngrouped || wasUnpinned) {
       // TODO: check for `automatically group created tabs` user preference
       // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
       //  selecting "remove from group" on the tab of this event), it will be apart of highlightedTabs, which is undesired behavior.
