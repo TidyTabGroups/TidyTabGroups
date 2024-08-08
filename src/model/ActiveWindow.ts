@@ -524,7 +524,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
 
     // 2
     // TODO: check for `use tab title for blank tab groups` user preference
-    const useTabTitle = tabGroupUpToDate.title === undefined || tabGroupUpToDate.title === "";
+    const useTabTitle = ChromeWindowHelper.isTabGroupTitleEmpty(tabGroupUpToDate.title);
     if (useTabTitle) {
       // FIXME: remove the timeout workaround once the chromium bug is resolved: https://issues.chromium.org/issues/334965868#comment4
       await Misc.waitMs(30);
@@ -538,7 +538,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
         return;
       }
 
-      if (tabGroupUpToDate.title === undefined || tabGroupUpToDate.title === "") {
+      if (ChromeWindowHelper.isTabGroupTitleEmpty(tabGroupUpToDate.title)) {
         tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: newTitle });
         newActiveWindowTabGroup = { ...newActiveWindowTabGroup, title: tabGroupUpToDate.title, useTabTitle: true };
       }

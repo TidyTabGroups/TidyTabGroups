@@ -381,3 +381,7 @@ export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
 
   return candidateTab?.title;
 }
+
+export function isTabGroupTitleEmpty(title: chrome.tabGroups.TabGroup["title"]) {
+  return title === undefined || title === "";
+}
