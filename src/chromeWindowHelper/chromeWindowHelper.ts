@@ -356,3 +356,28 @@ export function tabGroupEquals(tabGroup: ChromeTabGroupWithId, tabGroupToCompare
 
   return true;
 }
+
+export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
+  let candidateTab: ChromeTabWithId | undefined;
+  tabsInGroup.forEach((tab) => {
+    if (
+      (!candidateTab ||
+        (!candidateTab.active &&
+          // prioritize by the active tab in it's window
+          // FIXME: since the lastAccessed property is being compared, there is no need to check the tab.active property. However,
+          //  we are currently doing so as a fallback for correctness due to the instability with the lastAccessed property.
+          //  See https://issues.chromium.org/issues/326678907.
+          (tab.active ||
+            // then prioritize by lastAccessed
+            (tab.lastAccessed && (!candidateTab.lastAccessed || tab.lastAccessed > candidateTab.lastAccessed)) ||
+            // then prioritize by index if there is no lastAccessed on either tab
+            (!candidateTab.lastAccessed && tab.index > candidateTab.index)))) &&
+      tab.title &&
+      tab.title.length > 0
+    ) {
+      candidateTab = tab;
+    }
+  });
+
+  return candidateTab?.title;
+}

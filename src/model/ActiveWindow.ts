@@ -530,7 +530,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
       await Misc.waitMs(30);
 
       const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
-      const newTitle = getTabTitleForUseTabTitle(tabsInGroup) ?? Misc.DEFAULT_TAB_GROUP_TITLE;
+      const newTitle = ChromeWindowHelper.getTabTitleForUseTabTitle(tabsInGroup) ?? Misc.DEFAULT_TAB_GROUP_TITLE;
 
       tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
       if (!tabGroupUpToDate) {
@@ -688,7 +688,7 @@ export async function useTabTitleForEligebleTabGroups() {
         await Promise.all(
           Object.entries(tabsByGroupId).map(async ([groupId, tabsInGroup]) => {
             const activeWindowTabGroup = await getActiveWindowTabGroup(window.id, parseInt(groupId));
-            const tabTitle = getTabTitleForUseTabTitle(tabsInGroup);
+            const tabTitle = ChromeWindowHelper.getTabTitleForUseTabTitle(tabsInGroup);
             if (!activeWindowTabGroup || !activeWindowTabGroup.useTabTitle || !tabTitle || activeWindowTabGroup.title === tabTitle) {
               return;
             }
@@ -702,29 +702,4 @@ export async function useTabTitleForEligebleTabGroups() {
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
-}
-
-function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
-  let candidateTab: ChromeTabWithId | undefined;
-  tabsInGroup.forEach((tab) => {
-    if (
-      (!candidateTab ||
-        (!candidateTab.active &&
-          // prioritize by the active tab in it's window
-          // FIXME: since the lastAccessed property is being compared, there is no need to check the tab.active property. However,
-          //  we are currently doing so as a fallback for correctness due to the instability with the lastAccessed property.
-          //  See https://issues.chromium.org/issues/326678907.
-          (tab.active ||
-            // then prioritize by lastAccessed
-            (tab.lastAccessed && (!candidateTab.lastAccessed || tab.lastAccessed > candidateTab.lastAccessed)) ||
-            // then prioritize by index if there is no lastAccessed on either tab
-            (!candidateTab.lastAccessed && tab.index > candidateTab.index)))) &&
-      tab.title &&
-      tab.title.length > 0
-    ) {
-      candidateTab = tab;
-    }
-  });
-
-  return candidateTab?.title;
 }
