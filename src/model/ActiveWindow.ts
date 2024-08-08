@@ -687,18 +687,14 @@ export async function useTabTitleForEligebleTabGroups() {
 
         await Promise.all(
           Object.entries(tabsByGroupId).map(async ([groupId, tabsInGroup]) => {
+            const activeWindowTabGroup = await getActiveWindowTabGroup(window.id, parseInt(groupId));
             const tabTitle = getTabTitleForUseTabTitle(tabsInGroup);
-            if (tabTitle) {
-              const activeWindowTabGroup = await getActiveWindowTabGroup(window.id, parseInt(groupId));
-              if (!activeWindowTabGroup) {
-                return;
-              }
-
-              if (activeWindowTabGroup.useTabTitle && activeWindowTabGroup.title !== tabTitle) {
-                const updatedTabGroup = await ChromeWindowHelper.updateTabGroup(activeWindowTabGroup.id, { title: tabTitle });
-                await updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, { title: updatedTabGroup.title });
-              }
+            if (!activeWindowTabGroup || !activeWindowTabGroup.useTabTitle || !tabTitle || activeWindowTabGroup.title === tabTitle) {
+              return;
             }
+
+            const updatedTabGroup = await ChromeWindowHelper.updateTabGroup(activeWindowTabGroup.id, { title: tabTitle });
+            await updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, { title: updatedTabGroup.title });
           })
         );
       })
