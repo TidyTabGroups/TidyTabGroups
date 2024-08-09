@@ -277,73 +277,78 @@ async function activateWindowInternal(
   groupUnpinnedAndUngroupedTabs: boolean,
   focusModeColors?: ActiveWindowFocusModeColors
 ) {
-  const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
-  if (!window) {
-    throw new Error(`activateWindow::window with id ${window} not found`);
-  }
+  const myLogger = logger.createNestedLogger("activateWindowInternal");
+  try {
+    const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
+    if (!window) {
+      throw new Error(`activateWindow::window with id ${window} not found`);
+    }
 
-  if (window.type !== "normal") {
-    throw new Error(`activateWindow::window with id ${window} is not a normal window`);
-  }
+    if (window.type !== "normal") {
+      throw new Error(`activateWindow::window with id ${window} is not a normal window`);
+    }
 
-  const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
-  const selectedTab = tabs.find((tab) => tab.active);
+    const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
+    const selectedTab = tabs.find((tab) => tab.active);
 
-  let newFocusModeColors: ActiveWindowFocusModeColors | null = null;
-  if (focusModeColors) {
-    newFocusModeColors = focusModeColors;
-  } else {
-    const { lastSeenFocusModeColors, lastFocusedWindowHadFocusMode } = await Storage.getItems([
-      "lastSeenFocusModeColors",
-      "lastFocusedWindowHadFocusMode",
-    ]);
-    newFocusModeColors = lastFocusedWindowHadFocusMode ? lastSeenFocusModeColors : null;
-  }
-
-  if (window.focused && newFocusModeColors) {
-    await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors, lastFocusedWindowHadFocusMode: true });
-  }
-
-  let useTabTitleForGroupId: ChromeTabGroupId | null = null;
-  if (groupUnpinnedAndUngroupedTabs) {
-    const newTabGroupId = await ChromeWindowHelper.groupUnpinnedAndUngroupedTabs(windowId, tabs);
-    if (newTabGroupId) {
-      const [newTabGroup, tabsInGroup] = await Promise.all([
-        chrome.tabGroups.get(newTabGroupId),
-        chrome.tabs.query({ groupId: newTabGroupId }) as Promise<ChromeTabWithId[]>,
+    let newFocusModeColors: ActiveWindowFocusModeColors | null = null;
+    if (focusModeColors) {
+      newFocusModeColors = focusModeColors;
+    } else {
+      const { lastSeenFocusModeColors, lastFocusedWindowHadFocusMode } = await Storage.getItems([
+        "lastSeenFocusModeColors",
+        "lastFocusedWindowHadFocusMode",
       ]);
-      if (ChromeWindowHelper.isTabGroupTitleEmpty(newTabGroup.title)) {
-        await ChromeWindowHelper.updateTabGroup(newTabGroupId, {
-          title: ChromeWindowHelper.getTabTitleForUseTabTitle(tabsInGroup) ?? `${tabsInGroup.length} tabs`,
-        });
-        // TODO: check for `use tab title for blank tab groups` user preference
-        useTabTitleForGroupId = newTabGroupId;
+      newFocusModeColors = lastFocusedWindowHadFocusMode ? lastSeenFocusModeColors : null;
+    }
+
+    if (window.focused && newFocusModeColors) {
+      await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors, lastFocusedWindowHadFocusMode: true });
+    }
+
+    let useTabTitleForGroupId: ChromeTabGroupId | null = null;
+    if (groupUnpinnedAndUngroupedTabs) {
+      const newTabGroupId = await ChromeWindowHelper.groupUnpinnedAndUngroupedTabs(windowId, tabs);
+      if (newTabGroupId) {
+        const [newTabGroup, tabsInGroup] = await Promise.all([
+          chrome.tabGroups.get(newTabGroupId),
+          chrome.tabs.query({ groupId: newTabGroupId }) as Promise<ChromeTabWithId[]>,
+        ]);
+        if (ChromeWindowHelper.isTabGroupTitleEmpty(newTabGroup.title)) {
+          await ChromeWindowHelper.updateTabGroup(newTabGroupId, {
+            title: ChromeWindowHelper.getTabTitleForUseTabTitle(tabsInGroup) ?? `${tabsInGroup.length} tabs`,
+          });
+          // TODO: check for `use tab title for blank tab groups` user preference
+          useTabTitleForGroupId = newTabGroupId;
+        }
       }
     }
+
+    await ChromeWindowHelper.focusTabGroup(selectedTab ? selectedTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE, windowId, {
+      collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
+      highlightColors: newFocusModeColors ?? undefined,
+    });
+
+    const tabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
+    let newFocusMode = newFocusModeColors
+      ? {
+          colors: newFocusModeColors,
+          savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
+        }
+      : null;
+    const newActiveWindow = {
+      windowId,
+      focusMode: newFocusMode,
+      tabGroups: tabGroups.map((tabGroup) => {
+        return chromeTabGroupToActiveWindowTabGroup(tabGroup, { useTabTitle: useTabTitleForGroupId === tabGroup.id });
+      }),
+    } as Types.ActiveWindow;
+
+    await add(newActiveWindow);
+    return newActiveWindow;
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
-
-  await ChromeWindowHelper.focusTabGroup(selectedTab ? selectedTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE, windowId, {
-    collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
-    highlightColors: newFocusModeColors ?? undefined,
-  });
-
-  const tabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
-  let newFocusMode = newFocusModeColors
-    ? {
-        colors: newFocusModeColors,
-        savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
-      }
-    : null;
-  const newActiveWindow = {
-    windowId,
-    focusMode: newFocusMode,
-    tabGroups: tabGroups.map((tabGroup) => {
-      return chromeTabGroupToActiveWindowTabGroup(tabGroup, { useTabTitle: useTabTitleForGroupId === tabGroup.id });
-    }),
-  } as Types.ActiveWindow;
-
-  await add(newActiveWindow);
-  return newActiveWindow;
 }
 
 export async function activateWindow(windowId: ChromeWindowId, groupUnpinnedAndUngroupedTabs: boolean) {
