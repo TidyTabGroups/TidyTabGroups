@@ -244,7 +244,8 @@ export async function reactivateAllWindows() {
     await Promise.all(
       windowIds.map(async (windowId) => {
         const previousActiveWindow = previousActiveWindows.find((previousActiveWindow) => previousActiveWindow.windowId === windowId);
-        await activateWindowInternal(windowId, previousActiveWindow?.focusMode?.colors);
+        const groupUnpinnedAndUngroupedTabs = previousActiveWindow === undefined;
+        await activateWindowInternal(windowId, groupUnpinnedAndUngroupedTabs, previousActiveWindow?.focusMode?.colors);
       })
     );
   } catch (error) {
@@ -263,7 +264,7 @@ export async function activateAllWindows() {
 
   try {
     const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
-    await Promise.all(windows.map((window) => activateWindowInternal(window.id)));
+    await Promise.all(windows.map((window) => activateWindowInternal(window.id, true)));
   } catch (error) {
     throw new Error(`activateAllWindows::${error}`);
   } finally {
@@ -271,7 +272,11 @@ export async function activateAllWindows() {
   }
 }
 
-async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?: ActiveWindowFocusModeColors) {
+async function activateWindowInternal(
+  windowId: ChromeWindowId,
+  groupUnpinnedAndUngroupedTabs: boolean,
+  focusModeColors?: ActiveWindowFocusModeColors
+) {
   const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
   if (!window) {
     throw new Error(`activateWindow::window with id ${window} not found`);
@@ -299,6 +304,24 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
     await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors, lastFocusedWindowHadFocusMode: true });
   }
 
+  let useTabTitleForGroupId: ChromeTabGroupId | null = null;
+  if (groupUnpinnedAndUngroupedTabs) {
+    const newTabGroupId = await ChromeWindowHelper.groupUnpinnedAndUngroupedTabs(windowId, tabs);
+    if (newTabGroupId) {
+      const [newTabGroup, tabsInGroup] = await Promise.all([
+        chrome.tabGroups.get(newTabGroupId),
+        chrome.tabs.query({ groupId: newTabGroupId }) as Promise<ChromeTabWithId[]>,
+      ]);
+      if (ChromeWindowHelper.isTabGroupTitleEmpty(newTabGroup.title)) {
+        await ChromeWindowHelper.updateTabGroup(newTabGroupId, {
+          title: ChromeWindowHelper.getTabTitleForUseTabTitle(tabsInGroup) ?? `${tabsInGroup.length} tabs`,
+        });
+        // TODO: check for `use tab title for blank tab groups` user preference
+        useTabTitleForGroupId = newTabGroupId;
+      }
+    }
+  }
+
   await ChromeWindowHelper.focusTabGroup(selectedTab ? selectedTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE, windowId, {
     collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
     highlightColors: newFocusModeColors ?? undefined,
@@ -315,7 +338,7 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
     windowId,
     focusMode: newFocusMode,
     tabGroups: tabGroups.map((tabGroup) => {
-      return chromeTabGroupToActiveWindowTabGroup(tabGroup);
+      return chromeTabGroupToActiveWindowTabGroup(tabGroup, { useTabTitle: useTabTitleForGroupId === tabGroup.id });
     }),
   } as Types.ActiveWindow;
 
@@ -323,7 +346,7 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
   return newActiveWindow;
 }
 
-export async function activateWindow(windowId: ChromeWindowId) {
+export async function activateWindow(windowId: ChromeWindowId, groupUnpinnedAndUngroupedTabs: boolean) {
   if (isActivatingWindow(windowId)) {
     throw new Error(`activateWindow::windowId ${windowId} is already being activated`);
   }
@@ -331,7 +354,7 @@ export async function activateWindow(windowId: ChromeWindowId) {
   windowsBeingActivated.push(windowId);
 
   try {
-    await activateWindowInternal(windowId);
+    await activateWindowInternal(windowId, groupUnpinnedAndUngroupedTabs);
   } catch (error) {
     throw new Error(`activateWindow::${error}`);
   } finally {

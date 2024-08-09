@@ -12,7 +12,7 @@ export async function onWindowCreated(window: ChromeWindowWithId) {
   logger.log(`onWindowCreated::window:`, window);
 
   try {
-    const newActiveWindow = await ActiveWindow.activateWindow(window.id);
+    const newActiveWindow = await ActiveWindow.activateWindow(window.id, true);
     logger.log(`onWindowCreated::newActiveWindow:`, newActiveWindow);
   } catch (error) {
     throw new Error(`onWindowCreated::error processing window:${error}`);
