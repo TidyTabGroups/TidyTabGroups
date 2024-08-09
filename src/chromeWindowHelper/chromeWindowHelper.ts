@@ -452,8 +452,10 @@ export async function focusActiveTab(
     };
   }
 ) {
+  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId[], true>();
   const { groupId: originalGroupId, windowId: originalWindowId } = tab;
-  return await focusTabGroup<true>(originalGroupId, originalWindowId, options, async function shouldRetryCallAfterUserIsDoneTabDragging() {
+
+  operationHandler.setShouldRetryOperationCallback(async () => {
     const [tabUpToDate, tabGroupUpToDate] = await Promise.all([
       getIfTabExists(tab.id),
       originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE ? undefined : getIfTabGroupExists(originalGroupId),
@@ -466,4 +468,6 @@ export async function focusActiveTab(
       (originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE || !!tabGroupUpToDate)
     );
   });
+
+  return await operationHandler.try(focusTabGroup(originalGroupId, originalWindowId, options));
 }
