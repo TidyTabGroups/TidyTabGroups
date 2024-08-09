@@ -9,6 +9,9 @@ import {
 } from "../types/types";
 import Misc from "../misc";
 import ChromeTabOperationRetryHandler from "../chromeTabOperationRetryHandler";
+import Logger from "../logger";
+
+const logger = Logger.createLogger("chromeWindowHelper");
 
 export async function getTabGroupsOrdered(
   windowIdOrTabs: ChromeWindowId | ChromeTabWithId[],
