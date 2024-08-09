@@ -310,14 +310,13 @@ export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowI
   return tabs.sort((tab1, tab2) => (tab1.lastAccessed || 0) - (tab2.lastAccessed || 0));
 }
 
-export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
+export async function focusTabGroup(
   tabGroupId: ChromeTabGroupId,
   tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
   options: {
     collapseUnfocusedTabGroups: boolean;
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
-  },
-  shouldRetryCallAfterUserIsDoneTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
+  }
 ) {
   const tabGroups = Array.isArray(tabGroupsOrWindowId)
     ? tabGroupsOrWindowId
@@ -346,7 +345,7 @@ export async function focusTabGroup<ShouldRetryCall extends boolean = false>(
       }
 
       if (Object.keys(updateProps).length > 0) {
-        return await updateTabGroup<ShouldRetryCall>(tabGroup.id, updateProps, shouldRetryCallAfterUserIsDoneTabDragging);
+        return await updateTabGroup(tabGroup.id, updateProps);
       }
     })
   )) as (ChromeTabGroupWithId | undefined)[];
