@@ -35,7 +35,12 @@ export async function getTabGroupsOrdered(
 }
 
 export async function activateTab(tabId: ChromeTabId) {
-  return callAfterUserIsDoneTabDragging(() => chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>);
+  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabWithId, true>();
+  operationHandler.setShouldRetryOperationCallback(async () => {
+    const activeTabUpToDate = await getIfTabExists(tabId);
+    return !!activeTabUpToDate;
+  });
+  return await operationHandler.try(chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>);
 }
 
 export async function updateTabGroup<ShouldRetryCall extends boolean = false>(
