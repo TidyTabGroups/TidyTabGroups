@@ -8,6 +8,7 @@ import {
   ChromeTabGroupColorEnum,
 } from "../types/types";
 import Misc from "../misc";
+import ChromeTabOperationRetryHandler from "../chromeTabOperationRetryHandler";
 
 export async function getTabGroupsOrdered(
   windowIdOrTabs: ChromeWindowId | ChromeTabWithId[],
@@ -355,6 +356,36 @@ export function tabGroupEquals(tabGroup: ChromeTabGroupWithId, tabGroupToCompare
   }
 
   return true;
+}
+
+export async function getUnpinnedAndUngroupedTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+  const { tabs } = await getWindowIdAndTabs(windowIdOrTabs);
+  return tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned);
+}
+
+export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId, tabs?: ChromeTabWithId[]) {
+  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
+
+  const tabIdsWithNoGroup = (await getUnpinnedAndUngroupedTabs(tabs ?? windowId)).map((tab) => tab.id);
+  operationHandler.setOperation(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroup }));
+  operationHandler.setShouldRetryOperationCallback(async () => {
+    const [windowUpToDate, tabsWithNoGroupUpToDate] = await Promise.all([
+      getIfWindowExists(windowId),
+      queryTabsIfWindowExists(windowId, { pinned: false, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE }),
+    ]);
+
+    if (!windowUpToDate || !tabsWithNoGroupUpToDate || tabsWithNoGroupUpToDate.length === 0) {
+      return false;
+    }
+
+    // Reset the operation for the tabs up-to-date
+    const tabIdsWithNoGroupUpToDate = tabsWithNoGroupUpToDate.map((tab) => tab.id);
+    operationHandler.setOperation(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroupUpToDate }));
+
+    return true;
+  });
+
+  return await operationHandler.tryOperation();
 }
 
 export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
