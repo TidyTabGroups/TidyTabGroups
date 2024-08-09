@@ -374,9 +374,12 @@ export async function getUnpinnedAndUngroupedTabs(windowIdOrTabs: ChromeWindowId
 export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId, tabs?: ChromeTabWithId[]) {
   const myLogger = logger.createNestedLogger("groupUnpinnedAndUngroupedTabs");
   try {
-    const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
     const tabIdsWithNoGroup = (await getUnpinnedAndUngroupedTabs(tabs ?? windowId)).map((tab) => tab.id);
+    if (tabIdsWithNoGroup.length === 0) {
+      return;
+    }
 
+    const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
     operationHandler.setShouldRetryOperationCallback(async () => {
       const [windowUpToDate, tabsWithNoGroupUpToDate] = await Promise.all([
         getIfWindowExists(windowId),
