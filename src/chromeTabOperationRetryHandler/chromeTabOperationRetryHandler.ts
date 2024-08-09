@@ -4,6 +4,7 @@
   replacing of operations between retries.
 */
 
+import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import Misc from "../misc";
 
@@ -37,28 +38,19 @@ export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation exte
       throw new Error(logger.getPrefixedMessage("operation is null"));
     }
 
-    try {
-      return await this.operation;
-    } catch (error) {
-      if (Misc.getErrorMessage(error) !== "Tabs cannot be edited right now (user may be dragging a tab).") {
-        throw error;
-      }
+    const { result, encounteredUserInteractionError } = await ChromeWindowHelper.withUserInteractionErrorHandler(this.operation);
+    if (!encounteredUserInteractionError) {
+      return result;
+    }
 
-      logger.log(`Handled user interaction: `, this.operation.toString());
-      return new Promise((resolve, reject) =>
-        setTimeout(async () => {
-          try {
-            let shouldRetry = this.shouldRetryOperationCallback ? await this.shouldRetryOperationCallback() : true;
-            if (shouldRetry) {
-              resolve(await this.tryOperation());
-            } else {
-              resolve(undefined as ShouldRetryOperation extends true ? T | undefined : T);
-            }
-          } catch (error) {
-            reject(error);
-          }
-        }, 100)
-      );
+    logger.log(`Handled user interaction error for operation: `, this.operation.toString());
+    await Misc.waitMs(100);
+
+    let shouldRetry = this.shouldRetryOperationCallback ? await this.shouldRetryOperationCallback() : true;
+    if (shouldRetry) {
+      return await this.tryOperation();
+    } else {
+      return undefined as ShouldRetryOperation extends true ? T | undefined : T;
     }
   }
 }

@@ -431,6 +431,20 @@ export function isTabGroupTitleEmpty(title: chrome.tabGroups.TabGroup["title"]) 
   return title === undefined || title === "";
 }
 
+export async function withUserInteractionErrorHandler<T>(
+  operation: Promise<T>
+): Promise<{ result: T; encounteredUserInteractionError: false } | { result: undefined; encounteredUserInteractionError: true }> {
+  try {
+    return { result: await operation, encounteredUserInteractionError: false };
+  } catch (error) {
+    if (Misc.getErrorMessage(error) !== "Tabs cannot be edited right now (user may be dragging a tab).") {
+      throw error;
+    }
+
+    return { result: undefined, encounteredUserInteractionError: true };
+  }
+}
+
 // TODO: use this where applicable
 async function getWindowIdAndTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
   const windowId = Array.isArray(windowIdOrTabs) ? windowIdOrTabs[0]?.windowId : (windowIdOrTabs as ChromeWindowId | undefined);
