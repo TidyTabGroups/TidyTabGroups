@@ -4,18 +4,21 @@
   replacing of operations between retries.
 */
 
+import Logger from "../logger";
+
+const logger = Logger.createLogger("ChromeTabOperationRetryHandler");
+
 // TODO: replace all uses of callAfterUserIsDoneTabDragging with this
 type ShouldRetryOperationCallback<ShouldRetryOperation extends boolean> = ShouldRetryOperation extends true ? () => Promise<boolean> : undefined;
 export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation extends boolean = false> {
-  private operation?: Promise<T>;
+  private operation: Promise<T> | null = null;
   private shouldRetryOperationCallback?: ShouldRetryOperationCallback<ShouldRetryOperation>;
 
-  constructor(operation?: Promise<T>, shouldRetryOperationCallback?: ShouldRetryOperationCallback<ShouldRetryOperation>) {
-    this.operation = operation;
+  constructor(shouldRetryOperationCallback?: ShouldRetryOperationCallback<ShouldRetryOperation>) {
     this.shouldRetryOperationCallback = shouldRetryOperationCallback;
   }
 
-  setOperation(operation: Promise<T>) {
+  replaceOperation(operation: Promise<T>) {
     this.operation = operation;
   }
 
@@ -23,9 +26,14 @@ export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation exte
     this.shouldRetryOperationCallback = shouldRetryOperationCallback;
   }
 
-  async tryOperation(): Promise<ShouldRetryOperation extends true ? T | undefined : T> {
-    if (!this.operation) {
-      throw new Error("ChromeTabOperationRetryHandler::operation is not set");
+  async try(operation: Promise<T>) {
+    this.operation = operation;
+    return this.tryOperation();
+  }
+
+  private async tryOperation(): Promise<ShouldRetryOperation extends true ? T | undefined : T> {
+    if (this.operation === null) {
+      throw new Error(logger.getPrefixedMessage("operation is null"));
     }
 
     try {
@@ -36,7 +44,7 @@ export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation exte
         throw error;
       }
 
-      console.log(`ChromeTabEditOperationerWithUserInteractionHandler::handled user interaction: `, this.operation.toString());
+      logger.log(`Handled user interaction: `, this.operation.toString());
       return new Promise((resolve, reject) =>
         setTimeout(async () => {
           try {

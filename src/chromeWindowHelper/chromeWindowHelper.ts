@@ -365,9 +365,8 @@ export async function getUnpinnedAndUngroupedTabs(windowIdOrTabs: ChromeWindowId
 
 export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId, tabs?: ChromeTabWithId[]) {
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
-
   const tabIdsWithNoGroup = (await getUnpinnedAndUngroupedTabs(tabs ?? windowId)).map((tab) => tab.id);
-  operationHandler.setOperation(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroup }));
+
   operationHandler.setShouldRetryOperationCallback(async () => {
     const [windowUpToDate, tabsWithNoGroupUpToDate] = await Promise.all([
       getIfWindowExists(windowId),
@@ -380,12 +379,12 @@ export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId, ta
 
     // Reset the operation for the tabs up-to-date
     const tabIdsWithNoGroupUpToDate = tabsWithNoGroupUpToDate.map((tab) => tab.id);
-    operationHandler.setOperation(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroupUpToDate }));
+    operationHandler.replaceOperation(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroupUpToDate }));
 
     return true;
   });
 
-  return await operationHandler.tryOperation();
+  return await operationHandler.try(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroup }));
 }
 
 export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
