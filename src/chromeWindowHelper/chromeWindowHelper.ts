@@ -372,27 +372,32 @@ export async function getUnpinnedAndUngroupedTabs(windowIdOrTabs: ChromeWindowId
 }
 
 export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId, tabs?: ChromeTabWithId[]) {
-  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
-  const tabIdsWithNoGroup = (await getUnpinnedAndUngroupedTabs(tabs ?? windowId)).map((tab) => tab.id);
+  const myLogger = logger.createNestedLogger("groupUnpinnedAndUngroupedTabs");
+  try {
+    const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
+    const tabIdsWithNoGroup = (await getUnpinnedAndUngroupedTabs(tabs ?? windowId)).map((tab) => tab.id);
 
-  operationHandler.setShouldRetryOperationCallback(async () => {
-    const [windowUpToDate, tabsWithNoGroupUpToDate] = await Promise.all([
-      getIfWindowExists(windowId),
-      queryTabsIfWindowExists(windowId, { pinned: false, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE }),
-    ]);
+    operationHandler.setShouldRetryOperationCallback(async () => {
+      const [windowUpToDate, tabsWithNoGroupUpToDate] = await Promise.all([
+        getIfWindowExists(windowId),
+        queryTabsIfWindowExists(windowId, { pinned: false, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE }),
+      ]);
 
-    if (!windowUpToDate || !tabsWithNoGroupUpToDate || tabsWithNoGroupUpToDate.length === 0) {
-      return false;
-    }
+      if (!windowUpToDate || !tabsWithNoGroupUpToDate || tabsWithNoGroupUpToDate.length === 0) {
+        return false;
+      }
 
-    // Reset the operation for the tabs up-to-date
-    const tabIdsWithNoGroupUpToDate = tabsWithNoGroupUpToDate.map((tab) => tab.id);
-    operationHandler.replaceOperation(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroupUpToDate }));
+      // Reset the operation for the tabs up-to-date
+      const tabIdsWithNoGroupUpToDate = tabsWithNoGroupUpToDate.map((tab) => tab.id);
+      operationHandler.replaceOperation(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroupUpToDate }));
 
-    return true;
-  });
+      return true;
+    });
 
-  return await operationHandler.try(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroup }));
+    return await operationHandler.try(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroup }));
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
 }
 
 export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
