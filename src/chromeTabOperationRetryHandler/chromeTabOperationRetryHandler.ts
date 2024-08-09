@@ -5,6 +5,7 @@
 */
 
 import Logger from "../logger";
+import Misc from "../misc";
 
 const logger = Logger.createLogger("ChromeTabOperationRetryHandler");
 
@@ -39,8 +40,7 @@ export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation exte
     try {
       return await this.operation;
     } catch (error) {
-      // @ts-ignore
-      if (error?.message !== "Tabs cannot be edited right now (user may be dragging a tab).") {
+      if (Misc.getErrorMessage(error) !== "Tabs cannot be edited right now (user may be dragging a tab).") {
         throw error;
       }
 
