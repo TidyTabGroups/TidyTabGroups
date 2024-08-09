@@ -431,3 +431,29 @@ async function getWindowIdAndTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWith
   const tabs = Array.isArray(windowIdOrTabs) ? (windowIdOrTabs as ChromeTabWithId[]) : ((await chrome.tabs.query({ windowId })) as ChromeTabWithId[]);
   return { windowId, tabs };
 }
+
+export async function focusActiveTab(
+  tab: ChromeTabWithId,
+  options: {
+    collapseUnfocusedTabGroups: boolean;
+    highlightColors?: {
+      focused: chrome.tabGroups.ColorEnum;
+      nonFocused: chrome.tabGroups.ColorEnum;
+    };
+  }
+) {
+  const { groupId: originalGroupId, windowId: originalWindowId } = tab;
+  return await focusTabGroup<true>(originalGroupId, originalWindowId, options, async function shouldRetryCallAfterUserIsDoneTabDragging() {
+    const [tabUpToDate, tabGroupUpToDate] = await Promise.all([
+      getIfTabExists(tab.id),
+      originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE ? undefined : getIfTabGroupExists(originalGroupId),
+    ]);
+    return (
+      !!tabUpToDate &&
+      tabUpToDate.active &&
+      tabUpToDate.windowId === originalWindowId &&
+      tabUpToDate.groupId === originalGroupId &&
+      (originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE || !!tabGroupUpToDate)
+    );
+  });
+}

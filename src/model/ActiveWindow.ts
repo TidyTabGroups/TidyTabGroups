@@ -578,28 +578,10 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
 
 export async function focusActiveTab(tab: ChromeTabWithId) {
   const activeWindow = await getOrThrow(tab.windowId);
-  const { groupId: originalGroupId, windowId: originalWindowId } = tab;
-  const tabGroupsUpToDate = await ChromeWindowHelper.focusTabGroup<true>(
-    originalGroupId,
-    originalWindowId,
-    {
-      collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
-      highlightColors: activeWindow.focusMode?.colors,
-    },
-    async function shouldRetryCallAfterUserIsDoneTabDragging() {
-      const [tabUpToDate, tabGroupUpToDate] = await Promise.all([
-        ChromeWindowHelper.getIfTabExists(tab.id),
-        originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE ? undefined : ChromeWindowHelper.getIfTabGroupExists(originalGroupId),
-      ]);
-      return (
-        !!tabUpToDate &&
-        tabUpToDate.active &&
-        tabUpToDate.windowId === originalWindowId &&
-        tabUpToDate.groupId === originalGroupId &&
-        (originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE || !!tabGroupUpToDate)
-      );
-    }
-  );
+  const tabGroupsUpToDate = await ChromeWindowHelper.focusActiveTab(tab, {
+    collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
+    highlightColors: activeWindow.focusMode?.colors,
+  });
 
   const tabGroupsUpToDateById: { [tabGroupId: ChromeTabGroupId]: ChromeTabGroupWithId } = (tabGroupsUpToDate as ChromeTabGroupWithId[]).reduce(
     (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
