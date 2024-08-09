@@ -385,3 +385,14 @@ export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
 export function isTabGroupTitleEmpty(title: chrome.tabGroups.TabGroup["title"]) {
   return title === undefined || title === "";
 }
+
+// TODO: use this where applicable
+async function getWindowIdAndTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+  const windowId = Array.isArray(windowIdOrTabs) ? windowIdOrTabs[0]?.windowId : (windowIdOrTabs as ChromeWindowId | undefined);
+  if (windowId === undefined) {
+    return { windowId: chrome.windows.WINDOW_ID_NONE, tabs: [] };
+  }
+
+  const tabs = Array.isArray(windowIdOrTabs) ? (windowIdOrTabs as ChromeTabWithId[]) : ((await chrome.tabs.query({ windowId })) as ChromeTabWithId[]);
+  return { windowId, tabs };
+}
