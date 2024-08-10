@@ -318,10 +318,7 @@ export async function focusTabGroup(
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
   }
 ) {
-  const tabGroups = Array.isArray(tabGroupsOrWindowId)
-    ? tabGroupsOrWindowId
-    : ((await chrome.tabGroups.query({ windowId: tabGroupsOrWindowId })) as ChromeTabGroupWithId[]);
-
+  const { windowId, tabGroups } = await getWindowIdAndTabGroups(tabGroupsOrWindowId);
   const { collapseUnfocusedTabGroups, highlightColors } = options;
 
   const updatedTabGroups = (await Promise.all(
@@ -454,6 +451,19 @@ async function getWindowIdAndTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWith
 
   const tabs = Array.isArray(windowIdOrTabs) ? (windowIdOrTabs as ChromeTabWithId[]) : ((await chrome.tabs.query({ windowId })) as ChromeTabWithId[]);
   return { windowId, tabs };
+}
+
+// TODO: use this where applicable
+async function getWindowIdAndTabGroups(windowIdOrTabGroups: ChromeWindowId | ChromeTabGroupWithId[]) {
+  const windowId = Array.isArray(windowIdOrTabGroups) ? windowIdOrTabGroups[0]?.windowId : (windowIdOrTabGroups as ChromeWindowId | undefined);
+  if (windowId === undefined) {
+    return { windowId: chrome.windows.WINDOW_ID_NONE, tabGroups: [] };
+  }
+
+  const tabGroups = Array.isArray(windowIdOrTabGroups)
+    ? (windowIdOrTabGroups as ChromeTabGroupWithId[])
+    : ((await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[]);
+  return { windowId, tabGroups };
 }
 
 export async function focusActiveTab(
