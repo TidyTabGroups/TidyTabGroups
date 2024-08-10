@@ -713,3 +713,24 @@ export async function useTabTitleForEligebleTabGroups() {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
+
+// TODO: use this where currently applicable
+export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, tabGroups: Partial<chrome.tabGroups.UpdateProperties>[]) {
+  const activeWindow = await getOrThrow(windowId);
+
+  const tabGroupsById: { [tabGroupId: ChromeTabGroupId]: ChromeTabGroupWithId } = (tabGroups as ChromeTabGroupWithId[]).reduce(
+    (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
+    {}
+  );
+
+  const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => {
+    if (tabGroupsById[activeWindowTabGroup.id]) {
+      return {
+        ...activeWindowTabGroup,
+        ...tabGroupsById[activeWindowTabGroup.id],
+      } as Types.ActiveWindowTabGroup;
+    }
+    return activeWindowTabGroup;
+  });
+  await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
+}
