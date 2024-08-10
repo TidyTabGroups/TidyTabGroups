@@ -420,12 +420,30 @@ export async function onTabAttached(activeWindow: Types.ActiveWindow, tab: Chrom
   }
 }
 
+export async function onTabDetached(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId) {
+  const myLogger = logger.createNestedLogger("onTabDetached");
+  myLogger.log(`tab detached from windowId: ${tab.windowId}, tab title: ${tab.title}`);
+
+  try {
+    await ActiveWindow.blurTabGroupsIfNoActiveTab(activeWindow.windowId);
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
+}
+
 export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
   const myLogger = logger.createNestedLogger("onTabRemoved");
   myLogger.log(`tabId:`, tabId, removeInfo);
+
   if (removeInfo.isWindowClosing) {
     myLogger.log(`window is closing, nothing to do:`, tabId);
     return;
+  }
+
+  try {
+    await ActiveWindow.blurTabGroupsIfNoActiveTab(activeWindow.windowId);
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
 }
 

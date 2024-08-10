@@ -734,3 +734,14 @@ export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, t
   });
   await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
 }
+
+export async function blurTabGroupsIfNoActiveTab(windowId: ChromeWindowId) {
+  const activeWindow = await getOrThrow(windowId);
+  const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (ChromeTabWithId | undefined)[];
+  if (!activeTab) {
+    await ChromeWindowHelper.focusTabGroup(chrome.tabGroups.TAB_GROUP_ID_NONE, activeWindow.tabGroups, {
+      collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
+      highlightColors: activeWindow.focusMode?.colors,
+    });
+  }
+}

@@ -208,6 +208,24 @@ export async function initialize(onError: () => void) {
     );
   });
 
+  chrome.tabs.onDetached.addListener((tabId: ChromeTabId, detachInfo: chrome.tabs.TabDetachInfo) => {
+    const myLogger = logger.createNestedLogger("tabs.onDetached");
+    queueOperationIfWindowIsActive(
+      async (activeWindow) => {
+        const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
+        if (!tabUpToDate) {
+          myLogger.warn(TAB_NOT_UP_TO_DATE_MESSAGE(tabId));
+          return;
+        }
+
+        await ActiveWindowEvents.onTabDetached(activeWindow, tabUpToDate);
+      },
+      detachInfo.oldWindowId,
+      false,
+      "onTabDetached"
+    );
+  });
+
   chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
     queueOperationIfWindowIsActive(
       (activeWindow) => ActiveWindowEvents.onTabReplaced(activeWindow, addedTabId, removedTabId),
