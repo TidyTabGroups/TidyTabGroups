@@ -326,7 +326,7 @@ export async function onTabActivated(activeWindow: Types.ActiveWindow, activeInf
     myLogger.log(`title and groupId:`, tabUpToDate.title, tabUpToDate.groupId);
 
     // 1
-    await ActiveWindow.focusActiveTab(tabUpToDate);
+    await ActiveWindow.focusActiveTab(tabUpToDate.windowId, tabUpToDate.id, tabUpToDate.groupId);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -342,7 +342,7 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
   try {
     // 1
     if (changeInfo.groupId !== undefined && tab.active) {
-      await ActiveWindow.focusActiveTab(tab);
+      await ActiveWindow.focusActiveTab(tab.windowId, tab.id, tab.groupId);
       // wait for the potential tab group collapse animation of other groups to finish before doing anything else.
       // Note, this can be changed to run conditionally based on whether the any tab group was actually collapsed.
       await Misc.waitMs(350);
@@ -379,7 +379,7 @@ export async function onTabAttached(activeWindow: Types.ActiveWindow, tab: Chrom
 
   try {
     if (tab.active) {
-      await ActiveWindow.focusActiveTab(tab);
+      await ActiveWindow.focusActiveTab(tab.windowId, tab.id, tab.groupId);
     }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));

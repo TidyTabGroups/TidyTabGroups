@@ -471,34 +471,34 @@ async function getWindowIdAndTabGroups(windowIdOrTabGroups: ChromeWindowId | Chr
   return { windowId, tabGroups };
 }
 
-export async function focusActiveTab(
-  tab: ChromeTabWithId,
-  options: {
+export async function focusActiveTabWithRetryHandler(
+  tabId: ChromeTabId,
+  tabGroupId: ChromeTabGroupId,
+  tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
+  focusTabGroupOptions: {
     collapseUnfocusedTabGroups: boolean;
-    highlightColors?: {
-      focused: chrome.tabGroups.ColorEnum;
-      nonFocused: chrome.tabGroups.ColorEnum;
-    };
+    highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
   }
 ) {
-  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId[], true>();
-  const { groupId: originalGroupId, windowId: originalWindowId } = tab;
+  const isTabGroupIdNone = tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
+  const { windowId, tabGroups } = await getWindowIdAndTabGroups(tabGroupsOrWindowId);
 
+  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId[], true>();
   operationHandler.setShouldRetryOperationCallback(async () => {
     const [tabUpToDate, tabGroupUpToDate] = await Promise.all([
-      getIfTabExists(tab.id),
-      originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE ? undefined : getIfTabGroupExists(originalGroupId),
+      getIfTabExists(tabId),
+      isTabGroupIdNone ? undefined : getIfTabGroupExists(tabGroupId),
     ]);
+
     return (
-      !!tabUpToDate &&
-      tabUpToDate.active &&
-      tabUpToDate.windowId === originalWindowId &&
-      tabUpToDate.groupId === originalGroupId &&
-      (originalGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE || !!tabGroupUpToDate)
+      tabUpToDate?.active === true &&
+      tabUpToDate?.windowId === windowId &&
+      tabUpToDate?.groupId === tabGroupId &&
+      (isTabGroupIdNone || !!tabGroupUpToDate)
     );
   });
 
-  return await operationHandler.try(focusTabGroup(originalGroupId, originalWindowId, options));
+  return await operationHandler.try(focusTabGroup(tabGroupId, tabGroups, focusTabGroupOptions));
 }
 
 export async function focusTabGroupWithRetryHandler(
