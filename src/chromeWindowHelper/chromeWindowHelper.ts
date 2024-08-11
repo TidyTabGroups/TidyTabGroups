@@ -46,16 +46,14 @@ export async function activateTabWithRetryHandler(tabId: ChromeTabId) {
   return await operationHandler.try(chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>);
 }
 
-export async function updateTabGroup<ShouldRetryCall extends boolean = false>(
-  tabGroupId: ChromeTabGroupId,
-  updatedProperties: ChromeTabGroupUpdateProperties,
-  shouldRetryCallAfterUserIsDoneTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
-) {
+export async function updateTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId, updatedProperties: ChromeTabGroupUpdateProperties) {
   try {
-    return await callAfterUserIsDoneTabDragging<ChromeTabGroupWithId, ShouldRetryCall>(
-      () => chrome.tabGroups.update(tabGroupId, updatedProperties),
-      shouldRetryCallAfterUserIsDoneTabDragging
-    );
+    const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId, true>();
+    operationHandler.setShouldRetryOperationCallback(async () => {
+      const tabGroupUpToDate = await getIfTabGroupExists(tabGroupId);
+      return !!tabGroupUpToDate;
+    });
+    return await operationHandler.try(chrome.tabGroups.update(tabGroupId, updatedProperties));
   } catch (error) {
     // FIXME: remove this once saved tab groups are editable
     if (Misc.getErrorMessage(error).includes("saved groups are not editable")) {

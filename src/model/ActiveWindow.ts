@@ -314,12 +314,16 @@ async function activateWindowInternal(
           chrome.tabGroups.get(newTabGroupId),
           chrome.tabs.query({ groupId: newTabGroupId }) as Promise<ChromeTabWithId[]>,
         ]);
+
         if (ChromeWindowHelper.isTabGroupTitleEmpty(newTabGroup.title)) {
-          await ChromeWindowHelper.updateTabGroup(newTabGroupId, {
+          const tabGroupUpToDate = await ChromeWindowHelper.updateTabGroupWithRetryHandler(newTabGroupId, {
             title: ChromeWindowHelper.getTabTitleForUseTabTitle(tabsInGroup) ?? `${tabsInGroup.length} tabs`,
           });
-          // TODO: check for `use tab title for blank tab groups` user preference
-          useTabTitleForGroupId = newTabGroupId;
+
+          if (tabGroupUpToDate) {
+            // TODO: check for `use tab title for blank tab groups` user preference
+            useTabTitleForGroupId = newTabGroupId;
+          }
         }
       }
     }
@@ -531,10 +535,15 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     const { focusMode } = activeWindow;
     if (focusMode) {
       if (isFocusedTabGroup && focusMode.colors.focused !== tabGroupUpToDate.color) {
-        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.focused });
+        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroup.id, { color: focusMode.colors.focused });
       } else if (!isFocusedTabGroup && focusMode.colors.nonFocused !== tabGroupUpToDate.color) {
-        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: focusMode.colors.nonFocused });
+        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroup.id, { color: focusMode.colors.nonFocused });
       }
+
+      if (!tabGroupUpToDate) {
+        return;
+      }
+
       newActiveWindowTabGroup.color = tabGroupUpToDate.color;
     }
 
@@ -555,7 +564,11 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
       }
 
       if (ChromeWindowHelper.isTabGroupTitleEmpty(tabGroupUpToDate.title)) {
-        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroup(tabGroup.id, { title: newTitle });
+        tabGroupUpToDate = await ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroup.id, { title: newTitle });
+        if (!tabGroupUpToDate) {
+          return;
+        }
+
         newActiveWindowTabGroup = { ...newActiveWindowTabGroup, title: tabGroupUpToDate.title, useTabTitle: true };
       }
     }
@@ -702,7 +715,11 @@ export async function useTabTitleForEligebleTabGroups() {
               return;
             }
 
-            const updatedTabGroup = await ChromeWindowHelper.updateTabGroup(activeWindowTabGroup.id, { title: tabTitle });
+            const updatedTabGroup = await ChromeWindowHelper.updateTabGroupWithRetryHandler(activeWindowTabGroup.id, { title: tabTitle });
+            if (!updatedTabGroup) {
+              return;
+            }
+
             await updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, { title: updatedTabGroup.title });
           })
         );

@@ -118,7 +118,7 @@ const Popup = () => {
 
         // 3
         // We dont need to await this
-        savedTabGroupColorsToRestore?.map(({ tabGroupId, color }) => ChromeWindowHelper.updateTabGroup(tabGroupId, { color }));
+        savedTabGroupColorsToRestore?.map(({ tabGroupId, color }) => ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroupId, { color }));
 
         // 4
         const window = await ChromeWindowHelper.getIfWindowExists(activeWindow.windowId);
