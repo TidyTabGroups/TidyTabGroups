@@ -118,6 +118,7 @@ const Popup = () => {
 
         // 3
         // We dont need to await this
+        // TODO: shouldn't this be done only when focus mode is toggled off?
         savedTabGroupColorsToRestore?.map(({ tabGroupId, color }) => ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroupId, { color }));
 
         // 4
