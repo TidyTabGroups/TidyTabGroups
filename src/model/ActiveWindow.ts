@@ -559,7 +559,6 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
 
       tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
       if (!tabGroupUpToDate) {
-        myLogger.warn(`(2) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
         return;
       }
 

@@ -68,7 +68,6 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
 
     let tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
     if (!tabGroupUpToDate) {
-      myLogger.warn(`(1) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
       return;
     }
 
@@ -125,7 +124,6 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
 
     let tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
     if (!tabGroupUpToDate) {
-      myLogger.warn(`(1) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
       return;
     }
 
@@ -188,7 +186,6 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
 
     tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
     if (!tabGroupUpToDate) {
-      myLogger.warn(`(2) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
       return;
     }
 
@@ -221,7 +218,6 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
 
       tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
       if (!tabGroupUpToDate) {
-        myLogger.warn(`(3) tabGroupUpToDate not found for tabGroup:${tabGroup.id}`);
         return;
       }
 
