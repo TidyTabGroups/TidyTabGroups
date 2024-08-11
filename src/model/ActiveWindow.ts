@@ -415,7 +415,7 @@ export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId
       const tabsInGroup = tabs.filter((otherTab) => otherTab.groupId === tab.groupId);
       const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
       if (lastTabInGroup.index < tabs[tabs.length - 1].index && (await getUserPreferences()).repositionTabGroups) {
-        await ChromeWindowHelper.moveTabGroup(tab.groupId, { index: -1 });
+        await ChromeWindowHelper.moveTabGroupWithRetryHandler(tab.groupId, { index: -1 });
       } else {
         lastRelativeTabIndex = lastTabInGroup.index;
       }
@@ -425,7 +425,7 @@ export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId
     // if the tab opened any un-accessed tabs that are positioned after it, then dont move it
     const hasOpenedUnaccessedTabs = tabs.some((t) => t.openerTabId === tab.id && t.lastAccessed === undefined && t.index > tab.index);
     if (tab.index < lastRelativeTabIndex && !hasOpenedUnaccessedTabs && (await getUserPreferences()).repositionTabs) {
-      await ChromeWindowHelper.moveTab(tabId, { index: lastRelativeTabIndex });
+      await ChromeWindowHelper.moveTabWithRetryHandler(tabId, { index: lastRelativeTabIndex });
     }
   }
 }

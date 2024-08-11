@@ -65,12 +65,27 @@ export async function updateTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupI
   }
 }
 
-export async function moveTab(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
-  return callAfterUserIsDoneTabDragging(() => chrome.tabs.move(tabId, moveProperties) as Promise<ChromeTabWithId>);
+export async function moveTabWithRetryHandler(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
+  const windowIdToMoveTo = moveProperties.windowId || (await chrome.tabs.get(tabId)).windowId;
+
+  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabWithId, true>();
+  operationHandler.setShouldRetryOperationCallback(async () => {
+    const [tabUpToDate, windowUpToDate] = await Promise.all([getIfTabExists(tabId), getIfWindowExists(windowIdToMoveTo)]);
+    return !!tabUpToDate && !!windowUpToDate && tabUpToDate.windowId === windowIdToMoveTo;
+  });
+
+  return await operationHandler.try(chrome.tabs.move(tabId, moveProperties) as Promise<ChromeTabWithId>);
 }
 
-export async function moveTabGroup(tabGroupId: ChromeTabGroupId, moveProperties: chrome.tabGroups.MoveProperties) {
-  return callAfterUserIsDoneTabDragging(() => chrome.tabGroups.move(tabGroupId, moveProperties) as Promise<ChromeTabGroupWithId>);
+export async function moveTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId, moveProperties: chrome.tabGroups.MoveProperties) {
+  const windowIdToMoveTo = moveProperties.windowId || (await chrome.tabGroups.get(tabGroupId)).windowId;
+
+  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId, true>();
+  operationHandler.setShouldRetryOperationCallback(async () => {
+    const [tabGroupUpToDate, windowUpToDate] = await Promise.all([getIfTabGroupExists(tabGroupId), getIfWindowExists(windowIdToMoveTo)]);
+    return !!tabGroupUpToDate && !!windowUpToDate && tabGroupUpToDate.windowId === windowIdToMoveTo;
+  });
+  return await operationHandler.try(chrome.tabGroups.move(tabGroupId, moveProperties) as Promise<ChromeTabGroupWithId>);
 }
 
 export async function groupTabs<ShouldRetryCall extends boolean = false>(
