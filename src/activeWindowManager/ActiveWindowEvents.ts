@@ -176,16 +176,19 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
             // 3
             newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: tabGroupUpToDate.color };
             // this will effectively update the color of all other non-focused tab groups
-            const updatedTabGroups = await ChromeWindowHelper.focusTabGroup(focusedTabGroupId, tabGroup.windowId, {
+            const updatedTabGroups = await ChromeWindowHelper.focusTabGroupWithRetryHandler(focusedTabGroupId, tabGroup.windowId, {
               collapseUnfocusedTabGroups: false,
               highlightColors: newFocusModeColors,
             });
-            updatedTabGroups.forEach((tabGroup) => {
-              newActiveWindowTabGroupsById[tabGroup.id] = {
-                ...newActiveWindowTabGroupsById[tabGroup.id],
-                color: tabGroup.color,
-              };
-            });
+
+            if (updatedTabGroups) {
+              updatedTabGroups.forEach((tabGroup) => {
+                newActiveWindowTabGroupsById[tabGroup.id] = {
+                  ...newActiveWindowTabGroupsById[tabGroup.id],
+                  color: tabGroup.color,
+                };
+              });
+            }
           }
 
           if (newFocusModeColors) {
@@ -213,17 +216,20 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       !(await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id, active: true }))[0]
     ) {
       // 4
-      const updatedTabGroups = await ChromeWindowHelper.focusTabGroup(tabGroup.id, tabGroup.windowId, {
+      const updatedTabGroups = await ChromeWindowHelper.focusTabGroupWithRetryHandler(tabGroup.id, tabGroup.windowId, {
         collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
         highlightColors: activeWindow.focusMode?.colors,
       });
-      updatedTabGroups.forEach((updatedTabGroup) => {
-        newActiveWindowTabGroupsById[updatedTabGroup.id] = {
-          ...newActiveWindowTabGroupsById[updatedTabGroup.id],
-          collapsed: updatedTabGroup.collapsed,
-          color: updatedTabGroup.color,
-        };
-      });
+
+      if (updatedTabGroups) {
+        updatedTabGroups.forEach((updatedTabGroup) => {
+          newActiveWindowTabGroupsById[updatedTabGroup.id] = {
+            ...newActiveWindowTabGroupsById[updatedTabGroup.id],
+            collapsed: updatedTabGroup.collapsed,
+            color: updatedTabGroup.color,
+          };
+        });
+      }
 
       // 5
       const tabsUpToDate = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];

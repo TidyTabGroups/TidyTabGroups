@@ -246,6 +246,12 @@ export async function queryTabsIfWindowExists(windowId: ChromeWindowId, otherQue
   } catch (error) {}
 }
 
+export async function queryTabGroupsIfWindowExists(windowId: ChromeWindowId, otherQueryInfo?: chrome.tabGroups.QueryInfo) {
+  try {
+    return (await chrome.tabGroups.query({ ...otherQueryInfo, windowId })) as ChromeTabGroupWithId[];
+  } catch (error) {}
+}
+
 export async function doesWindowExist(windowId: ChromeWindowId) {
   const window = await getIfWindowExists(windowId);
   return !!window;
@@ -318,9 +324,8 @@ export async function focusTabGroup(
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
   }
 ) {
-  const { windowId, tabGroups } = await getWindowIdAndTabGroups(tabGroupsOrWindowId);
+  const { tabGroups } = await getWindowIdAndTabGroups(tabGroupsOrWindowId);
   const { collapseUnfocusedTabGroups, highlightColors } = options;
-
   const updatedTabGroups = (await Promise.all(
     tabGroups.map(async (tabGroup) => {
       const updateProps: chrome.tabGroups.UpdateProperties = {};
@@ -342,7 +347,7 @@ export async function focusTabGroup(
       }
 
       if (Object.keys(updateProps).length > 0) {
-        return await updateTabGroup(tabGroup.id, updateProps);
+        return await chrome.tabGroups.update(tabGroup.id, updateProps);
       }
     })
   )) as (ChromeTabGroupWithId | undefined)[];
@@ -494,4 +499,39 @@ export async function focusActiveTab(
   });
 
   return await operationHandler.try(focusTabGroup(originalGroupId, originalWindowId, options));
+}
+
+export async function focusTabGroupWithRetryHandler(
+  tabGroupId: ChromeTabGroupId,
+  tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
+  options: {
+    collapseUnfocusedTabGroups: boolean;
+    highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
+  },
+  fallback: boolean = false
+) {
+  const isTabGroupIdNone = tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
+  const { windowId, tabGroups } = await getWindowIdAndTabGroups(tabGroupsOrWindowId);
+
+  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId[], true>();
+  operationHandler.setShouldRetryOperationCallback(async () => {
+    const tabGroupsUpToDate = await queryTabGroupsIfWindowExists(windowId);
+    if (!tabGroupsUpToDate) {
+      return false;
+    }
+
+    let tabGroupIdToFocus = tabGroupId;
+    if (!isTabGroupIdNone && !tabGroupsUpToDate.find((tabGroup) => tabGroup.id === tabGroupId)) {
+      if (fallback) {
+        tabGroupIdToFocus = chrome.tabGroups.TAB_GROUP_ID_NONE;
+      } else {
+        return false;
+      }
+    }
+
+    operationHandler.replaceOperation(focusTabGroup(tabGroupIdToFocus, tabGroupsUpToDate, options));
+    return true;
+  });
+
+  return await operationHandler.try(focusTabGroup(tabGroupId, tabGroups, options));
 }

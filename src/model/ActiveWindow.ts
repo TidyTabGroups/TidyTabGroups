@@ -324,10 +324,15 @@ async function activateWindowInternal(
       }
     }
 
-    await ChromeWindowHelper.focusTabGroup(selectedTab ? selectedTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE, windowId, {
-      collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
-      highlightColors: newFocusModeColors ?? undefined,
-    });
+    await ChromeWindowHelper.focusTabGroupWithRetryHandler(
+      selectedTab ? selectedTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE,
+      windowId,
+      {
+        collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
+        highlightColors: newFocusModeColors ?? undefined,
+      },
+      true
+    );
 
     const tabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
     let newFocusMode = newFocusModeColors
@@ -739,7 +744,7 @@ export async function blurTabGroupsIfNoActiveTab(windowId: ChromeWindowId) {
   const activeWindow = await getOrThrow(windowId);
   const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (ChromeTabWithId | undefined)[];
   if (!activeTab) {
-    await ChromeWindowHelper.focusTabGroup(chrome.tabGroups.TAB_GROUP_ID_NONE, activeWindow.tabGroups, {
+    await ChromeWindowHelper.focusTabGroupWithRetryHandler(chrome.tabGroups.TAB_GROUP_ID_NONE, activeWindow.tabGroups, {
       collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
       highlightColors: activeWindow.focusMode?.colors,
     });

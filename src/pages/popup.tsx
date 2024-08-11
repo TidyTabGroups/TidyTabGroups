@@ -83,11 +83,14 @@ const Popup = () => {
         let getTabGroups = Misc.lazyCall(() => chrome.tabGroups.query({ windowId }));
         if (activeTab) {
           // FIXME: this needs to update the active window tab groups
-          const latestTabGroups = await ChromeWindowHelper.focusTabGroup(activeTab.groupId, await getTabGroups(), {
+          const latestTabGroups = await ChromeWindowHelper.focusTabGroupWithRetryHandler(activeTab.groupId, await getTabGroups(), {
             collapseUnfocusedTabGroups: true,
             highlightColors: activeWindow.focusMode?.colors,
           });
-          getTabGroups = async () => latestTabGroups;
+
+          if (latestTabGroups) {
+            getTabGroups = async () => latestTabGroups;
+          }
         }
 
         if (savedTabGroupColorsToRestore !== null) {
