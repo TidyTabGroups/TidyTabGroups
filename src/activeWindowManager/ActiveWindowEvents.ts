@@ -163,24 +163,15 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
           if (isFocusedTabGroup) {
             // 2
             newFocusModeColors = { ...activeWindow.focusMode.colors, focused: tabGroupUpToDate.color };
+            await ActiveWindow.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
           } else {
             // 3
             newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: tabGroupUpToDate.color };
+            await ActiveWindow.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
             // this will effectively update the color of all other non-focused tab groups
-            const updatedTabGroups = await ChromeWindowHelper.focusTabGroupWithRetryHandler(focusedTabGroupId, activeWindow.windowId, {
-              collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
-              highlightColors: newFocusModeColors,
-            });
-
-            if (updatedTabGroups) {
-              await ActiveWindow.mergeIntoActiveWindowTabGroups(
-                activeWindow.windowId,
-                updatedTabGroups.map((tabGroup) => ({ collapsed: tabGroup.collapsed, color: tabGroup.color }))
-              );
-            }
+            await ActiveWindow.focusTabGroup(activeWindow.windowId, focusedTabGroupId);
           }
 
-          await ActiveWindow.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
           const window = await ChromeWindowHelper.getIfWindowExists(tabGroup.windowId);
           if (window?.focused) {
             await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors });
@@ -204,17 +195,7 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       !(await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id, active: true }))[0]
     ) {
       // 4
-      const updatedTabGroups = await ChromeWindowHelper.focusTabGroupWithRetryHandler(tabGroup.id, tabGroup.windowId, {
-        collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
-        highlightColors: activeWindow.focusMode?.colors,
-      });
-
-      if (updatedTabGroups) {
-        await ActiveWindow.mergeIntoActiveWindowTabGroups(
-          activeWindow.windowId,
-          updatedTabGroups.map((tabGroup) => ({ collapsed: tabGroup.collapsed, color: tabGroup.color }))
-        );
-      }
+      await ActiveWindow.focusTabGroup(activeWindow.windowId, tabGroup.id);
 
       // 5
       const tabsUpToDate = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];

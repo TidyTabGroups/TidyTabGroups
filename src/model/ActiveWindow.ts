@@ -611,6 +611,24 @@ export async function focusActiveTab(tab: ChromeTabWithId) {
   await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
 }
 
+export async function focusTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  const activeWindow = await getOrThrow(windowId);
+  const focusTabGroupOptions = {
+    collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
+    highlightColors: activeWindow.focusMode?.colors,
+  };
+
+  const tabGroupsUpToDate = await ChromeWindowHelper.focusTabGroupWithRetryHandler(tabGroupId, windowId, focusTabGroupOptions);
+  if (tabGroupsUpToDate) {
+    await mergeIntoActiveWindowTabGroups(
+      windowId,
+      // TODO: we should only updated the properties that were actually updated from calling focusTabGroupWithRetryHandler
+      //  instead of naivly always updating the collapsed and color properties
+      tabGroupsUpToDate.map((tabGroup) => ({ collapsed: tabGroup.collapsed, color: tabGroup.color }))
+    );
+  }
+}
+
 export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: ChromeTabId[]) {
   const myLogger = logger.createNestedLogger("groupHighlightedTabs");
   try {
@@ -741,12 +759,8 @@ export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, t
 }
 
 export async function blurTabGroupsIfNoActiveTab(windowId: ChromeWindowId) {
-  const activeWindow = await getOrThrow(windowId);
   const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (ChromeTabWithId | undefined)[];
   if (!activeTab) {
-    await ChromeWindowHelper.focusTabGroupWithRetryHandler(chrome.tabGroups.TAB_GROUP_ID_NONE, activeWindow.tabGroups, {
-      collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
-      highlightColors: activeWindow.focusMode?.colors,
-    });
+    await focusTabGroup(windowId, chrome.tabGroups.TAB_GROUP_ID_NONE);
   }
 }
