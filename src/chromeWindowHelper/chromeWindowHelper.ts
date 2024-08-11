@@ -58,8 +58,7 @@ export async function updateTabGroup<ShouldRetryCall extends boolean = false>(
     );
   } catch (error) {
     // FIXME: remove this once saved tab groups are editable
-    // @ts-ignore
-    if (error?.message.toLowerCase().includes("saved groups are not editable")) {
+    if (Misc.getErrorMessage(error).includes("saved groups are not editable")) {
       console.warn(`updateTabGroup::saved tab group with id ${tabGroupId} is not editable: `, error);
       return (await chrome.tabGroups.get(tabGroupId)) as ChromeTabGroupWithId;
     } else {
