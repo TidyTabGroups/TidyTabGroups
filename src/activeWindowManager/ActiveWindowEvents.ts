@@ -168,14 +168,14 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
             newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: tabGroupUpToDate.color };
             // this will effectively update the color of all other non-focused tab groups
             const updatedTabGroups = await ChromeWindowHelper.focusTabGroupWithRetryHandler(focusedTabGroupId, activeWindow.windowId, {
-              collapseUnfocusedTabGroups: false,
+              collapseUnfocusedTabGroups: (await getUserPreferences()).collapseUnfocusedTabGroups,
               highlightColors: newFocusModeColors,
             });
 
             if (updatedTabGroups) {
               await ActiveWindow.mergeIntoActiveWindowTabGroups(
                 activeWindow.windowId,
-                updatedTabGroups.map((tabGroup) => ({ color: tabGroup.color }))
+                updatedTabGroups.map((tabGroup) => ({ collapsed: tabGroup.collapsed, color: tabGroup.color }))
               );
             }
           }
