@@ -426,23 +426,6 @@ export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId
   }
 }
 
-export async function collapseUnFocusedTabGroups(tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId, focusedTabGroupId: ChromeTabGroupId) {
-  let tabGroups: ChromeTabGroupWithId[];
-  if (typeof tabGroupsOrWindowId === "number") {
-    tabGroups = (await chrome.tabGroups.query({ windowId: tabGroupsOrWindowId, collapsed: false })) as ChromeTabGroupWithId[];
-  } else {
-    tabGroups = tabGroupsOrWindowId.filter((tabGroup) => !tabGroup.collapsed);
-  }
-
-  const unfocusedTabGroups = tabGroups.filter((tabGroup) => tabGroup.id !== focusedTabGroupId);
-  await Promise.all(
-    unfocusedTabGroups.map(async (unfocusedTabGroup) => {
-      // TODO: update the ActiveWindowTabGroup
-      await ChromeWindowHelper.updateTabGroup(unfocusedTabGroup.id, { collapsed: true });
-    })
-  );
-}
-
 export function chromeTabGroupToActiveWindowTabGroup(
   tabGroup: chrome.tabGroups.TabGroup,
   otherProperties?: { useTabTitle: Types.ActiveWindowTabGroup["useTabTitle"] }
