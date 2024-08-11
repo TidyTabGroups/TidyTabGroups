@@ -37,7 +37,7 @@ export async function getTabGroupsOrdered(
   return orderedTabGroups;
 }
 
-export async function activateTab(tabId: ChromeTabId) {
+export async function activateTabWithRetryHandler(tabId: ChromeTabId) {
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabWithId, true>();
   operationHandler.setShouldRetryOperationCallback(async () => {
     const activeTabUpToDate = await getIfTabExists(tabId);

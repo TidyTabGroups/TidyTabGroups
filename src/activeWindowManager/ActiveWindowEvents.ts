@@ -222,7 +222,7 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       }
 
       if (!tabGroupUpToDate.collapsed) {
-        await ChromeWindowHelper.activateTab(tabToActivate.id);
+        await ChromeWindowHelper.activateTabWithRetryHandler(tabToActivate.id);
       }
     }
 
