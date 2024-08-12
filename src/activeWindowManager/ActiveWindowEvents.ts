@@ -362,6 +362,7 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
         windowId: tab.windowId,
         highlighted: true,
         groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
+        pinned: false,
       })) as ChromeTabWithId[];
       await ActiveWindow.groupHighlightedTabs(tab.windowId, [tab.id, ...highlightedTabs.map((tab) => tab.id)]);
     }
