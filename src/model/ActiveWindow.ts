@@ -620,8 +620,6 @@ export async function focusTabGroup(windowId: ChromeWindowId, tabGroupId: Chrome
 export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: ChromeTabId[]) {
   const myLogger = logger.createNestedLogger("groupHighlightedTabs");
   try {
-    // whatever happens to the up-to-date version of tabId in the retry callbacks is assumed
-    //  to have happened to all the highlighted tabs.
     const tabId = tabIds[0];
     if (tabId === undefined) {
       return;
@@ -637,6 +635,8 @@ export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: Chr
                 tabIds,
               },
               async function shouldRetryCallAfterUserIsDoneTabDragging() {
+                // Whatever happens to the up-to-date version of tabId in the retry callbacks is assumed
+                //  to have happened to all the highlighted tabs.
                 const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
 
                 if (!tabUpToDate) {
