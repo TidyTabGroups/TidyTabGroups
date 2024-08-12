@@ -88,14 +88,9 @@ export async function moveTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId,
   return await operationHandler.try(() => chrome.tabGroups.move(tabGroupId, moveProperties) as Promise<ChromeTabGroupWithId>);
 }
 
-export async function groupTabs<ShouldRetryCall extends boolean = false>(
-  options: chrome.tabs.GroupOptions,
-  shouldRetryCallAfterUserIsDoneTabDragging?: ShouldRetryCall extends true ? () => Promise<boolean> : never
-) {
-  return callAfterUserIsDoneTabDragging<ChromeTabGroupId, ShouldRetryCall>(
-    () => chrome.tabs.group(options),
-    shouldRetryCallAfterUserIsDoneTabDragging
-  );
+export async function groupTabsWithRetryHandler(options: chrome.tabs.GroupOptions) {
+  const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
+  return await operationHandler.try(() => chrome.tabs.group(options));
 }
 
 export async function callAfterUserIsDoneTabDragging<T, ShouldRetryCall extends boolean = false>(
