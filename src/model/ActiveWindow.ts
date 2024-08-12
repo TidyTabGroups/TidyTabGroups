@@ -653,7 +653,7 @@ export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: Chr
                   return false;
                 }
 
-                return tabUpToDate.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
+                return tabUpToDate.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tabUpToDate.pinned === false;
               }
             )
           );
