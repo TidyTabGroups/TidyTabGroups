@@ -371,6 +371,10 @@ export async function onTabAttached(activeWindow: Types.ActiveWindow, tab: Chrom
   myLogger.log(`tab attached to windowId: ${tab.windowId}, tab title: ${tab.title}`);
 
   try {
+    if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false) {
+      await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
+    }
+
     if (tab.active) {
       await ActiveWindow.focusActiveTab(tab.windowId, tab.id, tab.groupId);
     }
