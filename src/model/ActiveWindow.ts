@@ -621,24 +621,30 @@ export async function focusTabGroup(windowId: ChromeWindowId, tabGroupId: Chrome
 export async function autoGroupTabAndHighlightedTabs(windowId: ChromeWindowId, tabId: ChromeTabId) {
   const myLogger = logger.createNestedLogger("autoGroupTabAndHighlightedTabs");
   try {
-    // If the tab is highlighted, auto-group it with all other ungrouped and highlighted tabs
-    // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
-    //  selecting "remove from group" on the tab of this event), it will be apart of highlightedTabs, which is undesired behavior.
-    //  In order to fix this, we need to properly identify which other tabs the user explicitly ungrouped
-    //  However, this scenerio is not actually possible on Chrome-like browsers, since the active tab is always the
-    //  last highlighted tab, which means the user did explicitly highlight the tab before ungrouping it.
-    let tabIdsToAutoGroup: ChromeTabId[];
-    const highlightedTabs = (await chrome.tabs.query({
-      windowId: windowId,
-      highlighted: true,
-      groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
-      pinned: false,
-    })) as ChromeTabWithId[];
+    const tab = (await chrome.tabs.get(tabId)) as ChromeTabWithId;
+    if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE || tab.pinned) {
+      throw new Error(myLogger.getPrefixedMessage(`tab is already grouped or pinned - tabId: ${tabId}`));
+    }
 
-    if (highlightedTabs.find((highlightedTab) => highlightedTab.id === tabId)) {
-      tabIdsToAutoGroup = highlightedTabs.map((highlightedTab) => highlightedTab.id);
-    } else {
-      tabIdsToAutoGroup = [tabId];
+    let tabIdsToAutoGroup = [tabId];
+
+    // If the tab is highlighted, auto-group it with all other ungrouped and highlighted tabs
+    if (tab.highlighted) {
+      // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
+      //  selecting "remove from group" on the tab of this event), it will be apart of highlightedTabs, which is undesired behavior.
+      //  In order to fix this, we need to properly identify which other tabs the user explicitly ungrouped
+      //  However, this scenerio is not actually possible on Chrome-like browsers, since the active tab is always the
+      //  last highlighted tab, which means the user did explicitly highlight the tab before ungrouping it.
+      const highlightedTabs = (await chrome.tabs.query({
+        windowId: windowId,
+        highlighted: true,
+        groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
+        pinned: false,
+      })) as ChromeTabWithId[];
+
+      if (highlightedTabs.find((highlightedTab) => highlightedTab.id === tabId)) {
+        tabIdsToAutoGroup = highlightedTabs.map((highlightedTab) => highlightedTab.id);
+      }
     }
 
     const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
