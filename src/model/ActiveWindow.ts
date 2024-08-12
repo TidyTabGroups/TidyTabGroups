@@ -15,6 +15,7 @@ import Logger from "../logger";
 import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
 import * as Storage from "../storage";
 import * as MouseInPageTracker from "../activeWindowManager/MouseInPageTracker";
+import ChromeTabOperationRetryHandler from "../chromeTabOperationRetryHandler";
 
 const logger = Logger.createLogger("ActiveWindow", { color: "#b603fc" });
 
@@ -679,10 +680,7 @@ export async function autoGroupTabAndHighlightedTabs(windowId: ChromeWindowId, t
     })(windowId);
 
     if (newGroupId) {
-      const newTabGroup = await ChromeWindowHelper.getIfTabGroupExists(newGroupId);
-      if (!newTabGroup) {
-        throw new Error(myLogger.getPrefixedMessage(`newTabGroup not found - newGroupId: ${newGroupId}`));
-      }
+      const newTabGroup = await chrome.tabGroups.get(newGroupId);
 
       // use try catch just for more descriptive error message
       try {
