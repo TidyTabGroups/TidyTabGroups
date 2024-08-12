@@ -356,6 +356,8 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
       // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
       //  selecting "remove from group" on the tab of this event), it will be apart of highlightedTabs, which is undesired behavior.
       //  In order to fix this, we need to properly identify which other tabs the user explicitly ungrouped
+      //  However, this scenerio is not actually possible on Chrome-like browsers, since the active tab is always the
+      //  last highlighted tab, which means the user did explicitly highlight the tab before ungrouping it.
       const highlightedTabs = (await chrome.tabs.query({
         windowId: tab.windowId,
         highlighted: true,
