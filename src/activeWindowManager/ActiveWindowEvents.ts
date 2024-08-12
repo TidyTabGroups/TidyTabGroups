@@ -353,18 +353,7 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
     const wasUnpinned = changeInfo.pinned === false && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
     if (wasUngrouped || wasUnpinned) {
       // TODO: check for `automatically group created tabs` user preference
-      // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
-      //  selecting "remove from group" on the tab of this event), it will be apart of highlightedTabs, which is undesired behavior.
-      //  In order to fix this, we need to properly identify which other tabs the user explicitly ungrouped
-      //  However, this scenerio is not actually possible on Chrome-like browsers, since the active tab is always the
-      //  last highlighted tab, which means the user did explicitly highlight the tab before ungrouping it.
-      const highlightedTabs = (await chrome.tabs.query({
-        windowId: tab.windowId,
-        highlighted: true,
-        groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
-        pinned: false,
-      })) as ChromeTabWithId[];
-      await ActiveWindow.groupHighlightedTabs(tab.windowId, [tab.id, ...highlightedTabs.map((tab) => tab.id)]);
+      await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
     }
 
     if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {

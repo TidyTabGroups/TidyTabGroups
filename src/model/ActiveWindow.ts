@@ -617,12 +617,27 @@ export async function focusTabGroup(windowId: ChromeWindowId, tabGroupId: Chrome
   );
 }
 
-export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: ChromeTabId[]) {
-  const myLogger = logger.createNestedLogger("groupHighlightedTabs");
+export async function autoGroupTabAndHighlightedTabs(windowId: ChromeWindowId, tabId: ChromeTabId) {
+  const myLogger = logger.createNestedLogger("autoGroupTabAndHighlightedTabs");
   try {
-    const tabId = tabIds[0];
-    if (tabId === undefined) {
-      return;
+    // If the tab is highlighted, auto-group it with all other ungrouped and highlighted tabs
+    // FIXME: if a non-grouped tab is active, and the user didnt explicitly ungroup it (e.g. by right-clicking and
+    //  selecting "remove from group" on the tab of this event), it will be apart of highlightedTabs, which is undesired behavior.
+    //  In order to fix this, we need to properly identify which other tabs the user explicitly ungrouped
+    //  However, this scenerio is not actually possible on Chrome-like browsers, since the active tab is always the
+    //  last highlighted tab, which means the user did explicitly highlight the tab before ungrouping it.
+    let tabIdsToAutoGroup: ChromeTabId[];
+    const highlightedTabs = (await chrome.tabs.query({
+      windowId: windowId,
+      highlighted: true,
+      groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
+      pinned: false,
+    })) as ChromeTabWithId[];
+
+    if (highlightedTabs.find((highlightedTab) => highlightedTab.id === tabId)) {
+      tabIdsToAutoGroup = highlightedTabs.map((highlightedTab) => highlightedTab.id);
+    } else {
+      tabIdsToAutoGroup = [tabId];
     }
 
     const newGroupId = await (async function groupTabsRec(windowId: ChromeWindowId) {
@@ -632,7 +647,7 @@ export async function groupHighlightedTabs(windowId: ChromeWindowId, tabIds: Chr
             await ChromeWindowHelper.groupTabs<true>(
               {
                 createProperties: { windowId },
-                tabIds,
+                tabIds: tabIdsToAutoGroup,
               },
               async function shouldRetryCallAfterUserIsDoneTabDragging() {
                 // Whatever happens to the up-to-date version of tabId in the retry callbacks is assumed
