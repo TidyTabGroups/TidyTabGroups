@@ -13,14 +13,14 @@ const logger = Logger.createLogger("ChromeTabOperationRetryHandler");
 // TODO: replace all uses of callAfterUserIsDoneTabDragging with this
 type ShouldRetryOperationCallback<ShouldRetryOperation extends boolean> = ShouldRetryOperation extends true ? () => Promise<boolean> : undefined;
 export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation extends boolean = false> {
-  private operation: Promise<T> | null = null;
+  private operation: (() => Promise<T>) | null = null;
   private shouldRetryOperationCallback?: ShouldRetryOperationCallback<ShouldRetryOperation>;
 
   constructor(shouldRetryOperationCallback?: ShouldRetryOperationCallback<ShouldRetryOperation>) {
     this.shouldRetryOperationCallback = shouldRetryOperationCallback;
   }
 
-  replaceOperation(operation: Promise<T>) {
+  replaceOperation(operation: () => Promise<T>) {
     this.operation = operation;
   }
 
@@ -28,7 +28,7 @@ export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation exte
     this.shouldRetryOperationCallback = shouldRetryOperationCallback;
   }
 
-  async try(operation: Promise<T>) {
+  async try(operation: () => Promise<T>) {
     this.operation = operation;
     return this.tryOperation();
   }

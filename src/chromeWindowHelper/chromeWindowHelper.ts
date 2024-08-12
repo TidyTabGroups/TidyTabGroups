@@ -43,7 +43,7 @@ export async function activateTabWithRetryHandler(tabId: ChromeTabId) {
     const activeTabUpToDate = await getIfTabExists(tabId);
     return !!activeTabUpToDate;
   });
-  return await operationHandler.try(chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>);
+  return await operationHandler.try(() => chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>);
 }
 
 export async function updateTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId, updatedProperties: ChromeTabGroupUpdateProperties) {
@@ -53,7 +53,7 @@ export async function updateTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupI
       const tabGroupUpToDate = await getIfTabGroupExists(tabGroupId);
       return !!tabGroupUpToDate;
     });
-    return await operationHandler.try(chrome.tabGroups.update(tabGroupId, updatedProperties));
+    return await operationHandler.try(() => chrome.tabGroups.update(tabGroupId, updatedProperties));
   } catch (error) {
     // FIXME: remove this once saved tab groups are editable
     if (Misc.getErrorMessage(error).includes("saved groups are not editable")) {
@@ -74,7 +74,7 @@ export async function moveTabWithRetryHandler(tabId: ChromeTabId, moveProperties
     return !!tabUpToDate && !!windowUpToDate && tabUpToDate.windowId === windowIdToMoveTo;
   });
 
-  return await operationHandler.try(chrome.tabs.move(tabId, moveProperties) as Promise<ChromeTabWithId>);
+  return await operationHandler.try(() => chrome.tabs.move(tabId, moveProperties) as Promise<ChromeTabWithId>);
 }
 
 export async function moveTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId, moveProperties: chrome.tabGroups.MoveProperties) {
@@ -85,7 +85,7 @@ export async function moveTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId,
     const [tabGroupUpToDate, windowUpToDate] = await Promise.all([getIfTabGroupExists(tabGroupId), getIfWindowExists(windowIdToMoveTo)]);
     return !!tabGroupUpToDate && !!windowUpToDate && tabGroupUpToDate.windowId === windowIdToMoveTo;
   });
-  return await operationHandler.try(chrome.tabGroups.move(tabGroupId, moveProperties) as Promise<ChromeTabGroupWithId>);
+  return await operationHandler.try(() => chrome.tabGroups.move(tabGroupId, moveProperties) as Promise<ChromeTabGroupWithId>);
 }
 
 export async function groupTabs<ShouldRetryCall extends boolean = false>(
@@ -405,12 +405,12 @@ export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId, ta
 
       // Reset the operation for the tabs up-to-date
       const tabIdsWithNoGroupUpToDate = tabsWithNoGroupUpToDate.map((tab) => tab.id);
-      operationHandler.replaceOperation(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroupUpToDate }));
+      operationHandler.replaceOperation(() => chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroupUpToDate }));
 
       return true;
     });
 
-    return await operationHandler.try(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroup }));
+    return await operationHandler.try(() => chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroup }));
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
@@ -446,10 +446,10 @@ export function isTabGroupTitleEmpty(title: chrome.tabGroups.TabGroup["title"]) 
 }
 
 export async function withUserInteractionErrorHandler<T>(
-  operation: Promise<T>
+  operation: () => Promise<T>
 ): Promise<{ result: T; encounteredUserInteractionError: false } | { result: undefined; encounteredUserInteractionError: true }> {
   try {
-    return { result: await operation, encounteredUserInteractionError: false };
+    return { result: await operation(), encounteredUserInteractionError: false };
   } catch (error) {
     if (Misc.getErrorMessage(error) !== "Tabs cannot be edited right now (user may be dragging a tab).") {
       throw error;
@@ -510,7 +510,7 @@ export async function focusActiveTabWithRetryHandler(
     );
   });
 
-  return await operationHandler.try(focusTabGroup(tabGroupId, tabGroups, focusTabGroupOptions));
+  return await operationHandler.try(() => focusTabGroup(tabGroupId, tabGroups, focusTabGroupOptions));
 }
 
 export async function focusTabGroupWithRetryHandler(
@@ -541,11 +541,11 @@ export async function focusTabGroupWithRetryHandler(
       }
     }
 
-    operationHandler.replaceOperation(focusTabGroup(tabGroupIdToFocus, tabGroupsUpToDate, options));
+    operationHandler.replaceOperation(() => focusTabGroup(tabGroupIdToFocus, tabGroupsUpToDate, options));
     return true;
   });
 
-  return await operationHandler.try(focusTabGroup(tabGroupId, tabGroups, options));
+  return await operationHandler.try(() => focusTabGroup(tabGroupId, tabGroups, options));
 }
 
 export async function groupTabAndHighlightedTabsWithRetryHandler(tabId: ChromeTabId) {
@@ -591,5 +591,5 @@ export async function groupTabAndHighlightedTabsWithRetryHandler(tabId: ChromeTa
     );
   });
 
-  return await operationHandler.try(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsToAutoGroup }));
+  return await operationHandler.try(() => chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsToAutoGroup }));
 }
