@@ -641,44 +641,31 @@ export async function autoGroupTabAndHighlightedTabs(windowId: ChromeWindowId, t
       tabIdsToAutoGroup = [tabId];
     }
 
-    const newGroupId = await (async function groupTabsRec(windowId: ChromeWindowId) {
-      return new Promise<ChromeTabGroupId | void>(async (resolve, reject) => {
-        try {
-          resolve(
-            await ChromeWindowHelper.groupTabs<true>(
-              {
-                createProperties: { windowId },
-                tabIds: tabIdsToAutoGroup,
-              },
-              async function shouldRetryCallAfterUserIsDoneTabDragging() {
-                // Whatever happens to the up-to-date version of tabId in the retry callbacks is assumed
-                //  to have happened to all the highlighted tabs.
-                const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
+    const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
+    operationHandler.setShouldRetryOperationCallback(async () => {
+      // Whatever happens to the up-to-date version of tabId in the retry callbacks is assumed
+      //  to have happened to all the highlighted tabs.
+      const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
 
-                if (!tabUpToDate) {
-                  return false;
-                }
+      if (!tabUpToDate || tabUpToDate.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE || tabUpToDate.pinned) {
+        return false;
+      }
 
-                if (tabUpToDate.windowId !== windowId) {
-                  // FIXME: if the tab was moved to a non-active window, then moved to an active window,
-                  //  the grouping operation will not be retried, which is not correct behavior. This is a limitation
-                  //  of the retry mechanism
-                  if (await get(tabUpToDate.windowId)) {
-                    resolve(await groupTabsRec(tabUpToDate.windowId));
-                  }
-                  return false;
-                }
-
-                return tabUpToDate.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tabUpToDate.pinned === false;
-              }
-            )
-          );
-        } catch (error) {
-          reject(error);
+      if (tabUpToDate.windowId !== windowId) {
+        // FIXME: if the tab was moved to a non-active window, then moved to an active window,
+        //  the grouping operation will not be retried, which is not correct behavior. This is a limitation
+        //  of the retry mechanism
+        if (await get(tabUpToDate.windowId)) {
+          operationHandler.replaceOperation(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsToAutoGroup }));
+        } else {
+          return false;
         }
-      });
-    })(windowId);
+      }
 
+      return true;
+    });
+
+    const newGroupId = await operationHandler.try(chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsToAutoGroup }));
     if (newGroupId) {
       const newTabGroup = await chrome.tabGroups.get(newGroupId);
 
