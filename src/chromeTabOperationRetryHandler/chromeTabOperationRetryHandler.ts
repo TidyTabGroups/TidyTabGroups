@@ -10,7 +10,6 @@ import Misc from "../misc";
 
 const logger = Logger.createLogger("ChromeTabOperationRetryHandler");
 
-// TODO: replace all uses of callAfterUserIsDoneTabDragging with this
 type ShouldRetryOperationCallback<ShouldRetryOperation extends boolean> = ShouldRetryOperation extends true ? () => Promise<boolean> : undefined;
 export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation extends boolean = false> {
   private operation: (() => Promise<T>) | null = null;

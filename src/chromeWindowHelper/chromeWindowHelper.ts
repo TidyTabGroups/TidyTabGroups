@@ -93,32 +93,6 @@ export async function groupTabsWithRetryHandler(options: chrome.tabs.GroupOption
   return await operationHandler.try(() => chrome.tabs.group(options));
 }
 
-export async function callAfterUserIsDoneTabDragging<T, ShouldRetryCall extends boolean = false>(
-  fn: () => Promise<T>,
-  shouldRetryCall?: ShouldRetryCall extends true ? () => Promise<boolean> : never
-): Promise<ShouldRetryCall extends true ? T | void : T> {
-  try {
-    return await fn();
-  } catch (error) {
-    // @ts-ignore
-    if (error?.message === "Tabs cannot be edited right now (user may be dragging a tab).") {
-      console.log(`callAfterUserIsDoneTabDragging::user may be dragging a tab: `, fn.toString());
-      return new Promise((resolve, reject) =>
-        setTimeout(async () => {
-          const shouldRetry = shouldRetryCall ? await shouldRetryCall() : true;
-          if (shouldRetry) {
-            callAfterUserIsDoneTabDragging(fn, shouldRetryCall).then(resolve).catch(reject);
-          } else {
-            resolve(undefined as ShouldRetryCall extends true ? T | void : T);
-          }
-        }, 100)
-      );
-    } else {
-      throw error;
-    }
-  }
-}
-
 export async function getIfTabExists(tabId: ChromeTabId) {
   try {
     return (await chrome.tabs.get(tabId)) as ChromeTabWithId;
