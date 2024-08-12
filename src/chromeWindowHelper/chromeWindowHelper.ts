@@ -89,7 +89,34 @@ export async function moveTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId,
 }
 
 export async function groupTabsWithRetryHandler(options: chrome.tabs.GroupOptions) {
+  const hasWindowIdToGroupIn = options.createProperties?.windowId !== undefined;
+  const hasGroupIdToGroupIn = options.groupId !== undefined;
+
+  const windowIdToGroupIn = options.createProperties?.windowId;
+  const groupIdToGroupIn = options.groupId;
+
+  if (!options.tabIds) {
+    return;
+  }
+
+  const tabIds = Array.isArray(options.tabIds) ? options.tabIds : [options.tabIds];
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupId, true>();
+  operationHandler.setShouldRetryOperationCallback(async () => {
+    const [windowToGroupInExists, tabGroupToGroupInExists, tabsUpToDate] = await Promise.all([
+      hasWindowIdToGroupIn ? doesWindowExist(windowIdToGroupIn!) : undefined,
+      hasGroupIdToGroupIn ? doesTabGroupExist(groupIdToGroupIn!) : undefined,
+      Promise.all(tabIds.map(getIfTabExists)),
+    ]);
+
+    const exisitingTabsUpToDate = tabsUpToDate.filter((tab) => !!tab) as ChromeTabWithId[];
+    if ((hasWindowIdToGroupIn && !windowToGroupInExists) || (hasGroupIdToGroupIn && !tabGroupToGroupInExists) || exisitingTabsUpToDate.length === 0) {
+      return false;
+    }
+
+    operationHandler.replaceOperation(() => chrome.tabs.group({ ...options, tabIds: exisitingTabsUpToDate.map((tab) => tab.id) }));
+    return true;
+  });
+
   return await operationHandler.try(() => chrome.tabs.group(options));
 }
 
