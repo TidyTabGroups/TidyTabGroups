@@ -285,6 +285,7 @@ export async function onTabCreated(activeWindow: Types.ActiveWindow, tab: chrome
 
       if (existingGroupId !== null) {
         const createNewGroup = existingGroupId === undefined;
+        // TODO: Re-use logic in ActiveWindow.autoGroupTabAndHighlightedTabs instead of or adjecent to this
         const groupId = await ChromeWindowHelper.groupTabs({
           createProperties: createNewGroup ? { windowId: tab.windowId } : undefined,
           groupId: createNewGroup ? undefined : existingGroupId,
