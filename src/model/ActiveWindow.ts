@@ -624,7 +624,7 @@ export async function autoGroupTabAndHighlightedTabs(windowId: ChromeWindowId, t
     const newGroupId = await ChromeWindowHelper.groupTabAndHighlightedTabsWithRetryHandler(tabId);
     if (newGroupId !== undefined) {
       const newTabGroup = await chrome.tabGroups.get(newGroupId);
-      await createActiveWindowTabGroup(newTabGroup.windowId, newTabGroup);
+      await createActiveWindowTabGroup(windowId, newTabGroup);
     }
     return newGroupId;
   } catch (error) {
