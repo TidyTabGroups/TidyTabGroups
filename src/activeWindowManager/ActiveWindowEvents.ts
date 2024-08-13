@@ -346,6 +346,7 @@ export async function onTabUpdated(activeWindow: Types.ActiveWindow, tab: Chrome
       await ActiveWindow.focusActiveTab(tab.windowId, tab.id, tab.groupId);
       // wait for the potential tab group collapse animation of other groups to finish before doing anything else.
       // Note, this can be changed to run conditionally based on whether the any tab group was actually collapsed.
+      // TODO: maybe this should be encapsulated inside of ActiveWindow.focusActiveTab
       await Misc.waitMs(350);
     }
 
