@@ -98,9 +98,8 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
   // 2. if the tab group is focused, update the active window's focus mode focused color
   // 3. if the tab group is NOT focused, update the active window's focus mode nonFocused color
   // 4. if the tab group was expanded, set ActiveWindowTabGroup.collapsed to false
-  // 5. if the tab group was expanded, focus the tab group
-  // 6. if the tab group was expanded, activate the last active tab in the group
-  // 7. if the tab group's title is updated, then set it's useSetTabTitle to false
+  // 5. if the tab group was expanded, activate the last active tab in the group
+  // 6. if the tab group's title is updated, then set it's useSetTabTitle to false
   try {
     const activeWindowTabGroup = await ActiveWindow.getActiveWindowTabGroup(tabGroup.windowId, tabGroup.id);
     if (activeWindowTabGroup === undefined) {
@@ -196,9 +195,6 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       const [activeTabInGroup] = await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id, active: true });
       if (!activeTabInGroup && (await getUserPreferences()).activateTabInFocusedTabGroup) {
         // 5
-        await ActiveWindow.focusTabGroup(activeWindow.windowId, tabGroup.id);
-
-        // 6
         const tabsUpToDate = (await chrome.tabs.query({ windowId: tabGroup.windowId })) as ChromeTabWithId[];
         const tabsInGroup = tabsUpToDate.filter((tab) => tab.groupId === tabGroup.id);
         if (tabsInGroup.length === 0) {
@@ -227,7 +223,7 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
       }
     }
 
-    // 7
+    // 6
     if (wasTitleUpdated) {
       await ActiveWindow.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { useTabTitle: false });
     }
