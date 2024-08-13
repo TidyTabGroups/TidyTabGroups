@@ -14,7 +14,7 @@ import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
 import * as Storage from "../storage";
-import * as MouseInPageTracker from "../activeWindowManager/MouseInPageTracker";
+import * as MouseInPageTracker from "../activeWindowEventManager/MouseInPageTracker";
 import ChromeTabOperationRetryHandler from "../chromeTabOperationRetryHandler";
 
 const logger = Logger.createLogger("ActiveWindow", { color: "#b603fc" });

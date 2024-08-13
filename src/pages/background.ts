@@ -1,4 +1,4 @@
-import ActiveWindowManager from "../activeWindowManager";
+import ActiveWindowManager from "../activeWindowEventManager";
 import Database from "../database";
 import Logger from "../logger";
 import { ActiveWindow } from "../model";
