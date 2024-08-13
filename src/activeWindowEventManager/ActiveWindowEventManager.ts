@@ -7,7 +7,7 @@ import * as Storage from "../storage";
 import * as ActiveWindowEventHandlers from "./ActiveWindowEventHandlers";
 import * as MouseInPageTracker from "./MouseInPageTracker";
 
-const logger = Logger.createLogger("activeWindowManager", { color: "#fcba03" });
+const logger = Logger.createLogger("ActiveWindowEventManager", { color: "#fcba03" });
 
 const TAB_NOT_UP_TO_DATE_MESSAGE = (tabOrTabId: ChromeTabId | chrome.tabs.Tab) => {
   if (typeof tabOrTabId === "number") {
