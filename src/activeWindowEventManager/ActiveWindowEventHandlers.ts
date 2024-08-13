@@ -6,7 +6,7 @@ import Types from "../types";
 import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
 import * as Storage from "../storage";
 
-const logger = Logger.createLogger("activeWindowEvents", { color: "#4287f5" });
+const logger = Logger.createLogger("ActiveWindowEventHandlers", { color: "#4287f5" });
 
 export async function onWindowCreated(window: ChromeWindowWithId) {
   logger.log(`onWindowCreated::window:`, window);
