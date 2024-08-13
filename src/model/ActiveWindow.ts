@@ -601,7 +601,7 @@ async function runFocusTabGroupLikeOperation(
       windowId,
       // TODO: we should only updated the properties that were actually updated from the ChromeWindowHelper.focusTabGroup
       //  call instead of naivly always updating the collapsed and color properties
-      tabGroups.map((tabGroup) => ({ collapsed: tabGroup.collapsed, color: tabGroup.color }))
+      tabGroups.map((tabGroup) => ({ id: tabGroup.id, collapsed: tabGroup.collapsed, color: tabGroup.color }))
     );
   }
 }
@@ -680,10 +680,11 @@ export async function useTabTitleForEligebleTabGroups() {
 }
 
 // TODO: use this where currently applicable
-export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, tabGroups: Partial<chrome.tabGroups.UpdateProperties>[]) {
+type TabGroupUpdatePropertiesWithId = { id: chrome.tabGroups.TabGroup["id"] } & Partial<chrome.tabGroups.UpdateProperties>;
+export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, tabGroups: TabGroupUpdatePropertiesWithId[]) {
   const activeWindow = await getOrThrow(windowId);
 
-  const tabGroupsById: { [tabGroupId: ChromeTabGroupId]: ChromeTabGroupWithId } = (tabGroups as ChromeTabGroupWithId[]).reduce(
+  const tabGroupsById: { [tabGroupId: ChromeTabGroupId]: TabGroupUpdatePropertiesWithId } = tabGroups.reduce(
     (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
     {}
   );
