@@ -4,7 +4,7 @@ import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import Types from "../types";
 import * as Storage from "../storage";
-import * as ActiveWindowEvents from "./ActiveWindowEvents";
+import * as ActiveWindowEventHandlers from "./ActiveWindowEventHandlers";
 import * as MouseInPageTracker from "./MouseInPageTracker";
 
 const logger = Logger.createLogger("activeWindowManager", { color: "#fcba03" });
@@ -31,7 +31,7 @@ export async function initialize(onError: () => void) {
               return;
             }
 
-            await ActiveWindowEvents.onMouseInPageStatusChanged(activeWindow, tabUpToDate, status);
+            await ActiveWindowEventHandlers.onMouseInPageStatusChanged(activeWindow, tabUpToDate, status);
           },
           tab.windowId,
           false,
@@ -82,12 +82,12 @@ export async function initialize(onError: () => void) {
         myLogger.warn("windowUpToDate not found - window.id: ", windowId);
         return;
       }
-      await ActiveWindowEvents.onWindowCreated(window as ChromeWindowWithId);
+      await ActiveWindowEventHandlers.onWindowCreated(window as ChromeWindowWithId);
     }, true);
   });
 
   chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
-    queueOperationIfWindowIsActive(ActiveWindowEvents.onWindowRemoved, windowId, true, "onWindowRemoved");
+    queueOperationIfWindowIsActive(ActiveWindowEventHandlers.onWindowRemoved, windowId, true, "onWindowRemoved");
   });
 
   chrome.windows.onFocusChanged.addListener((windowId: ChromeWindowId) => {
@@ -100,13 +100,13 @@ export async function initialize(onError: () => void) {
         );
         return;
       }
-      await ActiveWindowEvents.onWindowFocusChanged(windowId);
+      await ActiveWindowEventHandlers.onWindowFocusChanged(windowId);
     }, false);
   });
 
   chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
     queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEvents.onTabGroupCreated(activeWindow, tabGroup),
+      (activeWindow) => ActiveWindowEventHandlers.onTabGroupCreated(activeWindow, tabGroup),
       tabGroup.windowId,
       false,
       "onTabGroupCreated"
@@ -115,7 +115,7 @@ export async function initialize(onError: () => void) {
 
   chrome.tabGroups.onRemoved.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
     queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEvents.onTabGroupRemoved(activeWindow, tabGroup),
+      (activeWindow) => ActiveWindowEventHandlers.onTabGroupRemoved(activeWindow, tabGroup),
       tabGroup.windowId,
       false,
       "onTabGroupRemoved"
@@ -124,7 +124,7 @@ export async function initialize(onError: () => void) {
 
   chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
     queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEvents.onTabGroupUpdated(activeWindow, tabGroup),
+      (activeWindow) => ActiveWindowEventHandlers.onTabGroupUpdated(activeWindow, tabGroup),
       tabGroup.windowId,
       false,
       "onTabGroupUpdated"
@@ -132,12 +132,12 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
-    queueOperationIfWindowIsActive((activeWindow) => ActiveWindowEvents.onTabCreated(activeWindow, tab), tab.windowId, false, "onTabCreated");
+    queueOperationIfWindowIsActive((activeWindow) => ActiveWindowEventHandlers.onTabCreated(activeWindow, tab), tab.windowId, false, "onTabCreated");
   });
 
   chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
     queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEvents.onTabActivated(activeWindow, activeInfo),
+      (activeWindow) => ActiveWindowEventHandlers.onTabActivated(activeWindow, activeInfo),
       activeInfo.windowId,
       false,
       "onTabActivated"
@@ -166,7 +166,7 @@ export async function initialize(onError: () => void) {
             delete changeInfo[key];
           }
         });
-        await ActiveWindowEvents.onTabUpdated(activeWindow, tabUpToDate, changeInfo);
+        await ActiveWindowEventHandlers.onTabUpdated(activeWindow, tabUpToDate, changeInfo);
       },
       tab.windowId,
       false,
@@ -176,7 +176,7 @@ export async function initialize(onError: () => void) {
 
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
     queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEvents.onTabRemoved(activeWindow, tabId, removeInfo),
+      (activeWindow) => ActiveWindowEventHandlers.onTabRemoved(activeWindow, tabId, removeInfo),
       removeInfo.windowId,
       false,
       "onTabRemoved"
@@ -185,7 +185,7 @@ export async function initialize(onError: () => void) {
 
   chrome.tabs.onMoved.addListener((tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) => {
     queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEvents.onTabMoved(activeWindow, tabId, moveInfo),
+      (activeWindow) => ActiveWindowEventHandlers.onTabMoved(activeWindow, tabId, moveInfo),
       moveInfo.windowId,
       false,
       "onTabMoved"
@@ -212,7 +212,7 @@ export async function initialize(onError: () => void) {
           return;
         }
 
-        await ActiveWindowEvents.onTabAttached(activeWindow, tabUpToDate);
+        await ActiveWindowEventHandlers.onTabAttached(activeWindow, tabUpToDate);
       },
       attachInfo.newWindowId,
       false,
@@ -230,7 +230,7 @@ export async function initialize(onError: () => void) {
           return;
         }
 
-        await ActiveWindowEvents.onTabDetached(activeWindow, tabUpToDate);
+        await ActiveWindowEventHandlers.onTabDetached(activeWindow, tabUpToDate);
       },
       detachInfo.oldWindowId,
       false,
@@ -240,7 +240,7 @@ export async function initialize(onError: () => void) {
 
   chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
     queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEvents.onTabReplaced(activeWindow, addedTabId, removedTabId),
+      (activeWindow) => ActiveWindowEventHandlers.onTabReplaced(activeWindow, addedTabId, removedTabId),
       new Promise(async (resolve, reject) => {
         const addedTab = await ChromeWindowHelper.getIfTabExists(addedTabId);
         if (addedTab?.id !== undefined) {
