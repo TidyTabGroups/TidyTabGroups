@@ -622,7 +622,7 @@ export async function autoGroupTabAndHighlightedTabs(windowId: ChromeWindowId, t
   const myLogger = logger.createNestedLogger("autoGroupTabAndHighlightedTabs");
   try {
     const newGroupId = await ChromeWindowHelper.groupTabAndHighlightedTabsWithRetryHandler(tabId);
-    if (newGroupId) {
+    if (newGroupId !== undefined) {
       const newTabGroup = await chrome.tabGroups.get(newGroupId);
       await createActiveWindowTabGroup(newTabGroup.windowId, newTabGroup);
     }
