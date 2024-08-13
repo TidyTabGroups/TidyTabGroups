@@ -101,7 +101,6 @@ export async function onTabGroupUpdated(activeWindow: Types.ActiveWindow, tabGro
   // 5. if the tab group was expanded, focus the tab group
   // 6. if the tab group was expanded, activate the last active tab in the group
   // 7. if the tab group's title is updated, then set it's useSetTabTitle to false
-  // 8. update the ActiveWindowTabGroup
   try {
     const activeWindowTabGroup = await ActiveWindow.getActiveWindowTabGroup(tabGroup.windowId, tabGroup.id);
     if (activeWindowTabGroup === undefined) {
