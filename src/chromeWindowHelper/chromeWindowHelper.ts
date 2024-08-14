@@ -6,6 +6,7 @@ import {
   ChromeTabGroupId,
   ChromeTabGroupUpdateProperties,
   ChromeTabGroupColorEnum,
+  ChromeWindowWithId,
 } from "../types/types";
 import Misc from "../misc";
 import ChromeTabOperationRetryHandler from "../chromeTabOperationRetryHandler";
@@ -144,7 +145,7 @@ export async function doesTabGroupExist(tabGroupId: ChromeTabGroupId) {
 
 export async function getIfWindowExists(windowId: ChromeWindowId) {
   try {
-    return await chrome.windows.get(windowId);
+    return (await chrome.windows.get(windowId)) as ChromeWindowWithId;
   } catch (error) {}
 }
 
