@@ -289,9 +289,6 @@ async function activateWindowInternal(
       throw new Error(`activateWindow::window with id ${window} is not a normal window`);
     }
 
-    const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
-    const selectedTab = tabs.find((tab) => tab.active);
-
     let newFocusModeColors: ActiveWindowFocusModeColors | null = null;
     if (focusModeColors) {
       newFocusModeColors = focusModeColors;
@@ -329,8 +326,9 @@ async function activateWindowInternal(
       }
     }
 
+    const [activeTab] = (await chrome.tabs.query({ windowId, active: true })) as (ChromeTabWithId | undefined)[];
     await ChromeWindowHelper.focusTabGroupWithRetryHandler(
-      selectedTab ? selectedTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE,
+      activeTab ? activeTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE,
       windowId,
       {
         collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
