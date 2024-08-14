@@ -309,7 +309,7 @@ async function activateWindowInternal(
 
     let useTabTitleForGroupId: ChromeTabGroupId | null = null;
     if (groupUnpinnedAndUngroupedTabs) {
-      const newTabGroupId = await ChromeWindowHelper.groupUnpinnedAndUngroupedTabsWithRetryHandler(windowId, tabs);
+      const newTabGroupId = await ChromeWindowHelper.groupUnpinnedAndUngroupedTabsWithRetryHandler(windowId);
       if (newTabGroupId) {
         const [newTabGroup, tabsInGroup] = await Promise.all([
           chrome.tabGroups.get(newTabGroupId),

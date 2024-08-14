@@ -246,10 +246,11 @@ export async function getUnpinnedAndUngroupedTabs(windowIdOrTabs: ChromeWindowId
   return tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned);
 }
 
-export async function groupUnpinnedAndUngroupedTabsWithRetryHandler(windowId: ChromeWindowId, tabs?: ChromeTabWithId[]) {
+export async function groupUnpinnedAndUngroupedTabsWithRetryHandler(tabsOrWindowId: ChromeWindowId | ChromeTabWithId[]) {
   const myLogger = logger.createNestedLogger("groupUnpinnedAndUngroupedTabsWithRetryHandler");
   try {
-    const tabIdsWithNoGroup = (await getUnpinnedAndUngroupedTabs(tabs ?? windowId)).map((tab) => tab.id);
+    const { windowId, tabs } = await getWindowIdAndTabs(tabsOrWindowId);
+    const tabIdsWithNoGroup = (await getUnpinnedAndUngroupedTabs(tabs)).map((tab) => tab.id);
     if (tabIdsWithNoGroup.length === 0) {
       return;
     }
