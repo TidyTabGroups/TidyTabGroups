@@ -66,7 +66,7 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {
-    queueOperation(() => onInstalled(details), true);
+    queueOperation({ name: "onInstalled", operation: () => onInstalled(details) }, true);
   });
 
   chrome.windows.onCreated.addListener((window: chrome.windows.Window) => {
@@ -92,17 +92,23 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.windows.onFocusChanged.addListener((windowId: ChromeWindowId) => {
-    queueOperation(async () => {
-      // check the up-to-date focused window because it could have changed
-      const lastFocusedWindow = (await chrome.windows.getLastFocused()) as ChromeWindowWithId;
-      if (windowId === chrome.windows.WINDOW_ID_NONE ? lastFocusedWindow.focused : lastFocusedWindow.id !== windowId) {
-        logger.warn(
-          `onFocusChanged::focused window not up to date - windowId: ${windowId}, lastFocusedWindow: ${lastFocusedWindow.id}, lastFocusedWindow.focused: ${lastFocusedWindow.focused}`
-        );
-        return;
-      }
-      await ActiveWindowEventHandlers.onWindowFocusChanged(windowId);
-    }, false);
+    queueOperation(
+      {
+        name: "onFocusChanged",
+        operation: async () => {
+          // check the up-to-date focused window because it could have changed
+          const lastFocusedWindow = (await chrome.windows.getLastFocused()) as ChromeWindowWithId;
+          if (windowId === chrome.windows.WINDOW_ID_NONE ? lastFocusedWindow.focused : lastFocusedWindow.id !== windowId) {
+            logger.warn(
+              `onFocusChanged::focused window not up to date - windowId: ${windowId}, lastFocusedWindow: ${lastFocusedWindow.id}, lastFocusedWindow.focused: ${lastFocusedWindow.focused}`
+            );
+            return;
+          }
+          await ActiveWindowEventHandlers.onWindowFocusChanged(windowId);
+        },
+      },
+      false
+    );
   });
 
   chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
@@ -296,32 +302,41 @@ export async function initialize(onError: () => void) {
       return;
     }
 
-    queueOperation(async () => {
-      try {
-        if (message.type === messageTypes[0]) {
-          const { windowId } = message.data as { windowId: ChromeWindowId };
-          const activeWindow = await ActiveWindow.get(windowId);
-          sendResponse({ activeWindow });
-        } else if (message.type === messageTypes[1]) {
-          const { windowId, updateProps } = message.data as { windowId: Types.ActiveWindow["windowId"]; updateProps: Partial<Types.ActiveWindow> };
-          const updatedActiveWindow = await ActiveWindow.update(windowId, updateProps);
-          sendResponse({ activeWindow: updatedActiveWindow });
-        } else {
-          throw new Error("message type is invalid");
-        }
-      } catch (error) {
-        const errorMessage = myLogger.getPrefixedMessage(`error processing message:${error}`);
-        sendResponse({ error: errorMessage });
-        throw new Error(errorMessage);
-      }
-    }, true);
+    queueOperation(
+      {
+        name: "onMessage",
+        operation: async () => {
+          try {
+            if (message.type === messageTypes[0]) {
+              const { windowId } = message.data as { windowId: ChromeWindowId };
+              const activeWindow = await ActiveWindow.get(windowId);
+              sendResponse({ activeWindow });
+            } else if (message.type === messageTypes[1]) {
+              const { windowId, updateProps } = message.data as {
+                windowId: Types.ActiveWindow["windowId"];
+                updateProps: Partial<Types.ActiveWindow>;
+              };
+              const updatedActiveWindow = await ActiveWindow.update(windowId, updateProps);
+              sendResponse({ activeWindow: updatedActiveWindow });
+            } else {
+              throw new Error("message type is invalid");
+            }
+          } catch (error) {
+            const errorMessage = myLogger.getPrefixedMessage(`error processing message:${error}`);
+            sendResponse({ error: errorMessage });
+            throw new Error(errorMessage);
+          }
+        },
+      },
+      true
+    );
 
     // return true for the asynchronous response
     return true;
   });
 
   type ActiveWindowQueuedEventOperation = (activeWindow: Types.ActiveWindow) => Promise<void>;
-  type QueuedEventOperation = () => Promise<void>;
+  type QueuedEventOperation = { name: string; operation: () => Promise<void> };
   let operationQueue: QueuedEventOperation[] = [];
   let isProcessingQueue = false;
   let isQueueSuspended = false;
@@ -332,14 +347,20 @@ export async function initialize(onError: () => void) {
     next: boolean,
     name: string
   ) {
-    queueOperation(async () => {
-      const { isValid, activeWindow, tabUpToDate } = await validateTabUpToDateAndActiveWindow(tabId);
-      if (!isValid) {
-        return;
-      }
+    queueOperation(
+      {
+        name,
+        operation: async () => {
+          const { isValid, activeWindow, tabUpToDate } = await validateTabUpToDateAndActiveWindow(tabId);
+          if (!isValid) {
+            return;
+          }
 
-      await operation(activeWindow, tabUpToDate);
-    }, next);
+          await operation(activeWindow, tabUpToDate);
+        },
+      },
+      next
+    );
   }
 
   async function queueActiveWindowTabGroupOperation(
@@ -348,14 +369,20 @@ export async function initialize(onError: () => void) {
     next: boolean,
     name: string
   ) {
-    queueOperation(async () => {
-      const { isValid, activeWindow, tabGroupUpToDate } = await validateTabGroupUpToDateAndActiveWindow(tabGroupId);
-      if (!isValid) {
-        return;
-      }
+    queueOperation(
+      {
+        name,
+        operation: async () => {
+          const { isValid, activeWindow, tabGroupUpToDate } = await validateTabGroupUpToDateAndActiveWindow(tabGroupId);
+          if (!isValid) {
+            return;
+          }
 
-      await operation(activeWindow, tabGroupUpToDate);
-    }, next);
+          await operation(activeWindow, tabGroupUpToDate);
+        },
+      },
+      next
+    );
   }
 
   async function queueActiveWindowOperation(
@@ -364,14 +391,20 @@ export async function initialize(onError: () => void) {
     next: boolean,
     name: string
   ) {
-    queueOperation(async () => {
-      const { isValid, activeWindow, windowUpToDate } = await validateWindowUpToDateAndActiveWindow(windowId);
-      if (!isValid) {
-        return;
-      }
+    queueOperation(
+      {
+        name,
+        operation: async () => {
+          const { isValid, activeWindow, windowUpToDate } = await validateWindowUpToDateAndActiveWindow(windowId);
+          if (!isValid) {
+            return;
+          }
 
-      await operation(activeWindow, windowUpToDate);
-    }, next);
+          await operation(activeWindow, windowUpToDate);
+        },
+      },
+      next
+    );
   }
 
   function queueOperationIfWindowIsActive(
@@ -381,21 +414,27 @@ export async function initialize(onError: () => void) {
     name: string
   ) {
     const myLogger = logger.createNestedLogger("queueOperationIfWindowIsActive");
-    queueOperation(async () => {
-      let activeWindow: Types.ActiveWindow;
-      try {
-        const windowId = await windowIdOrPromisedWindowId;
-        const myActiveWindow = await ActiveWindow.get(windowId);
-        if (!myActiveWindow) {
-          myLogger.warn("activeWindow not found, ignoring operation: ", name);
-          return;
-        }
-        activeWindow = myActiveWindow;
-      } catch (error) {
-        throw new Error(myLogger.getPrefixedMessage(`error trying to get active window for operation: ${name}: ${error}`));
-      }
-      await operation(activeWindow);
-    }, next);
+    queueOperation(
+      {
+        name,
+        operation: async () => {
+          let activeWindow: Types.ActiveWindow;
+          try {
+            const windowId = await windowIdOrPromisedWindowId;
+            const myActiveWindow = await ActiveWindow.get(windowId);
+            if (!myActiveWindow) {
+              myLogger.warn("activeWindow not found, ignoring operation: ", name);
+              return;
+            }
+            activeWindow = myActiveWindow;
+          } catch (error) {
+            throw new Error(myLogger.getPrefixedMessage(`error trying to get active window for operation: ${name}: ${error}`));
+          }
+          await operation(activeWindow);
+        },
+      },
+      next
+    );
   }
 
   function queueOperation(operation: QueuedEventOperation, next: boolean) {
@@ -436,13 +475,13 @@ export async function initialize(onError: () => void) {
       const currentOperation = operationQueue.shift();
       if (currentOperation) {
         const operationTimeoutId = setTimeout(() => {
-          logger.error("processQueue::Operation timed out:", currentOperation);
+          logger.error(`processQueue::Operation timed out: ${currentOperation.name}`);
           onBackgroundEventError();
         }, 7500);
         try {
-          await currentOperation();
+          await currentOperation.operation();
         } catch (error) {
-          logger.error("processQueue::Error processing operation:", error);
+          logger.error(`processQueue::Error processing operation: ${currentOperation.name}`, error);
           onBackgroundEventError();
         } finally {
           clearTimeout(operationTimeoutId);
