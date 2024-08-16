@@ -112,9 +112,11 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
-    queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEventHandlers.onTabGroupCreated(activeWindow, tabGroup),
-      tabGroup.windowId,
+    queueActiveWindowTabGroupOperation(
+      tabGroup.id,
+      (activeWindow, tabGroup) => {
+        return ActiveWindowEventHandlers.onTabGroupCreated(activeWindow, tabGroup);
+      },
       false,
       "onTabGroupCreated"
     );

@@ -55,9 +55,6 @@ export async function onWindowFocusChanged(windowId: ChromeWindowId) {
 
 export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGroup: chrome.tabGroups.TabGroup) {
   const myLogger = logger.createNestedLogger("onTabGroupCreated");
-  // 1. adjust the tab group's color based on the active window's focus mode
-  // 2. if the tab group's title is empty, set the ActiveWindowTabGroup's useTabTitle to true
-  // 3. add the ActiveWindowTabGroup
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
     const existingActiveWindowTabGroup = activeWindow.tabGroups.find((otherTabGroup) => otherTabGroup.id === tabGroup.id);
@@ -66,12 +63,7 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
       return;
     }
 
-    let tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
-    if (!tabGroupUpToDate) {
-      return;
-    }
-
-    await ActiveWindow.createActiveWindowTabGroup(activeWindow.windowId, tabGroupUpToDate);
+    await ActiveWindow.createActiveWindowTabGroup(activeWindow.windowId, tabGroup);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
