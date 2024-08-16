@@ -1,11 +1,12 @@
 import { ActiveWindow } from "../model";
-import { ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
+import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import Types from "../types";
 import * as Storage from "../storage";
 import * as ActiveWindowEventHandlers from "./ActiveWindowEventHandlers";
 import * as MouseInPageTracker from "./MouseInPageTracker";
+import Misc from "../misc";
 
 const logger = Logger.createLogger("ActiveWindowEventManager", { color: "#fcba03" });
 
@@ -152,26 +153,53 @@ export async function initialize(onError: () => void) {
       return;
     }
 
-    queueOperationIfWindowIsActive(
-      async (activeWindow) => {
-        const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
-        if (!tabUpToDate) {
-          myLogger.warn(TAB_NOT_UP_TO_DATE_MESSAGE(tab));
-          return;
-        }
-
-        (Object.keys(changeInfo) as (keyof chrome.tabs.TabChangeInfo)[]).forEach((key) => {
-          if (tabUpToDate[key] !== changeInfo[key]) {
-            myLogger.warn(`tab is not up to date for changeInfo.key:${key}, tabId: ${tabId}, tab title: ${tab.title}`);
-            delete changeInfo[key];
+    // If the tab group was changed and the tab is active, focus the tab
+    if (changeInfo.groupId !== undefined) {
+      queueActiveWindowTabOperation(
+        tabId,
+        async (activeWindow, tab) => {
+          if (changeInfo.groupId === tab.groupId && tab.active) {
+            await ActiveWindow.focusActiveTab(tab.windowId, tab.id, tab.groupId);
+            // wait for the potential tab group collapse animation of other groups to finish before doing anything else.
+            // Note, this can be changed to run conditionally based on whether the any tab group was actually collapsed.
+            // TODO: maybe this should be encapsulated inside of ActiveWindow.focusActiveTab
+            await Misc.waitMs(350);
           }
-        });
-        await ActiveWindowEventHandlers.onTabUpdated(activeWindow, tabUpToDate, changeInfo);
-      },
-      tab.windowId,
-      false,
-      "onTabUpdated"
-    );
+        },
+        false,
+        myLogger.getPrefixedMessage("focusActiveTab")
+      );
+    }
+
+    // If the tab was ungrouped, auto-group it with the other ungrouped highlighted tabs
+    if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false) {
+      queueActiveWindowTabOperation(
+        tabId,
+        async (activeWindow, tab) => {
+          const isUngroupedAndUnpinned = tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false;
+          if (isUngroupedAndUnpinned) {
+            // TODO: check for `automatically group created tabs` user preference
+            await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
+          }
+        },
+        false,
+        myLogger.getPrefixedMessage("autoGroupTabAndHighlightedTabs")
+      );
+    }
+
+    // If the tab group was changed or the tab title was changed, use the tab title for eligible tab groups
+    if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {
+      queueActiveWindowTabOperation(
+        tabId,
+        async (activeWindow, tab) => {
+          if (changeInfo.groupId === tab.groupId || (tab.title !== undefined && changeInfo.title === tab.title)) {
+            await ActiveWindow.useTabTitleForEligebleTabGroups();
+          }
+        },
+        false,
+        myLogger.getPrefixedMessage("useTabTitleForEligebleTabGroups")
+      );
+    }
   });
 
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
@@ -298,6 +326,54 @@ export async function initialize(onError: () => void) {
   let isProcessingQueue = false;
   let isQueueSuspended = false;
 
+  async function queueActiveWindowTabOperation(
+    tabId: ChromeTabId,
+    operation: (activeWindow: Types.ActiveWindow, tab: ChromeTabWithId) => Promise<void>,
+    next: boolean,
+    name: string
+  ) {
+    queueOperation(async () => {
+      const { isValid, activeWindow, tabUpToDate } = await validateTabUpToDateAndActiveWindow(tabId);
+      if (!isValid) {
+        return;
+      }
+
+      await operation(activeWindow, tabUpToDate);
+    }, next);
+  }
+
+  async function queueActiveWindowTabGroupOperation(
+    tabGroupId: ChromeTabGroupId,
+    operation: (activeWindow: Types.ActiveWindow, tab: ChromeTabGroupWithId) => Promise<void>,
+    next: boolean,
+    name: string
+  ) {
+    queueOperation(async () => {
+      const { isValid, activeWindow, tabGroupUpToDate } = await validateTabGroupUpToDateAndActiveWindow(tabGroupId);
+      if (!isValid) {
+        return;
+      }
+
+      await operation(activeWindow, tabGroupUpToDate);
+    }, next);
+  }
+
+  async function queueActiveWindowOperation(
+    windowId: ChromeWindowId,
+    operation: (activeWindow: Types.ActiveWindow, window: ChromeWindowWithId) => Promise<void>,
+    next: boolean,
+    name: string
+  ) {
+    queueOperation(async () => {
+      const { isValid, activeWindow, windowUpToDate } = await validateWindowUpToDateAndActiveWindow(windowId);
+      if (!isValid) {
+        return;
+      }
+
+      await operation(activeWindow, windowUpToDate);
+    }, next);
+  }
+
   function queueOperationIfWindowIsActive(
     operation: ActiveWindowQueuedEventOperation,
     windowIdOrPromisedWindowId: ChromeWindowId | Promise<ChromeWindowId>,
@@ -398,4 +474,79 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   }
 
   // Misc.openDummyTab();
+}
+
+async function validateTabUpToDateAndActiveWindow(tabId: ChromeTabId): Promise<
+  | {
+      isValid: true;
+      activeWindow: Types.ActiveWindow;
+      tabUpToDate: ChromeTabWithId;
+    }
+  | {
+      isValid: false;
+      activeWindow: undefined;
+      tabUpToDate: undefined;
+    }
+> {
+  const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
+  if (!tabUpToDate) {
+    return { isValid: false, activeWindow: undefined, tabUpToDate: undefined };
+  }
+
+  const activeWindow = await ActiveWindow.get(tabUpToDate.windowId);
+  if (!activeWindow) {
+    return { isValid: false, activeWindow: undefined, tabUpToDate: undefined };
+  }
+
+  return { isValid: true, activeWindow, tabUpToDate };
+}
+
+async function validateTabGroupUpToDateAndActiveWindow(groupId: ChromeTabGroupId): Promise<
+  | {
+      isValid: true;
+      activeWindow: Types.ActiveWindow;
+      tabGroupUpToDate: ChromeTabGroupWithId;
+    }
+  | {
+      isValid: false;
+      activeWindow: undefined;
+      tabGroupUpToDate: undefined;
+    }
+> {
+  const tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(groupId);
+  if (!tabGroupUpToDate) {
+    return { isValid: false, activeWindow: undefined, tabGroupUpToDate: undefined };
+  }
+
+  const activeWindow = await ActiveWindow.get(tabGroupUpToDate.windowId);
+  if (!activeWindow) {
+    return { isValid: false, activeWindow: undefined, tabGroupUpToDate: undefined };
+  }
+
+  return { isValid: true, activeWindow, tabGroupUpToDate };
+}
+
+async function validateWindowUpToDateAndActiveWindow(windowId: ChromeWindowId): Promise<
+  | {
+      isValid: boolean;
+      activeWindow: Types.ActiveWindow;
+      windowUpToDate: ChromeWindowWithId;
+    }
+  | {
+      isValid: false;
+      activeWindow: undefined;
+      windowUpToDate: undefined;
+    }
+> {
+  const windowUpToDate = await ChromeWindowHelper.getIfWindowExists(windowId);
+  if (!windowUpToDate) {
+    return { isValid: false, activeWindow: undefined, windowUpToDate: undefined };
+  }
+
+  const activeWindow = await ActiveWindow.get(windowId);
+  if (!activeWindow) {
+    return { isValid: false, activeWindow: undefined, windowUpToDate: undefined };
+  }
+
+  return { isValid: true, activeWindow, windowUpToDate };
 }
