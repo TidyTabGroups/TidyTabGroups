@@ -77,14 +77,14 @@ export async function initialize(onError: () => void) {
       return;
     }
 
-    queueOperation(async () => {
-      const windowUpToDate = await ChromeWindowHelper.getIfWindowExists(windowId);
-      if (!windowUpToDate) {
-        myLogger.warn("windowUpToDate not found - window.id: ", windowId);
-        return;
-      }
-      await ActiveWindowEventHandlers.onWindowCreated(window as ChromeWindowWithId);
-    }, true);
+    queueActiveWindowOperation(
+      windowId,
+      async (activeWindow, window) => {
+        await ActiveWindowEventHandlers.onWindowCreated(window);
+      },
+      true,
+      myLogger.getPrefixedMessage("onWindowCreated")
+    );
   });
 
   chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
