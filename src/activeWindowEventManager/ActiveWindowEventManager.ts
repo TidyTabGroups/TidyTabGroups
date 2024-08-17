@@ -231,15 +231,15 @@ export async function initialize(onError: () => void) {
       return;
     }
 
-    if (tab.id === undefined) {
-      myLogger.warn(`tab.id is undefined. tabId: ${tabId}`);
-      return;
-    }
-
     queueOperation(
       {
         name: myLogger.getPrefixedMessage("onTabUpdated"),
-        operation: async () => ActiveWindowEventHandlers.onTabUpdated(tab as ChromeTabWithId, changeInfo),
+        operation: async () => {
+          const myMyLogger = myLogger.createNestedLogger("onTabUpdated");
+          myMyLogger.log(`id: ${tab.id}, title: ${tab.title}, changeInfo: ${changeInfo}`);
+
+          await ActiveWindowEventHandlers.onTabUpdated(tabId, changeInfo);
+        },
       },
       false
     );
@@ -248,7 +248,12 @@ export async function initialize(onError: () => void) {
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
     const myLogger = logger.createNestedLogger("tabs.onRemoved");
     queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEventHandlers.onTabRemoved(activeWindow, tabId, removeInfo),
+      async (activeWindow) => {
+        const myMyLogger = myLogger.createNestedLogger("onTabRemoved");
+        myMyLogger.log(`tabId: ${tabId}, removeInfo: `, removeInfo);
+
+        await ActiveWindowEventHandlers.onTabRemoved(activeWindow, tabId, removeInfo);
+      },
       removeInfo.windowId,
       false,
       myLogger.getPrefixedMessage("onTabRemoved")
@@ -284,13 +289,10 @@ export async function initialize(onError: () => void) {
     const myLogger = logger.createNestedLogger("tabs.onDetached");
     queueOperationIfWindowIsActive(
       async (activeWindow) => {
-        const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
-        if (!tabUpToDate) {
-          myLogger.warn(TAB_NOT_UP_TO_DATE_MESSAGE(tabId));
-          return;
-        }
+        const myMyLogger = myLogger.createNestedLogger("onTabDetached");
+        myMyLogger.log(`tabId: ${tabId}, detachInfo.oldWindowId: ${detachInfo.oldWindowId}`);
 
-        await ActiveWindowEventHandlers.onTabDetached(activeWindow, tabUpToDate);
+        await ActiveWindowEventHandlers.onTabDetached(activeWindow, tabId);
       },
       detachInfo.oldWindowId,
       false,

@@ -317,14 +317,12 @@ export async function onTabActivated(tabId: ChromeTabId) {
   }
 }
 
-export async function onTabUpdated(tab: ChromeTabWithId, changeInfo: chrome.tabs.TabChangeInfo) {
+export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo) {
   const myLogger = logger.createNestedLogger("onTabUpdated");
-  myLogger.log(`title, changeInfo and id:`, tab.title, changeInfo, tab.id);
-
   try {
     // If the tab group was changed and the tab is active, focus the tab
-    if (changeInfo.groupId !== undefined && tab.active) {
-      runActiveWindowTabOperation(tab.id, async ({ tab }) => {
+    if (changeInfo.groupId !== undefined) {
+      runActiveWindowTabOperation(tabId, async ({ tab }) => {
         const isStillTabGroupChanged = changeInfo.groupId === tab.groupId;
         if (isStillTabGroupChanged && tab.active) {
           await ActiveWindow.focusActiveTab(tab.windowId, tab.id, tab.groupId);
@@ -338,7 +336,7 @@ export async function onTabUpdated(tab: ChromeTabWithId, changeInfo: chrome.tabs
 
     // If the tab was ungrouped, auto-group it with the other ungrouped highlighted tabs
     if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false) {
-      runActiveWindowTabOperation(tab.id, async ({ tab }) => {
+      runActiveWindowTabOperation(tabId, async ({ tab }) => {
         const isUngroupedAndUnpinned = tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false;
         if (isUngroupedAndUnpinned) {
           // TODO: check for `automatically group created tabs` user preference
@@ -349,7 +347,7 @@ export async function onTabUpdated(tab: ChromeTabWithId, changeInfo: chrome.tabs
 
     // If the tab group was changed or the tab title was changed, use the tab title for eligible tab groups
     if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {
-      runActiveWindowTabOperation(tab.id, async ({ tab }) => {
+      runActiveWindowTabOperation(tabId, async ({ tab }) => {
         if (changeInfo.groupId === tab.groupId || changeInfo.title === tab.title) {
           await ActiveWindow.useTabTitleForEligebleTabGroups();
         }
@@ -384,10 +382,8 @@ export async function onTabAttached(tabId: ChromeTabId, attachInfo: chrome.tabs.
   }
 }
 
-export async function onTabDetached(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId) {
+export async function onTabDetached(activeWindow: Types.ActiveWindow, tabId: ChromeTabId) {
   const myLogger = logger.createNestedLogger("onTabDetached");
-  myLogger.log(`tab detached from windowId: ${tab.windowId}, tab title: ${tab.title}`);
-
   try {
     await ActiveWindow.blurTabGroupsIfNoActiveTab(activeWindow.windowId);
   } catch (error) {
@@ -397,13 +393,6 @@ export async function onTabDetached(activeWindow: Types.ActiveWindow, tab: Chrom
 
 export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
   const myLogger = logger.createNestedLogger("onTabRemoved");
-  myLogger.log(`tabId:`, tabId, removeInfo);
-
-  if (removeInfo.isWindowClosing) {
-    myLogger.log(`window is closing, nothing to do:`, tabId);
-    return;
-  }
-
   try {
     await ActiveWindow.blurTabGroupsIfNoActiveTab(activeWindow.windowId);
   } catch (error) {
