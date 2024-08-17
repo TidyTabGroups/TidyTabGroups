@@ -51,6 +51,12 @@ export type ChromeTabWithId = chrome.tabs.Tab & {
   id: ChromeTabId;
 };
 
+export type ChromeTabGroupChangeInfo = {
+  collapsed?: boolean;
+  title?: string;
+  color?: chrome.tabGroups.ColorEnum;
+};
+
 export interface LocalStorageShape {
   userPreferences: UserPreferences;
   lastSeenFocusModeColors: ActiveWindowFocusModeColors;
