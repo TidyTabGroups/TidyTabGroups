@@ -46,9 +46,10 @@ export async function runActiveWindowTabGroupOperation<T extends Partial<ChromeT
 
 export async function runActiveWindowTabOperation(
   tabId: ChromeTabId,
-  operation: (context: { activeWindow: Types.ActiveWindow; tab: ChromeTabWithId }) => Promise<void>
+  operation: (context: { activeWindow: Types.ActiveWindow; tab: ChromeTabWithId }) => Promise<void>,
+  requiredPropertiesToMatch?: Partial<Record<keyof ChromeTabWithId, any>>
 ) {
-  const { isValid, activeWindow, tabUpToDate } = await validateTabUpToDateAndActiveWindow(tabId);
+  const { isValid, activeWindow, tabUpToDate } = await validateTabUpToDateAndActiveWindow(tabId, requiredPropertiesToMatch);
   if (!isValid) {
     return;
   }
@@ -56,7 +57,10 @@ export async function runActiveWindowTabOperation(
   await operation({ activeWindow, tab: tabUpToDate });
 }
 
-async function validateTabUpToDateAndActiveWindow(tabId: ChromeTabId): Promise<
+async function validateTabUpToDateAndActiveWindow(
+  tabId: ChromeTabId,
+  requiredPropertiesToMatch?: Partial<Record<keyof ChromeTabWithId, any>>
+): Promise<
   | {
       isValid: true;
       activeWindow: Types.ActiveWindow;
@@ -71,6 +75,14 @@ async function validateTabUpToDateAndActiveWindow(tabId: ChromeTabId): Promise<
   const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
   if (!tabUpToDate) {
     return { isValid: false, activeWindow: undefined, tabUpToDate: undefined };
+  }
+
+  if (requiredPropertiesToMatch) {
+    for (const [key, value] of Object.entries(requiredPropertiesToMatch)) {
+      if (tabUpToDate[key as keyof ChromeTabWithId] !== value) {
+        return { isValid: false, activeWindow: undefined, tabUpToDate: undefined };
+      }
+    }
   }
 
   const activeWindow = await ActiveWindow.get(tabUpToDate.windowId);

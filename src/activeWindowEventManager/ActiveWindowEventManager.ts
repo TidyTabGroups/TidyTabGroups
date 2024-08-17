@@ -189,21 +189,37 @@ export async function initialize(onError: () => void) {
 
   chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
     const myLogger = logger.createNestedLogger("tabs.onCreated");
-    queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEventHandlers.onTabCreated(activeWindow, tab),
-      tab.windowId,
-      false,
-      myLogger.getPrefixedMessage("onTabCreated")
+    queueOperation(
+      {
+        name: myLogger.getPrefixedMessage("onTabCreated"),
+        operation: async () => {
+          const myMyLogger = myLogger.createNestedLogger("onTabCreated");
+          if (!tab.id) {
+            myMyLogger.warn(`tab.id not found for tab:`, tab);
+            return;
+          }
+
+          myMyLogger.log(`tab.title: '${tab.title}', tab.groupId: ${tab.groupId}:`);
+          return ActiveWindowEventHandlers.onTabCreated(tab.id);
+        },
+      },
+      false
     );
   });
 
   chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
     const myLogger = logger.createNestedLogger("tabs.onActivated");
-    queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEventHandlers.onTabActivated(activeWindow, activeInfo),
-      activeInfo.windowId,
-      false,
-      myLogger.getPrefixedMessage("onTabActivated")
+    queueOperation(
+      {
+        name: myLogger.getPrefixedMessage("onTabActivated"),
+        operation: async () => {
+          const myMyLogger = myLogger.createNestedLogger("onTabActivated");
+          myMyLogger.log("activeInfo", activeInfo);
+
+          await ActiveWindowEventHandlers.onTabActivated(activeInfo.tabId);
+        },
+      },
+      false
     );
   });
 
@@ -251,29 +267,16 @@ export async function initialize(onError: () => void) {
 
   chrome.tabs.onAttached.addListener((tabId: ChromeTabId, attachInfo: chrome.tabs.TabAttachInfo) => {
     const myLogger = logger.createNestedLogger("tabs.onAttached");
-    queueOperationIfWindowIsActive(
-      async (activeWindow) => {
-        const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
-        if (!tabUpToDate) {
-          myLogger.warn(TAB_NOT_UP_TO_DATE_MESSAGE(tabId));
-          return;
-        }
-
-        if (tabUpToDate.windowId !== attachInfo.newWindowId) {
-          myLogger.warn(`tabUpToDate is no longer attached to this window - windowId: ${activeWindow.windowId}, tabId`, {
-            activeWindowWindowId: activeWindow.windowId,
-            tabId,
-            tabUpToDateTitle: tabUpToDate.title,
-            tabUpToDateWindowId: tabUpToDate.windowId,
-          });
-          return;
-        }
-
-        await ActiveWindowEventHandlers.onTabAttached(activeWindow, tabUpToDate);
+    queueOperation(
+      {
+        name: myLogger.getPrefixedMessage("onTabAttached"),
+        operation: async () => {
+          const myMyLogger = myLogger.createNestedLogger("onTabAttached");
+          myMyLogger.log(`tab.id: '${tabId}', attachInfo.newWindowId: ${attachInfo.newWindowId}`);
+          await ActiveWindowEventHandlers.onTabAttached(tabId, attachInfo);
+        },
       },
-      attachInfo.newWindowId,
-      false,
-      myLogger.getPrefixedMessage("onTabAttached")
+      false
     );
   });
 
