@@ -18,24 +18,28 @@ import { runActiveWindowTabGroupOperation, runActiveWindowTabOperation } from ".
 const logger = Logger.createLogger("ActiveWindowEventHandlers", { color: "#4287f5" });
 
 export async function onWindowCreated(window: ChromeWindowWithId) {
-  logger.log(`onWindowCreated::window:`, window);
+  const myLogger = logger.createNestedLogger("onWindowCreated");
+  myLogger.log(`window:`, window);
 
   try {
     const newActiveWindow = await ActiveWindow.activateWindow(window.id, true);
-    logger.log(`onWindowCreated::newActiveWindow:`, newActiveWindow);
+    myLogger.log(`newActiveWindow:`, newActiveWindow);
   } catch (error) {
-    throw new Error(`onWindowCreated::error processing window:${error}`);
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
 export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
   const { windowId } = activeWindow;
-  logger.log(`onWindowRemoved::windowId:`, windowId);
+
+  const myLogger = logger.createNestedLogger("onWindowRemoved");
+  myLogger.log(`windowId:`, windowId);
+
   try {
     await ActiveWindow.deactivateWindow(windowId);
-    logger.log(`onWindowRemoved::deactivated window:`, windowId);
+    myLogger.log(`deactivated window:`, windowId);
   } catch (error) {
-    throw new Error(`onWindowRemoved::error processing window:${error}`);
+    throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
 }
 
