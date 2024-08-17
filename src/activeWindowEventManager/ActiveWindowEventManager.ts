@@ -125,6 +125,7 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
+    const myLogger = logger.createNestedLogger("tabGroups.onCreated");
     queueOperationIfWindowIsActive(
       async (activeWindow) => {
         const tabGroupUpToDate = await ChromeWindowHelper.getIfTabGroupExists(tabGroup.id);
@@ -135,16 +136,17 @@ export async function initialize(onError: () => void) {
       },
       tabGroup.windowId,
       false,
-      "onTabGroupCreated"
+      myLogger.getPrefixedMessage("onTabGroupCreated")
     );
   });
 
   chrome.tabGroups.onRemoved.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
+    const myLogger = logger.createNestedLogger("tabGroups.onRemoved");
     queueOperationIfWindowIsActive(
       (activeWindow) => ActiveWindowEventHandlers.onTabGroupRemoved(activeWindow, tabGroup),
       tabGroup.windowId,
       false,
-      "onTabGroupRemoved"
+      myLogger.getPrefixedMessage("onTabGroupRemoved")
     );
   });
 
@@ -186,15 +188,22 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
-    queueOperationIfWindowIsActive((activeWindow) => ActiveWindowEventHandlers.onTabCreated(activeWindow, tab), tab.windowId, false, "onTabCreated");
+    const myLogger = logger.createNestedLogger("tabs.onCreated");
+    queueOperationIfWindowIsActive(
+      (activeWindow) => ActiveWindowEventHandlers.onTabCreated(activeWindow, tab),
+      tab.windowId,
+      false,
+      myLogger.getPrefixedMessage("onTabCreated")
+    );
   });
 
   chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
+    const myLogger = logger.createNestedLogger("tabs.onActivated");
     queueOperationIfWindowIsActive(
       (activeWindow) => ActiveWindowEventHandlers.onTabActivated(activeWindow, activeInfo),
       activeInfo.windowId,
       false,
-      "onTabActivated"
+      myLogger.getPrefixedMessage("onTabActivated")
     );
   });
 
@@ -221,20 +230,22 @@ export async function initialize(onError: () => void) {
   });
 
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
+    const myLogger = logger.createNestedLogger("tabs.onRemoved");
     queueOperationIfWindowIsActive(
       (activeWindow) => ActiveWindowEventHandlers.onTabRemoved(activeWindow, tabId, removeInfo),
       removeInfo.windowId,
       false,
-      "onTabRemoved"
+      myLogger.getPrefixedMessage("onTabRemoved")
     );
   });
 
   chrome.tabs.onMoved.addListener((tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) => {
+    const myLogger = logger.createNestedLogger("tabs.onMoved");
     queueOperationIfWindowIsActive(
       (activeWindow) => ActiveWindowEventHandlers.onTabMoved(activeWindow, tabId, moveInfo),
       moveInfo.windowId,
       false,
-      "onTabMoved"
+      myLogger.getPrefixedMessage("onTabMoved")
     );
   });
 
@@ -262,7 +273,7 @@ export async function initialize(onError: () => void) {
       },
       attachInfo.newWindowId,
       false,
-      "onTabAttached"
+      myLogger.getPrefixedMessage("onTabAttached")
     );
   });
 
@@ -280,11 +291,12 @@ export async function initialize(onError: () => void) {
       },
       detachInfo.oldWindowId,
       false,
-      "onTabDetached"
+      myLogger.getPrefixedMessage("onTabDetached")
     );
   });
 
   chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
+    const myLogger = logger.createNestedLogger("tabs.onReplaced");
     queueOperationIfWindowIsActive(
       (activeWindow) => ActiveWindowEventHandlers.onTabReplaced(activeWindow, addedTabId, removedTabId),
       new Promise(async (resolve, reject) => {
@@ -296,7 +308,7 @@ export async function initialize(onError: () => void) {
         }
       }),
       false,
-      "onTabReplaced"
+      myLogger.getPrefixedMessage("onTabReplaced")
     );
   });
 
@@ -316,7 +328,7 @@ export async function initialize(onError: () => void) {
 
     queueOperation(
       {
-        name: "onMessage",
+        name: myLogger.getPrefixedMessage("onMessage"),
         operation: async () => {
           try {
             if (message.type === messageTypes[0]) {
