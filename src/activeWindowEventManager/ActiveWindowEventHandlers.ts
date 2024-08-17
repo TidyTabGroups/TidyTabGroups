@@ -400,16 +400,6 @@ export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: Chro
   }
 }
 
-export async function onTabMoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) {
-  const myLogger = logger.createNestedLogger("onTabMoved");
-  myLogger.log(`tabId and moveInfo:`, tabId, moveInfo);
-}
-
-export async function onTabReplaced(activeWindow: Types.ActiveWindow, addedTabId: ChromeTabId, removedTabId: ChromeTabId) {
-  const myLogger = logger.createNestedLogger("onTabReplaced");
-  myLogger.log(`addedTabId and removedTabId:`, addedTabId, removedTabId);
-}
-
 async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: ChromeTabId) {
   // 1. if the tab is pinned, ignore
   // 2. if the tab is active, reposition it

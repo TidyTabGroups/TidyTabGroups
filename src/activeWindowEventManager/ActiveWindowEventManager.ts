@@ -260,16 +260,6 @@ export async function initialize(onError: () => void) {
     );
   });
 
-  chrome.tabs.onMoved.addListener((tabId: ChromeTabId, moveInfo: chrome.tabs.TabMoveInfo) => {
-    const myLogger = logger.createNestedLogger("tabs.onMoved");
-    queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEventHandlers.onTabMoved(activeWindow, tabId, moveInfo),
-      moveInfo.windowId,
-      false,
-      myLogger.getPrefixedMessage("onTabMoved")
-    );
-  });
-
   chrome.tabs.onAttached.addListener((tabId: ChromeTabId, attachInfo: chrome.tabs.TabAttachInfo) => {
     const myLogger = logger.createNestedLogger("tabs.onAttached");
     queueOperation(
@@ -297,23 +287,6 @@ export async function initialize(onError: () => void) {
       detachInfo.oldWindowId,
       false,
       myLogger.getPrefixedMessage("onTabDetached")
-    );
-  });
-
-  chrome.tabs.onReplaced.addListener((addedTabId: ChromeTabId, removedTabId: ChromeTabId) => {
-    const myLogger = logger.createNestedLogger("tabs.onReplaced");
-    queueOperationIfWindowIsActive(
-      (activeWindow) => ActiveWindowEventHandlers.onTabReplaced(activeWindow, addedTabId, removedTabId),
-      new Promise(async (resolve, reject) => {
-        const addedTab = await ChromeWindowHelper.getIfTabExists(addedTabId);
-        if (addedTab?.id !== undefined) {
-          resolve(addedTab.windowId);
-        } else {
-          reject(`onTabReplaced::addedTab not found for addedTabId: ${addedTabId}`);
-        }
-      }),
-      false,
-      myLogger.getPrefixedMessage("onTabReplaced")
     );
   });
 
