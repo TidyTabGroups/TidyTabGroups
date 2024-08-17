@@ -1,13 +1,4 @@
-import {
-  ChromeWindowId,
-  ChromeTabWithId,
-  ChromeTabGroupWithId,
-  ChromeTabId,
-  ChromeTabGroupId,
-  ChromeTabGroupUpdateProperties,
-  ChromeTabGroupColorEnum,
-  ChromeWindowWithId,
-} from "../types/types";
+import { ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabId, ChromeTabGroupId, ChromeWindowWithId } from "../types/types";
 import Misc from "../misc";
 import ChromeTabOperationRetryHandler from "../chromeTabOperationRetryHandler";
 import Logger from "../logger";
@@ -47,7 +38,7 @@ export async function activateTabWithRetryHandler(tabId: ChromeTabId) {
   return await operationHandler.try(() => chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>);
 }
 
-export async function updateTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId, updatedProperties: ChromeTabGroupUpdateProperties) {
+export async function updateTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId, updatedProperties: chrome.tabGroups.UpdateProperties) {
   try {
     const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId, true>();
     operationHandler.setShouldRetryOperationCallback(async () => {
@@ -231,7 +222,7 @@ export async function focusTabGroup(
 }
 
 // FIXME: remove the "orange" explicit type once the chrome.tabGroups.ColorEnum type is updated
-export const TAB_GROUP_COLORS: Array<ChromeTabGroupColorEnum> = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
+export const TAB_GROUP_COLORS: Array<chrome.tabGroups.ColorEnum> = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
 
 export function tabGroupEquals(tabGroup: ChromeTabGroupWithId, tabGroupToCompare: ChromeTabGroupWithId) {
   const keys = Object.keys(tabGroupToCompare) as (keyof chrome.tabGroups.TabGroup)[];

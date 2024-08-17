@@ -8,7 +8,6 @@ import Types from "../types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import Misc from "../misc";
-import { ChromeTabGroupColorEnum } from "../types/types";
 
 const logger = Logger.createLogger("popup");
 
@@ -100,7 +99,7 @@ const Popup = () => {
           const colors = ChromeWindowHelper.TAB_GROUP_COLORS.filter((color) => color !== "grey");
           await Promise.all(
             tabGroups.map((tabGroup) => {
-              let newColor: ChromeTabGroupColorEnum;
+              let newColor: chrome.tabGroups.ColorEnum;
               // FIXME: the compiler thinks that savedTabGroupColorsToRestore could be null
               const savedColor = savedTabGroupColorsToRestore!.find((savedColor) => savedColor.tabGroupId === tabGroup.id)?.color;
               if (savedColor) {
@@ -109,9 +108,7 @@ const Popup = () => {
                 newColor = colors[colorIndex++ % colors.length];
               }
 
-              // FIXME: figure out why newColor: Types.ChromeTabGroupColorEnum cant be passed in to updateTabGroup with the same type
-              // @ts-ignore
-              return ChromeWindowHelper.updateTabGroup(tabGroup.id, { color: newColor });
+              return ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroup.id, { color: newColor });
             })
           );
         }
