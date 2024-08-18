@@ -108,17 +108,7 @@ export async function initialize(onError: () => void) {
     queueOperation(
       {
         name: myLogger.getPrefixedMessage("onFocusChanged"),
-        operation: async () => {
-          // check the up-to-date focused window because it could have changed
-          const lastFocusedWindow = (await chrome.windows.getLastFocused()) as ChromeWindowWithId;
-          if (windowId === chrome.windows.WINDOW_ID_NONE ? lastFocusedWindow.focused : lastFocusedWindow.id !== windowId) {
-            myLogger.warn(
-              `focused window not up to date - windowId: ${windowId}, lastFocusedWindow: ${lastFocusedWindow.id}, lastFocusedWindow.focused: ${lastFocusedWindow.focused}`
-            );
-            return;
-          }
-          await ActiveWindowEventHandlers.onWindowFocusChanged(windowId);
-        },
+        operation: () => ActiveWindowEventHandlers.onWindowFocusChanged(windowId),
       },
       false
     );

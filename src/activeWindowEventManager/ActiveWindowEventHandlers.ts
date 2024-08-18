@@ -13,7 +13,7 @@ import {
   ChromeWindowWithId,
 } from "../types/types";
 import * as Storage from "../storage";
-import { runActiveWindowTabGroupOperation, runActiveWindowTabOperation } from "./ActiveWindowEventOperationRunner";
+import { runActiveWindowOperation, runActiveWindowTabGroupOperation, runActiveWindowTabOperation } from "./ActiveWindowEventOperationRunner";
 
 const logger = Logger.createLogger("ActiveWindowEventHandlers", { color: "#4287f5" });
 
@@ -48,15 +48,17 @@ export async function onWindowFocusChanged(windowId: ChromeWindowId) {
   // 2. use tab title for eligeble tab groups
   const myLogger = logger.createNestedLogger("onWindowFocusChanged");
   myLogger.log(`windowId: ${windowId}`);
+
   try {
     // 1
-    const activeWindow = await ActiveWindow.get(windowId);
-    if (activeWindow) {
-      let keys: Partial<Types.LocalStorageShape> = {};
-      if (activeWindow.focusMode) {
-        keys = { ...keys, lastSeenFocusModeColors: activeWindow.focusMode.colors };
-      }
-      await Storage.setItems({ ...keys, lastFocusedWindowHadFocusMode: activeWindow.focusMode !== null });
+    if (windowId !== chrome.windows.WINDOW_ID_NONE) {
+      await runActiveWindowOperation(windowId, async (activeWindow) => {
+        let keys: Partial<Types.LocalStorageShape> = {};
+        if (activeWindow.focusMode) {
+          keys = { ...keys, lastSeenFocusModeColors: activeWindow.focusMode.colors };
+        }
+        await Storage.setItems({ ...keys, lastFocusedWindowHadFocusMode: activeWindow.focusMode !== null });
+      });
     }
 
     // 2
