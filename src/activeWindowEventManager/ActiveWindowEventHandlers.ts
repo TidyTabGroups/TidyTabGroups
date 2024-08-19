@@ -368,7 +368,9 @@ export async function onTabAttached(tabId: ChromeTabId, attachInfo: chrome.tabs.
       await runActiveWindowTabOperation(
         tabId,
         async ({ tab }) => {
-          await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
+          if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false) {
+            await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
+          }
         },
         { windowId: attachInfo.newWindowId, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE, pinned: false }
       );
