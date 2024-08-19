@@ -324,7 +324,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
   try {
     // If the tab group was changed and the tab is active, focus the tab
     if (changeInfo.groupId !== undefined) {
-      runActiveWindowTabOperation(tabId, async ({ tab }) => {
+      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
         const isStillTabGroupChanged = changeInfo.groupId === tab.groupId;
         if (isStillTabGroupChanged && tab.active) {
           await ActiveWindow.focusActiveTab(tab.windowId, tab.id, tab.groupId);
@@ -338,7 +338,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
 
     // If the tab was ungrouped, auto-group it with the other ungrouped highlighted tabs
     if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false) {
-      runActiveWindowTabOperation(tabId, async ({ tab }) => {
+      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
         const isUngroupedAndUnpinned = tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false;
         if (isUngroupedAndUnpinned) {
           // TODO: check for `automatically group created tabs` user preference
@@ -349,7 +349,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
 
     // If the tab group was changed or the tab title was changed, use the tab title for eligible tab groups
     if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {
-      runActiveWindowTabOperation(tabId, async ({ tab }) => {
+      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
         if (changeInfo.groupId === tab.groupId || changeInfo.title === tab.title) {
           await ActiveWindow.useTabTitleForEligebleTabGroups();
         }
