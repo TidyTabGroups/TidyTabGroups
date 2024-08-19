@@ -55,7 +55,12 @@ export async function initialize(onError: (message: string) => void) {
 
   Storage.addChangeListener(async (changes) => {
     const { userPreferences } = changes;
-    if (userPreferences && !userPreferences.oldValue.collapseUnfocusedTabGroups && userPreferences.newValue.collapseUnfocusedTabGroups) {
+    if (userPreferences === undefined) {
+      return;
+    }
+
+    // TODO: the following logic should be queued into the operation queue
+    if (!userPreferences.oldValue.collapseUnfocusedTabGroups && userPreferences.newValue.collapseUnfocusedTabGroups) {
       const activeWindows = await ActiveWindow.getAll();
       const activeTabs = (await chrome.tabs.query({ active: true })) as ChromeTabWithId[];
       const activeTabsByWindowId = activeTabs.reduce((acc, activeTab) => {
