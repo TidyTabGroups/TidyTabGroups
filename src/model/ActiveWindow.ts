@@ -245,8 +245,7 @@ export async function reactivateAllWindows() {
     await Promise.all(
       windowIds.map(async (windowId) => {
         const previousActiveWindow = previousActiveWindows.find((previousActiveWindow) => previousActiveWindow.windowId === windowId);
-        const groupUnpinnedAndUngroupedTabs = previousActiveWindow === undefined;
-        await activateWindowInternal(windowId, groupUnpinnedAndUngroupedTabs, previousActiveWindow?.focusMode?.colors);
+        await activateWindowInternal(windowId, previousActiveWindow?.focusMode?.colors);
       })
     );
   } catch (error) {
@@ -265,7 +264,7 @@ export async function activateAllWindows() {
 
   try {
     const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
-    await Promise.all(windows.map((window) => activateWindowInternal(window.id, true)));
+    await Promise.all(windows.map((window) => activateWindowInternal(window.id)));
   } catch (error) {
     throw new Error(`activateAllWindows::${error}`);
   } finally {
@@ -273,11 +272,7 @@ export async function activateAllWindows() {
   }
 }
 
-async function activateWindowInternal(
-  windowId: ChromeWindowId,
-  groupUnpinnedAndUngroupedTabs: boolean,
-  focusModeColors?: ActiveWindowFocusModeColors
-) {
+async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?: ActiveWindowFocusModeColors) {
   const myLogger = logger.createNestedLogger("activateWindowInternal");
   try {
     const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
@@ -305,7 +300,7 @@ async function activateWindowInternal(
     }
 
     let useTabTitleForGroupId: ChromeTabGroupId | null = null;
-    if (groupUnpinnedAndUngroupedTabs) {
+    if ((await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
       const newTabGroupId = await ChromeWindowHelper.groupUnpinnedAndUngroupedTabsWithRetryHandler(windowId);
       if (newTabGroupId) {
         const [newTabGroup, tabsInGroup] = await Promise.all([
@@ -359,7 +354,7 @@ async function activateWindowInternal(
   }
 }
 
-export async function activateWindow(windowId: ChromeWindowId, groupUnpinnedAndUngroupedTabs: boolean) {
+export async function activateWindow(windowId: ChromeWindowId) {
   if (isActivatingWindow(windowId)) {
     throw new Error(`activateWindow::windowId ${windowId} is already being activated`);
   }
@@ -367,7 +362,7 @@ export async function activateWindow(windowId: ChromeWindowId, groupUnpinnedAndU
   windowsBeingActivated.push(windowId);
 
   try {
-    await activateWindowInternal(windowId, groupUnpinnedAndUngroupedTabs);
+    await activateWindowInternal(windowId);
   } catch (error) {
     throw new Error(`activateWindow::${error}`);
   } finally {

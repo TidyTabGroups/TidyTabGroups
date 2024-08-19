@@ -67,7 +67,7 @@ export interface LocalStorageShape {
 export interface UserPreferences {
   repositionTabs: boolean;
   repositionTabGroups: boolean;
-  addNewTabToFocusedTabGroup: boolean;
+  alwaysGroupTabs: boolean;
   collapseUnfocusedTabGroups: boolean;
   activateTabInFocusedTabGroup: boolean;
 }

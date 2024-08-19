@@ -75,13 +75,8 @@ const UserPreferences = () => {
             ),
           },
           {
-            name: "Automatically place new Tabs in focused Tab Group",
-            control: (
-              <Switch
-                checked={userPreferences.addNewTabToFocusedTabGroup}
-                onChange={(e) => updatePreferences({ addNewTabToFocusedTabGroup: e.target.checked })}
-              />
-            ),
+            name: "Always group Tabs",
+            control: <Switch checked={userPreferences.alwaysGroupTabs} onChange={(e) => updatePreferences({ alwaysGroupTabs: e.target.checked })} />,
           },
           {
             name: "Automatically collapse unfocused Tab Groups",

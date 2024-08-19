@@ -22,7 +22,7 @@ export async function onWindowCreated(window: ChromeWindowWithId) {
   myLogger.log(`window:`, window);
 
   try {
-    const newActiveWindow = await ActiveWindow.activateWindow(window.id, true);
+    const newActiveWindow = await ActiveWindow.activateWindow(window.id);
     myLogger.log(`newActiveWindow:`, newActiveWindow);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -261,38 +261,37 @@ export async function onTabCreated(tabId: ChromeTabId) {
         lastActiveTab = tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 1] as ChromeTabWithId | undefined;
       }
 
-      if (!tab.pinned && tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-        let existingGroupId: ChromeTabGroupId | undefined | null = null;
+      if (
+        !tab.pinned &&
+        tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
+        (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs
+      ) {
+        let existingGroupId: ChromeTabGroupId | undefined;
         if (lastActiveTab && lastActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-          if ((await Storage.getItems("userPreferences")).userPreferences.addNewTabToFocusedTabGroup) {
-            // 2
-            myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${lastActiveTab.title}'`);
-            existingGroupId = lastActiveTab.groupId;
-          }
+          // 2
+          myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${lastActiveTab.title}'`);
+          existingGroupId = lastActiveTab.groupId;
         } else {
           // 3
-          // TODO: check for `automatically group created tabs` user preference
           myLogger.log(`creating new tab group for tab: '${tab.title}'`);
           existingGroupId = undefined;
         }
 
-        if (existingGroupId !== null) {
-          const createNewGroup = existingGroupId === undefined;
-          // TODO: Re-use logic in ActiveWindow.autoGroupTabAndHighlightedTabs instead of or adjecent to this
-          const groupId = await ChromeWindowHelper.groupTabsWithRetryHandler({
-            createProperties: createNewGroup ? { windowId: tab.windowId } : undefined,
-            groupId: createNewGroup ? undefined : existingGroupId,
-            tabIds: tab.id,
-          });
+        const createNewGroup = existingGroupId === undefined;
+        // TODO: Re-use logic in ActiveWindow.autoGroupTabAndHighlightedTabs instead of or adjecent to this
+        const groupId = await ChromeWindowHelper.groupTabsWithRetryHandler({
+          createProperties: createNewGroup ? { windowId: tab.windowId } : undefined,
+          groupId: createNewGroup ? undefined : existingGroupId,
+          tabIds: tab.id,
+        });
 
-          if (groupId !== undefined) {
-            tab.groupId = groupId;
+        if (groupId !== undefined) {
+          tab.groupId = groupId;
 
-            if (createNewGroup) {
-              const newTabGroup = await ChromeWindowHelper.getIfTabGroupExists(groupId);
-              if (newTabGroup) {
-                await ActiveWindow.createActiveWindowTabGroup(activeWindow.windowId, newTabGroup);
-              }
+          if (createNewGroup) {
+            const newTabGroup = await ChromeWindowHelper.getIfTabGroupExists(groupId);
+            if (newTabGroup) {
+              await ActiveWindow.createActiveWindowTabGroup(activeWindow.windowId, newTabGroup);
             }
           }
         }
@@ -338,11 +337,11 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     }
 
     // If the tab was ungrouped, auto-group it with the other ungrouped highlighted tabs
-    if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false) {
+    const wasUngroupedOrUnpinned = changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false;
+    if (wasUngroupedOrUnpinned && (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
       await runActiveWindowTabOperation(tabId, async ({ tab }) => {
         const isUngroupedAndUnpinned = tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false;
         if (isUngroupedAndUnpinned) {
-          // TODO: check for `automatically group created tabs` user preference
           await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
         }
       });
@@ -365,13 +364,15 @@ export async function onTabAttached(tabId: ChromeTabId, attachInfo: chrome.tabs.
   const myLogger = logger.createNestedLogger("onTabAttached");
 
   try {
-    await runActiveWindowTabOperation(
-      tabId,
-      async ({ tab }) => {
-        await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
-      },
-      { windowId: attachInfo.newWindowId, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE, pinned: false }
-    );
+    if ((await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
+      await runActiveWindowTabOperation(
+        tabId,
+        async ({ tab }) => {
+          await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
+        },
+        { windowId: attachInfo.newWindowId, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE, pinned: false }
+      );
+    }
 
     await runActiveWindowTabOperation(
       tabId,

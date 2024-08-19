@@ -67,7 +67,7 @@ async function getLocalStorageDefaultValues(): Promise<LocalStorageShape> {
       userPreferences: {
         repositionTabs: false,
         repositionTabGroups: false,
-        addNewTabToFocusedTabGroup: true,
+        alwaysGroupTabs: true,
         collapseUnfocusedTabGroups: true,
         activateTabInFocusedTabGroup: true,
       },
