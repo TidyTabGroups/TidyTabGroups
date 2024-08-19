@@ -323,6 +323,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
   const myLogger = logger.createNestedLogger("onTabUpdated");
   try {
     // If the tab group was changed and the tab is active, focus the tab
+    // TODO: shouldnt this be run after the potential auto-grouping?
     if (changeInfo.groupId !== undefined) {
       await runActiveWindowTabOperation(tabId, async ({ tab }) => {
         const isStillTabGroupChanged = changeInfo.groupId === tab.groupId;
