@@ -17,7 +17,16 @@ chrome.action.onClicked.addListener(function (tab) {
 
 async function onError() {
   logger.error("onError::An error occurred in the background page. Will try to recover...");
-  chrome.runtime.reload();
+
+  if (process.env.NODE_ENV === "development") {
+    chrome.action.setBadgeText({ text: "🚨" });
+    chrome.action.setBadgeBackgroundColor({ color: "red" });
+    chrome.action.setBadgeTextColor({ color: "white" });
+    chrome.action.setPopup({ popup: "/error_popup.html" });
+    chrome.action.openPopup();
+  } else {
+    chrome.runtime.reload();
+  }
 }
 
 async function initializeStorage() {
