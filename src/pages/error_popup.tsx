@@ -1,12 +1,25 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Container, Typography, Button } from "@mui/material";
 import { App } from "./app";
 import Logger from "../logger";
+import * as Storage from "../storage";
 
 const logger = Logger.createLogger("ErrorPopup");
 
 const ErrorPopup = () => {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    Storage.start().then(() => {
+      Storage.getItems(["lastError"]).then((result) => {
+        if (result.lastError) {
+          setErrorMessage(result.lastError);
+        }
+      });
+    });
+  }, []);
+
   const handleReload = () => {
     chrome.runtime.reload();
   };
@@ -25,8 +38,13 @@ const ErrorPopup = () => {
       <Typography variant="h5" gutterBottom color="error">
         An error occurred
       </Typography>
+      {errorMessage && (
+        <Typography variant="body1" paragraph sx={{ overflowWrap: "anywhere" }}>
+          {errorMessage}
+        </Typography>
+      )}
       <Typography variant="body1" paragraph>
-        Tidy Tabs encountered an unexpected error. Please try reloading the extension.
+        Please try reloading the extension.
       </Typography>
       <Button variant="contained" color="primary" onClick={handleReload}>
         Reload Extension

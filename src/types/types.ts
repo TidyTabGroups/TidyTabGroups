@@ -61,6 +61,7 @@ export interface LocalStorageShape {
   userPreferences: UserPreferences;
   lastSeenFocusModeColors: ActiveWindowFocusModeColors;
   lastFocusedWindowHadFocusMode: boolean;
+  lastError: string | null;
 }
 
 export interface UserPreferences {

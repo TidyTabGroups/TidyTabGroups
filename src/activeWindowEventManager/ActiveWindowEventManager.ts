@@ -14,6 +14,7 @@ import Types from "../types";
 import * as Storage from "../storage";
 import * as ActiveWindowEventHandlers from "./ActiveWindowEventHandlers";
 import * as MouseInPageTracker from "./MouseInPageTracker";
+import Misc from "../misc";
 
 const logger = Logger.createLogger("ActiveWindowEventManager", { color: "#fcba03" });
 
@@ -25,7 +26,7 @@ const TAB_NOT_UP_TO_DATE_MESSAGE = (tabOrTabId: ChromeTabId | chrome.tabs.Tab) =
   }
 };
 
-export async function initialize(onError: () => void) {
+export async function initialize(onError: (message: string) => void) {
   let asyncInitializationSteps = new Promise<void>(async (resolve, reject) => {
     const myLogger = logger.createNestedLogger("initialize::asyncInitializationSteps");
     try {
@@ -384,6 +385,7 @@ export async function initialize(onError: () => void) {
   }
 
   async function processQueue(): Promise<void> {
+    const myLogger = logger.createNestedLogger("processQueue");
     if (isProcessingQueue) {
       throw new Error("processQueue::Queue is already being processed");
     }
@@ -391,8 +393,8 @@ export async function initialize(onError: () => void) {
     try {
       await asyncInitializationSteps;
     } catch (error) {
-      logger.error("processQueue::Error during asyncInitializationSteps:", error);
-      onBackgroundEventError();
+      const errorMessage = myLogger.getPrefixedMessage(`Error during asyncInitializationSteps: ${Misc.getErrorMessage(error)}`);
+      onBackgroundEventError(errorMessage);
       return;
     }
 
@@ -401,14 +403,15 @@ export async function initialize(onError: () => void) {
       const currentOperation = operationQueue.shift();
       if (currentOperation) {
         const operationTimeoutId = setTimeout(() => {
-          logger.error(`processQueue::Operation timed out: ${currentOperation.name}`);
-          onBackgroundEventError();
+          onBackgroundEventError(`processQueue::Operation timed out: ${currentOperation.name}`);
         }, 7500);
         try {
           await currentOperation.operation();
         } catch (error) {
-          logger.error(`processQueue::Error processing operation: ${currentOperation.name}`, error);
-          onBackgroundEventError();
+          const errorMessage = myLogger.getPrefixedMessage(
+            `processQueue::Error processing operation: ${currentOperation.name}: ${Misc.getErrorMessage(error)}`
+          );
+          onBackgroundEventError(errorMessage);
         } finally {
           clearTimeout(operationTimeoutId);
         }
@@ -417,9 +420,9 @@ export async function initialize(onError: () => void) {
     isProcessingQueue = false;
   }
 
-  function onBackgroundEventError() {
+  function onBackgroundEventError(message: string) {
     isQueueSuspended = true;
-    onError();
+    onError(message);
   }
 }
 

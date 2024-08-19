@@ -38,7 +38,9 @@ export async function updateItems<T extends keyof LocalStorageShape, P extends {
 ) {
   await waitForReady();
   const items = await getItems(keys);
-  const newItems = await updater(items as P);
+  // @ts-ignore
+  // FIXME: Fix this ts-ignore
+  const newItems = await updater(items);
   await setItems(newItems);
   return newItems;
 }
