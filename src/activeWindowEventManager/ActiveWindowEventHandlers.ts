@@ -376,7 +376,9 @@ export async function onTabAttached(tabId: ChromeTabId, attachInfo: chrome.tabs.
     await runActiveWindowTabOperation(
       tabId,
       async ({ tab }) => {
-        await ActiveWindow.focusActiveTab(tab.windowId, tab.id, tab.groupId);
+        if (tab.active) {
+          await ActiveWindow.focusActiveTab(tab.windowId, tab.id, tab.groupId);
+        }
       },
       { windowId: attachInfo.newWindowId, active: true }
     );
