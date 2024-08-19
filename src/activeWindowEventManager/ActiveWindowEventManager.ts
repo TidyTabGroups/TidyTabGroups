@@ -76,6 +76,15 @@ export async function initialize(onError: (message: string) => void) {
         })
       );
     }
+
+    if (!userPreferences.oldValue.alwaysGroupTabs && userPreferences.newValue.alwaysGroupTabs) {
+      const activeWindows = await ActiveWindow.getAll();
+      await Promise.all(
+        activeWindows.map(async (activeWindow) => {
+          await ActiveWindow.groupUnpinnedAndUngroupedTabs(activeWindow.windowId);
+        })
+      );
+    }
   });
 
   chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {

@@ -700,3 +700,11 @@ export async function blurTabGroupsIfNoActiveTab(windowId: ChromeWindowId) {
     await focusTabGroup(windowId, chrome.tabGroups.TAB_GROUP_ID_NONE);
   }
 }
+
+export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId) {
+  const newTabGroupId = await ChromeWindowHelper.groupUnpinnedAndUngroupedTabsWithRetryHandler(windowId);
+  if (newTabGroupId) {
+    const tabGroup = await chrome.tabGroups.get(newTabGroupId);
+    await createActiveWindowTabGroup(windowId, tabGroup);
+  }
+}
