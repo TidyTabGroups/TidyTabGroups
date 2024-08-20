@@ -1,4 +1,5 @@
 import ActiveWindowManager from "../activeWindowEventManager";
+import ChromeWindowHelper from "../chromeWindowHelper";
 import Database from "../database";
 import Logger from "../logger";
 import Misc from "../misc";
@@ -60,8 +61,8 @@ async function initializeStorage() {
 
 async function getLocalStorageDefaultValues(): Promise<LocalStorageShape> {
   try {
-    const currentWindow = (await chrome.windows.getCurrent()) as ChromeWindowWithId;
-    const activeWindow = await ActiveWindow.get(currentWindow.id);
+    const currentWindow = await ChromeWindowHelper.getIfCurrentWindowExists();
+    const activeWindow = currentWindow ? await ActiveWindow.get(currentWindow.id) : null;
 
     return {
       userPreferences: {

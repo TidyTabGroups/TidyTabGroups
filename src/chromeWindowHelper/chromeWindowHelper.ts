@@ -139,6 +139,11 @@ export async function getIfWindowExists(windowId: ChromeWindowId) {
     return (await chrome.windows.get(windowId)) as ChromeWindowWithId;
   } catch (error) {}
 }
+export async function getIfCurrentWindowExists() {
+  try {
+    return (await chrome.windows.getCurrent()) as ChromeWindowWithId;
+  } catch (error) {}
+}
 
 export async function queryTabsIfWindowExists(windowId: ChromeWindowId, otherQueryInfo?: chrome.tabs.QueryInfo) {
   try {

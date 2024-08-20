@@ -2,7 +2,7 @@
   "manifest_version": 3,
 
   "name": "Tidy Tabs",
-  "description": "A suite of powerful tab group features with a focus on better productivity, organization, multitasking, and mindful browsing.",
+  "description": "Enhances tab group management by always grouping tabs, auto-collapsing unfocused tab groups, and more!",
   "version": "1.0",
 
   "action": {
