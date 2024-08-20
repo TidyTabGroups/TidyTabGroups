@@ -1,30 +1,41 @@
 import { getIfTabExists } from "../chromeWindowHelper/chromeWindowHelper";
-import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../types/types";
+import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, FixedPageType } from "../types/types";
 
 export function onWindowError(windowId: ChromeWindowId) {
   // TODO: re-activate the window
 }
 
-export async function createPopupWindowWithUrl(url: string) {
+export async function createFixedPage(type: FixedPageType, url: string) {
   const windows = await chrome.windows.getAll({ populate: true });
 
-  const existingWindow = windows.find((window) => window.tabs && window.tabs[0] && window.tabs[0].url === url);
-  if (existingWindow) {
-    return;
+  if (type === "popupWindow") {
+    const existingPopupWindow = windows.find((window) => window.tabs && window.tabs[0] && window.tabs[0].url === url);
+    if (existingPopupWindow) {
+      return;
+    }
+
+    await chrome.windows.create({
+      url: url,
+      type: "popup",
+      focused: false,
+    });
+  } else {
+    await Promise.all(
+      windows.map(async (window) => {
+        if (window.id === undefined) {
+          return;
+        }
+
+        const pinned = type === "pinnedTab";
+        const existingTabs = await chrome.tabs.query({ windowId: window.id, url, pinned });
+        if (existingTabs.length > 0) {
+          return;
+        }
+
+        await chrome.tabs.create({ url, windowId: window.id, pinned, active: false, index: 0 });
+      })
+    );
   }
-
-  await chrome.windows.create({
-    url: url,
-    type: "popup",
-  });
-}
-
-export async function createDummyPageWindow() {
-  await createPopupWindowWithUrl(chrome.runtime.getURL("dummy-page.html"));
-}
-
-export async function createOptionsPageWindow() {
-  await createPopupWindowWithUrl(chrome.runtime.getURL("options.html"));
 }
 
 export async function getTabFromTabOrTabId(tabOrTabId: ChromeTabId | ChromeTabWithId) {

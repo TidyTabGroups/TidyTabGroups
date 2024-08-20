@@ -64,6 +64,8 @@ export interface LocalStorageShape {
   lastError: string | null;
 }
 
+export type FixedPageType = "tab" | "pinnedTab" | "popupWindow";
+
 export interface UserPreferences {
   /* Functionality */
   repositionTabs: boolean;
@@ -73,8 +75,14 @@ export interface UserPreferences {
   activateTabInFocusedTabGroup: boolean;
   /* Other */
   reloadOnError: boolean;
-  createDummyTabOnStartup: boolean;
-  createOptionsPageTabOnStartup: boolean;
+  createDummyFixedPageOnStartup: {
+    enabled: boolean;
+    type: FixedPageType;
+  };
+  createOptionsFixedPageOnStartup: {
+    enabled: boolean;
+    type: FixedPageType;
+  };
 }
 
 export interface LastGroupedTabInfo {

@@ -17,9 +17,10 @@ import {
   Toolbar,
   Grid,
 } from "@mui/material";
-import { UserPreference } from "./userPreference";
+import { UserPreference, UserPreferenceProps } from "./userPreference";
 import { App } from "./app";
 import { UserPreferenceCard } from "./userPreference/UserPreferenceCard";
+import { FixedPageTypeSelect } from "../UIComponents";
 
 Storage.start();
 
@@ -58,6 +59,56 @@ const UserPreferences = () => {
 
   if (isLoading) {
     return null;
+  }
+
+  const otherUserPreferences: UserPreferenceProps[] = [
+    {
+      name: "Reload on error",
+      control: <Switch checked={userPreferences.reloadOnError} onChange={(e) => updatePreferences({ reloadOnError: e.target.checked })} />,
+    },
+  ];
+
+  if (process.env.NODE_ENV === "development") {
+    otherUserPreferences.push(
+      {
+        name: "Create dummy tab on startup",
+        control: (
+          <FixedPageTypeSelect
+            value={userPreferences.createDummyFixedPageOnStartup.type}
+            onChangeType={(value) =>
+              updatePreferences({
+                createDummyFixedPageOnStartup: { ...userPreferences.createDummyFixedPageOnStartup, type: value },
+              })
+            }
+            onChangeEnabled={(value) =>
+              updatePreferences({
+                createDummyFixedPageOnStartup: { ...userPreferences.createDummyFixedPageOnStartup, enabled: value },
+              })
+            }
+            enabled={userPreferences.createDummyFixedPageOnStartup.enabled}
+          />
+        ),
+      },
+      {
+        name: "Create options page tab on startup",
+        control: (
+          <FixedPageTypeSelect
+            value={userPreferences.createOptionsFixedPageOnStartup.type}
+            onChangeType={(value) =>
+              updatePreferences({
+                createOptionsFixedPageOnStartup: { ...userPreferences.createOptionsFixedPageOnStartup, type: value },
+              })
+            }
+            onChangeEnabled={(value) =>
+              updatePreferences({
+                createOptionsFixedPageOnStartup: { ...userPreferences.createOptionsFixedPageOnStartup, enabled: value },
+              })
+            }
+            enabled={userPreferences.createOptionsFixedPageOnStartup.enabled}
+          />
+        ),
+      }
+    );
   }
 
   return (
@@ -99,33 +150,7 @@ const UserPreferences = () => {
         ]}
         title="Functionality"
       />
-      <UserPreferenceCard
-        userPreferences={[
-          {
-            name: "Reload on error",
-            control: <Switch checked={userPreferences.reloadOnError} onChange={(e) => updatePreferences({ reloadOnError: e.target.checked })} />,
-          },
-          {
-            name: "Create dummy tab on startup",
-            control: (
-              <Switch
-                checked={userPreferences.createDummyTabOnStartup}
-                onChange={(e) => updatePreferences({ createDummyTabOnStartup: e.target.checked })}
-              />
-            ),
-          },
-          {
-            name: "Create options page tab on startup",
-            control: (
-              <Switch
-                checked={userPreferences.createOptionsPageTabOnStartup}
-                onChange={(e) => updatePreferences({ createOptionsPageTabOnStartup: e.target.checked })}
-              />
-            ),
-          },
-        ]}
-        title="Other"
-      />
+      <UserPreferenceCard userPreferences={otherUserPreferences} title="Other" />
     </Container>
   );
 };

@@ -5,7 +5,7 @@ import Logger from "../logger";
 import Misc from "../misc";
 import { ActiveWindow } from "../model";
 import * as Storage from "../storage";
-import { LocalStorageShape, ChromeWindowWithId } from "../types/types";
+import { LocalStorageShape, ChromeWindowWithId, UserPreferences, FixedPageType } from "../types/types";
 
 const logger = Logger.createLogger("Background", { color: "pink" });
 
@@ -24,35 +24,12 @@ initializeStorage().catch((error) => {
   onError(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
 });
 
-Storage.addChangeListener(async (changes) => {
-  if (changes.userPreferences?.newValue) {
-    const newPreferences = changes.userPreferences.newValue;
-    const oldPreferences = changes.userPreferences.oldValue;
-
-    if (newPreferences.createDummyTabOnStartup && !oldPreferences.createDummyTabOnStartup) {
-      Misc.createDummyPageWindow();
-    }
-
-    if (newPreferences.createOptionsPageTabOnStartup && !oldPreferences.createOptionsPageTabOnStartup) {
-      Misc.createOptionsPageWindow();
-    }
-  }
-});
-
-Storage.getItems("userPreferences").then(async ({ userPreferences }) => {
-  const myLogger = logger.createNestedLogger("Storage.getItems('userPreferences')");
-  try {
-    if (userPreferences.createDummyTabOnStartup) {
-      await Misc.createDummyPageWindow();
-    }
-
-    if (userPreferences.createOptionsPageTabOnStartup) {
-      await Misc.createOptionsPageWindow();
-    }
-  } catch (error) {
+if (process.env.NODE_ENV === "development") {
+  initializeFixedPages().catch((error) => {
+    const myLogger = logger.createNestedLogger("initializeFixedPages");
     onError(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
-  }
-});
+  });
+}
 
 async function onError(message: string) {
   const myLogger = logger.createNestedLogger("onError");
@@ -113,8 +90,14 @@ async function getLocalStorageDefaultValues(): Promise<LocalStorageShape> {
         activateTabInFocusedTabGroup: true,
         /* Other */
         reloadOnError: process.env.NODE_ENV === "production",
-        createDummyTabOnStartup: process.env.NODE_ENV === "development",
-        createOptionsPageTabOnStartup: process.env.NODE_ENV === "development",
+        createDummyFixedPageOnStartup: {
+          enabled: true,
+          type: "pinnedTab",
+        },
+        createOptionsFixedPageOnStartup: {
+          enabled: true,
+          type: "pinnedTab",
+        },
       },
       lastSeenFocusModeColors: activeWindow?.focusMode?.colors || { focused: "pink", nonFocused: "purple" },
       lastFocusedWindowHadFocusMode: activeWindow?.focusMode ? true : false,
@@ -122,5 +105,39 @@ async function getLocalStorageDefaultValues(): Promise<LocalStorageShape> {
     };
   } catch (error) {
     throw new Error(`getLocalStorageDefaultValues::An error occurred while getting the default values: ${error}`);
+  }
+}
+
+async function initializeFixedPages() {
+  Storage.addChangeListener(async (changes) => {
+    if (changes.userPreferences?.newValue) {
+      const newPreferences = changes.userPreferences.newValue;
+      const oldPreferences = changes.userPreferences.oldValue;
+
+      if (newPreferences.createDummyFixedPageOnStartup.enabled && !oldPreferences.createDummyFixedPageOnStartup.enabled) {
+        await createDummyFixedPage(newPreferences.createDummyFixedPageOnStartup.type);
+      }
+
+      if (newPreferences.createOptionsFixedPageOnStartup.enabled && !oldPreferences.createOptionsFixedPageOnStartup.enabled) {
+        await createOptionsFixedPage(newPreferences.createOptionsFixedPageOnStartup.type);
+      }
+    }
+  });
+
+  const createDummyFixedPage = async (type: FixedPageType) => {
+    await Misc.createFixedPage(type, chrome.runtime.getURL("dummy-page.html"));
+  };
+
+  const createOptionsFixedPage = async (type: FixedPageType) => {
+    await Misc.createFixedPage(type, chrome.runtime.getURL("options.html"));
+  };
+
+  const { userPreferences } = await Storage.getItems("userPreferences");
+  if (userPreferences.createDummyFixedPageOnStartup.enabled) {
+    await createDummyFixedPage(userPreferences.createDummyFixedPageOnStartup.type);
+  }
+
+  if (userPreferences.createOptionsFixedPageOnStartup.enabled) {
+    await createOptionsFixedPage(userPreferences.createOptionsFixedPageOnStartup.type);
   }
 }
