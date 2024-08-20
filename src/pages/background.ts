@@ -24,10 +24,6 @@ initializeStorage().catch((error) => {
   onError(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
 });
 
-chrome.action.onClicked.addListener(function (tab) {
-  chrome.runtime.openOptionsPage();
-});
-
 async function onError(message: string) {
   const myLogger = logger.createNestedLogger("onError");
   myLogger.error(message);
