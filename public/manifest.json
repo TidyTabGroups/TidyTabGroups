@@ -2,7 +2,7 @@
   "manifest_version": 3,
 
   "name": "Tidy Tabs",
-  "description": "Enhances tab group management by always grouping tabs, auto-collapsing unfocused tab groups, and more!",
+  "description": "Tired of tab chaos? Automatically collapse, instantly group, and intelligently position tabs for a cleaner browsing experience.",
   "version": "1.0",
 
   "action": {
