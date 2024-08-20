@@ -65,11 +65,16 @@ export interface LocalStorageShape {
 }
 
 export interface UserPreferences {
+  /* Functionality */
   repositionTabs: boolean;
   repositionTabGroups: boolean;
   alwaysGroupTabs: boolean;
   collapseUnfocusedTabGroups: boolean;
   activateTabInFocusedTabGroup: boolean;
+  /* Other */
+  reloadOnError: boolean;
+  createDummyTabOnStartup: boolean;
+  createOptionsPageTabOnStartup: boolean;
 }
 
 export interface LastGroupedTabInfo {

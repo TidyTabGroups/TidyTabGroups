@@ -5,19 +5,26 @@ export function onWindowError(windowId: ChromeWindowId) {
   // TODO: re-activate the window
 }
 
-// opens a dummy tab in windows that have a chrome://extensions/* tab open
-export async function openDummyTab() {
-  const lastFocusedWindow = await chrome.windows.getLastFocused();
-  const [activeTab] = await chrome.tabs.query({ windowId: lastFocusedWindow.id, active: true });
+export async function createPopupWindowWithUrl(url: string) {
+  const windows = await chrome.windows.getAll({ populate: true });
 
-  if (!activeTab || !activeTab.url) {
+  const existingWindow = windows.find((window) => window.tabs && window.tabs[0] && window.tabs[0].url === url);
+  if (existingWindow) {
     return;
   }
 
-  const activeTabUrl = new URL(activeTab.url);
-  if (activeTabUrl.origin === "chrome://extensions") {
-    chrome.tabs.create({ windowId: lastFocusedWindow.id, url: "dummy-page.html", active: false, index: activeTab.index + 1 });
-  }
+  await chrome.windows.create({
+    url: url,
+    type: "popup",
+  });
+}
+
+export async function createDummyPageWindow() {
+  await createPopupWindowWithUrl(chrome.runtime.getURL("dummy-page.html"));
+}
+
+export async function createOptionsPageWindow() {
+  await createPopupWindowWithUrl(chrome.runtime.getURL("options.html"));
 }
 
 export async function getTabFromTabOrTabId(tabOrTabId: ChromeTabId | ChromeTabWithId) {

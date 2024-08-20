@@ -99,6 +99,33 @@ const UserPreferences = () => {
         ]}
         title="Functionality"
       />
+      <UserPreferenceCard
+        userPreferences={[
+          {
+            name: "Reload on error",
+            control: <Switch checked={userPreferences.reloadOnError} onChange={(e) => updatePreferences({ reloadOnError: e.target.checked })} />,
+          },
+          {
+            name: "Create dummy tab on startup",
+            control: (
+              <Switch
+                checked={userPreferences.createDummyTabOnStartup}
+                onChange={(e) => updatePreferences({ createDummyTabOnStartup: e.target.checked })}
+              />
+            ),
+          },
+          {
+            name: "Create options page tab on startup",
+            control: (
+              <Switch
+                checked={userPreferences.createOptionsPageTabOnStartup}
+                onChange={(e) => updatePreferences({ createOptionsPageTabOnStartup: e.target.checked })}
+              />
+            ),
+          },
+        ]}
+        title="Other"
+      />
     </Container>
   );
 };
