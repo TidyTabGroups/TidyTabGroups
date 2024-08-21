@@ -2,7 +2,7 @@
   "manifest_version": 3,
 
   "name": "Tidy Tabs",
-  "description": "Tired of tab chaos? Automatically collapse, instantly group, and intelligently position tabs for a cleaner browsing experience.",
+  "description": "Tired of tab chaos? Automatically collapse, effortlessly group, and intelligently position tabs with Tidy Tab Groups.",
   "version": "1.0",
 
   "action": {
