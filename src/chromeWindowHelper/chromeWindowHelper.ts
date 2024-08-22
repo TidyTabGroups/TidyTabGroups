@@ -157,7 +157,7 @@ export function getLastAccessedTab(tabs: ChromeTabWithId[]) {
 }
 
 export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
-  const tabs = Array.isArray(windowIdOrTabs) ? windowIdOrTabs : ((await chrome.tabs.query({ windowId: windowIdOrTabs })) as ChromeTabWithId[]);
+  const { tabs } = await getWindowIdAndTabs(windowIdOrTabs);
   return tabs.sort((tab1, tab2) => (tab1.lastAccessed || 0) - (tab2.lastAccessed || 0));
 }
 
@@ -207,10 +207,10 @@ export async function getUnpinnedAndUngroupedTabs(windowIdOrTabs: ChromeWindowId
   return tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned);
 }
 
-export async function groupUnpinnedAndUngroupedTabsWithRetryHandler(tabsOrWindowId: ChromeWindowId | ChromeTabWithId[]) {
+export async function groupUnpinnedAndUngroupedTabsWithRetryHandler(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
   const myLogger = logger.createNestedLogger("groupUnpinnedAndUngroupedTabsWithRetryHandler");
   try {
-    const { windowId, tabs } = await getWindowIdAndTabs(tabsOrWindowId);
+    const { windowId, tabs } = await getWindowIdAndTabs(windowIdOrTabs);
     const tabIdsWithNoGroup = (await getUnpinnedAndUngroupedTabs(tabs)).map((tab) => tab.id);
     if (tabIdsWithNoGroup.length === 0) {
       return;
@@ -279,7 +279,6 @@ export async function withUserInteractionErrorHandler<T>(
   }
 }
 
-// TODO: use this where applicable
 async function getWindowIdAndTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
   const windowId = Array.isArray(windowIdOrTabs) ? windowIdOrTabs[0]?.windowId : (windowIdOrTabs as ChromeWindowId | undefined);
   if (windowId === undefined) {
