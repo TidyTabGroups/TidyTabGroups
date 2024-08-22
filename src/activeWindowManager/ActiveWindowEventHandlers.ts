@@ -389,39 +389,18 @@ export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: Chro
   }
 }
 
-async function onPageFocused(activeWindow: Types.ActiveWindow, tabId: ChromeTabId) {
-  // 1. if the tab is pinned, ignore
-  // 2. if the tab is active, reposition it
-  // 3. use tab title for eligeble tab groups
-  const myLogger = logger.createNestedLogger("onPageFocused");
-  const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tabId);
-  if (!tabUpToDate || !tabUpToDate.id) {
-    myLogger.warn("pageFocused::tabUpToDate is not valid:", tabUpToDate);
-    return;
-  }
-
-  // 1
-  if (tabUpToDate.pinned) {
-    myLogger.warn("pageFocused::tab is pinned:", tabUpToDate.title);
-    return;
-  }
-
-  if (tabUpToDate.active) {
-    // 2
-    await ActiveWindow.repositionTab(tabUpToDate.windowId, tabUpToDate.id);
-    // 3
-    await ActiveWindow.useTabTitleForEligebleTabGroups();
-  } else {
-    myLogger.warn("pageFocused::tab is not active:", tabUpToDate.title);
-  }
-}
-
 export async function onMouseInPageStatusChanged(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId, status: Types.MouseInPageStatus) {
   const myLogger = logger.createNestedLogger("onMouseInPageStatusChanged");
-  myLogger.log(`tabId:`, tab.id, status);
-  if (status === "entered") {
-    await ActiveWindow.useTabTitleForEligebleTabGroups();
-  } else if (status === "focused") {
-    await onPageFocused(activeWindow, tab.id);
+  myLogger.log(`tabId: ${tab.id} status: ${status}`);
+
+  switch (status) {
+    case "entered":
+      await ActiveWindow.useTabTitleForEligebleTabGroups();
+      break;
+    case "focused":
+      if (tab.active && !tab.pinned) {
+        await ActiveWindow.repositionTab(tab.windowId, tab.id);
+      }
+      break;
   }
 }
