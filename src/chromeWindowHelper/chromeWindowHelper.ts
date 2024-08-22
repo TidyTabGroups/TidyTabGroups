@@ -1,4 +1,12 @@
-import { ChromeWindowId, ChromeTabWithId, ChromeTabGroupWithId, ChromeTabId, ChromeTabGroupId, ChromeWindowWithId } from "../types/types";
+import {
+  ChromeWindowId,
+  ChromeTabWithId,
+  ChromeTabGroupWithId,
+  ChromeTabId,
+  ChromeTabGroupId,
+  ChromeWindowWithId,
+  FixedPageType,
+} from "../types/types";
 import Misc from "../misc";
 import ChromeTabOperationRetryHandler from "../chromeTabOperationRetryHandler";
 import Logger from "../logger";
@@ -134,9 +142,9 @@ export async function doesTabGroupExist(tabGroupId: ChromeTabGroupId) {
   return !!tabGroup;
 }
 
-export async function getIfWindowExists(windowId: ChromeWindowId) {
+export async function getIfWindowExists(windowId: ChromeWindowId, queryOptions: chrome.windows.QueryOptions = {}) {
   try {
-    return (await chrome.windows.get(windowId)) as ChromeWindowWithId;
+    return (await chrome.windows.get(windowId, queryOptions)) as ChromeWindowWithId;
   } catch (error) {}
 }
 export async function getIfCurrentWindowExists() {
@@ -452,4 +460,55 @@ export async function groupTabAndHighlightedTabsWithRetryHandler(tabId: ChromeTa
   });
 
   return await operationHandler.try(() => chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsToAutoGroup }));
+}
+export async function createFixedPage<T extends FixedPageType>(
+  type: T,
+  url: string,
+  windowId?: T extends "pinnedTab" | "tab" ? ChromeWindowId : undefined
+) {
+  const myLogger = logger.createNestedLogger("createFixedPage");
+  try {
+    if (type === "popupWindow") {
+      const windows = await chrome.windows.getAll({ populate: true, windowTypes: ["popup"] });
+      const existingPopupWindow = windows.find((window) => window.tabs && window.tabs[0] && window.tabs[0].url === url);
+      if (existingPopupWindow) {
+        return;
+      }
+
+      await chrome.windows.create({
+        url: url,
+        type: "popup",
+        focused: false,
+      });
+    } else {
+      let windows: ChromeWindowWithId[];
+      if (windowId !== undefined) {
+        const window = await getIfWindowExists(windowId, { populate: true, windowTypes: ["normal"] });
+        if (!window) {
+          throw new Error(`Normal window with id ${windowId} not found`);
+        }
+        windows = [window];
+      } else {
+        windows = (await chrome.windows.getAll({ populate: true })) as ChromeWindowWithId[];
+      }
+
+      await Promise.all(
+        windows.map(async (window) => {
+          if (window.id === undefined) {
+            return;
+          }
+
+          const pinned = type === "pinnedTab";
+          const existingTabs = await chrome.tabs.query({ windowId: window.id, url, pinned });
+          if (existingTabs.length > 0) {
+            return;
+          }
+
+          await chrome.tabs.create({ url, windowId: window.id, pinned, active: false, index: 0 });
+        })
+      );
+    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
 }

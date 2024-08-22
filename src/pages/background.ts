@@ -115,29 +115,42 @@ async function initializeFixedPages() {
       const oldPreferences = changes.userPreferences.oldValue;
 
       if (newPreferences.createDummyFixedPageOnStartup.enabled && !oldPreferences.createDummyFixedPageOnStartup.enabled) {
-        await createDummyFixedPage(newPreferences.createDummyFixedPageOnStartup.type);
+        await Misc.createDummyFixedPage(newPreferences.createDummyFixedPageOnStartup.type);
       }
 
       if (newPreferences.createOptionsFixedPageOnStartup.enabled && !oldPreferences.createOptionsFixedPageOnStartup.enabled) {
-        await createOptionsFixedPage(newPreferences.createOptionsFixedPageOnStartup.type);
+        await Misc.createOptionsFixedPage(newPreferences.createOptionsFixedPageOnStartup.type);
       }
     }
   });
 
-  const createDummyFixedPage = async (type: FixedPageType) => {
-    await Misc.createFixedPage(type, chrome.runtime.getURL("dummy-page.html"));
-  };
+  chrome.windows.onCreated.addListener(async (window) => {
+    if (window.type === "normal") {
+      const { createDummyFixedPageOnStartup, createOptionsFixedPageOnStartup } = (await Storage.getItems("userPreferences")).userPreferences;
+      if (
+        createDummyFixedPageOnStartup.enabled &&
+        (createDummyFixedPageOnStartup.type === "pinnedTab" || createDummyFixedPageOnStartup.type === "tab")
+      ) {
+        await Misc.createDummyFixedPage(createDummyFixedPageOnStartup.type, window.id);
+      }
 
-  const createOptionsFixedPage = async (type: FixedPageType) => {
-    await Misc.createFixedPage(type, chrome.runtime.getURL("options.html"));
-  };
+      if (
+        createOptionsFixedPageOnStartup.enabled &&
+        (createOptionsFixedPageOnStartup.type === "pinnedTab" || createOptionsFixedPageOnStartup.type === "tab")
+      ) {
+        await Misc.createOptionsFixedPage(createOptionsFixedPageOnStartup.type, window.id);
+      }
+    }
+  });
 
-  const { userPreferences } = await Storage.getItems("userPreferences");
-  if (userPreferences.createDummyFixedPageOnStartup.enabled) {
-    await createDummyFixedPage(userPreferences.createDummyFixedPageOnStartup.type);
-  }
+  chrome.runtime.onInstalled.addListener(async (installationDetails: chrome.runtime.InstalledDetails) => {
+    const { userPreferences } = await Storage.getItems("userPreferences");
+    if (userPreferences.createDummyFixedPageOnStartup.enabled) {
+      await Misc.createDummyFixedPage(userPreferences.createDummyFixedPageOnStartup.type);
+    }
 
-  if (userPreferences.createOptionsFixedPageOnStartup.enabled) {
-    await createOptionsFixedPage(userPreferences.createOptionsFixedPageOnStartup.type);
-  }
+    if (userPreferences.createOptionsFixedPageOnStartup.enabled) {
+      await Misc.createOptionsFixedPage(userPreferences.createOptionsFixedPageOnStartup.type);
+    }
+  });
 }

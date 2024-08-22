@@ -1,41 +1,17 @@
+import ChromeWindowHelper from "../chromeWindowHelper";
 import { getIfTabExists } from "../chromeWindowHelper/chromeWindowHelper";
-import { ChromeTabGroupId, ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, FixedPageType } from "../types/types";
+import {
+  ChromeTabGroupId,
+  ChromeTabGroupWithId,
+  ChromeTabId,
+  ChromeTabWithId,
+  ChromeWindowId,
+  ChromeWindowWithId,
+  FixedPageType,
+} from "../types/types";
 
 export function onWindowError(windowId: ChromeWindowId) {
   // TODO: re-activate the window
-}
-
-export async function createFixedPage(type: FixedPageType, url: string) {
-  const windows = await chrome.windows.getAll({ populate: true });
-
-  if (type === "popupWindow") {
-    const existingPopupWindow = windows.find((window) => window.tabs && window.tabs[0] && window.tabs[0].url === url);
-    if (existingPopupWindow) {
-      return;
-    }
-
-    await chrome.windows.create({
-      url: url,
-      type: "popup",
-      focused: false,
-    });
-  } else {
-    await Promise.all(
-      windows.map(async (window) => {
-        if (window.id === undefined) {
-          return;
-        }
-
-        const pinned = type === "pinnedTab";
-        const existingTabs = await chrome.tabs.query({ windowId: window.id, url, pinned });
-        if (existingTabs.length > 0) {
-          return;
-        }
-
-        await chrome.tabs.create({ url, windowId: window.id, pinned, active: false, index: 0 });
-      })
-    );
-  }
 }
 
 export async function getTabFromTabOrTabId(tabOrTabId: ChromeTabId | ChromeTabWithId) {
@@ -110,4 +86,12 @@ export function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return "An unknown error occurred";
+}
+
+export function createDummyFixedPage<T extends FixedPageType>(type: T, windowId?: T extends "pinnedTab" | "tab" ? ChromeWindowId : undefined) {
+  return ChromeWindowHelper.createFixedPage<T>(type, chrome.runtime.getURL("dummy-page.html"), windowId);
+}
+
+export function createOptionsFixedPage<T extends FixedPageType>(type: T, windowId?: T extends "pinnedTab" | "tab" ? ChromeWindowId : undefined) {
+  return ChromeWindowHelper.createFixedPage<T>(type, chrome.runtime.getURL("options.html"), windowId);
 }
