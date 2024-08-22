@@ -184,8 +184,7 @@ export async function onTabGroupUpdated(
           // 5
           const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
           if (tabsInGroup.length === 0) {
-            // TODO: return instead of throwing an error
-            throw new Error(myLogger.getPrefixedMessage(`no tabs found in tab group:${tabGroup.id}`));
+            return;
           }
 
           const lastAccessedTabInTabGroup = ChromeWindowHelper.getLastAccessedTab(tabsInGroup);
