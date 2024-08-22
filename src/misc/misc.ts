@@ -2,10 +2,6 @@ import ChromeWindowHelper from "../chromeWindowHelper";
 import { getIfTabExists } from "../chromeWindowHelper/chromeWindowHelper";
 import { ChromeTabId, ChromeTabWithId, ChromeWindowId, FixedPageType } from "../types/types";
 
-export function onWindowError(windowId: ChromeWindowId) {
-  // TODO: re-activate the window
-}
-
 export async function getTabFromTabOrTabId(tabOrTabId: ChromeTabId | ChromeTabWithId) {
   const tab = typeof tabOrTabId === "number" ? await getIfTabExists(tabOrTabId) : tabOrTabId;
   return tab;
