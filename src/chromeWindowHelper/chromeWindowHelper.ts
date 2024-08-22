@@ -163,13 +163,13 @@ export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowI
 
 export async function focusTabGroup(
   tabGroupId: ChromeTabGroupId,
-  tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
+  windowIdOrTabGroups: ChromeTabGroupWithId[] | ChromeWindowId,
   options: {
     collapseUnfocusedTabGroups: boolean;
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
   }
 ) {
-  const { tabGroups } = await getWindowIdAndTabGroups(tabGroupsOrWindowId);
+  const { tabGroups } = await getWindowIdAndTabGroups(windowIdOrTabGroups);
   const { collapseUnfocusedTabGroups, highlightColors } = options;
   const updatedTabGroups = (await Promise.all(
     tabGroups.map(async (tabGroup) => {
@@ -289,7 +289,6 @@ async function getWindowIdAndTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWith
   return { windowId, tabs };
 }
 
-// TODO: use this where applicable
 async function getWindowIdAndTabGroups(windowIdOrTabGroups: ChromeWindowId | ChromeTabGroupWithId[]) {
   const windowId = Array.isArray(windowIdOrTabGroups) ? windowIdOrTabGroups[0]?.windowId : (windowIdOrTabGroups as ChromeWindowId | undefined);
   if (windowId === undefined) {
@@ -305,14 +304,14 @@ async function getWindowIdAndTabGroups(windowIdOrTabGroups: ChromeWindowId | Chr
 export async function focusActiveTabWithRetryHandler(
   tabId: ChromeTabId,
   tabGroupId: ChromeTabGroupId,
-  tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
+  windowIdOrTabGroups: ChromeTabGroupWithId[] | ChromeWindowId,
   focusTabGroupOptions: {
     collapseUnfocusedTabGroups: boolean;
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
   }
 ) {
   const isTabGroupIdNone = tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
-  const { windowId, tabGroups } = await getWindowIdAndTabGroups(tabGroupsOrWindowId);
+  const { windowId, tabGroups } = await getWindowIdAndTabGroups(windowIdOrTabGroups);
 
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId[], true>();
   operationHandler.setShouldRetryOperationCallback(async () => {
@@ -334,7 +333,7 @@ export async function focusActiveTabWithRetryHandler(
 
 export async function focusTabGroupWithRetryHandler(
   tabGroupId: ChromeTabGroupId,
-  tabGroupsOrWindowId: ChromeTabGroupWithId[] | ChromeWindowId,
+  windowIdOrTabGroups: ChromeTabGroupWithId[] | ChromeWindowId,
   options: {
     collapseUnfocusedTabGroups: boolean;
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
@@ -342,7 +341,7 @@ export async function focusTabGroupWithRetryHandler(
   fallback: boolean = false
 ) {
   const isTabGroupIdNone = tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
-  const { windowId, tabGroups } = await getWindowIdAndTabGroups(tabGroupsOrWindowId);
+  const { windowId, tabGroups } = await getWindowIdAndTabGroups(windowIdOrTabGroups);
 
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId[], true>();
   operationHandler.setShouldRetryOperationCallback(async () => {
