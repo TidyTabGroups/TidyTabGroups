@@ -13,7 +13,7 @@ import Logger from "../logger";
 import Types from "../types";
 import Storage from "../storage";
 import * as ActiveWindowEventHandlers from "./ActiveWindowEventHandlers";
-import * as MouseInPageTracker from "./MouseInPageTracker";
+import MouseInPageTracker from "../mouseInPageTracker";
 import Misc from "../misc";
 
 const logger = Logger.createLogger("ActiveWindowEventManager", { color: "#fcba03" });
