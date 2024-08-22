@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import * as Storage from "../storage";
+import Storage from "../storage";
 import { UserPreferences } from "../types/types";
 import {
   Switch,

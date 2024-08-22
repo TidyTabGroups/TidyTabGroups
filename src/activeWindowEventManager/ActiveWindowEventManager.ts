@@ -11,7 +11,7 @@ import {
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import Types from "../types";
-import * as Storage from "../storage";
+import Storage from "../storage";
 import * as ActiveWindowEventHandlers from "./ActiveWindowEventHandlers";
 import * as MouseInPageTracker from "./MouseInPageTracker";
 import Misc from "../misc";

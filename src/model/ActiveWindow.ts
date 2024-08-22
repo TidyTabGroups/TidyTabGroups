@@ -13,7 +13,7 @@ import Misc from "../misc";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
-import * as Storage from "../storage";
+import Storage from "../storage";
 import * as MouseInPageTracker from "../activeWindowEventManager/MouseInPageTracker";
 import ChromeTabOperationRetryHandler from "../chromeTabOperationRetryHandler";
 

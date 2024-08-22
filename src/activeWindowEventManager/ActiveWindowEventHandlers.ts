@@ -12,7 +12,7 @@ import {
   ChromeWindowId,
   ChromeWindowWithId,
 } from "../types/types";
-import * as Storage from "../storage";
+import Storage from "../storage";
 import { runActiveWindowOperation, runActiveWindowTabGroupOperation, runActiveWindowTabOperation } from "./ActiveWindowEventOperationRunner";
 
 const logger = Logger.createLogger("ActiveWindowEventHandlers", { color: "#4287f5" });

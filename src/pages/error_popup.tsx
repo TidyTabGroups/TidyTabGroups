@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Container, Typography, Button } from "@mui/material";
 import { App } from "./app";
 import Logger from "../logger";
-import * as Storage from "../storage";
+import Storage from "../storage";
 
 const logger = Logger.createLogger("ErrorPopup");
 
