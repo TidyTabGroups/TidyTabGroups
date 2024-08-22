@@ -46,11 +46,6 @@ const Popup = () => {
     const enableFocusMode = e.target.checked;
     if (enableFocusMode) {
       const tabs = (await chrome.tabs.query({ windowId })) as Types.ChromeTabWithId[];
-      const activeTab = tabs.find((tab) => tab.active);
-
-      if (!activeTab) {
-        throw new Error("No active tab found");
-      }
       const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
       const { lastSeenFocusModeColors } = await Storage.getItems(["lastSeenFocusModeColors"]);
 
