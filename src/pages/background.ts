@@ -1,4 +1,4 @@
-import ActiveWindowManager from "../activeWindowEventManager";
+import ActiveWindowManager from "../activeWindowManager";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Database from "../database";
 import Logger from "../logger";
