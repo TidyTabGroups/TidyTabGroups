@@ -1,6 +1,5 @@
 import { PDFViewerOverlay, DetachableDOM } from "../DOM";
 import Misc from "../misc";
-import ContentHelper from "../contentHelper";
 import { MouseInPageStatus } from "../types/types";
 import Logger from "../logger";
 
@@ -99,7 +98,7 @@ if (isMainFrame) {
   );
 
   function enableNotifyMainFrameAboutMouseEnterForSubframes() {
-    ContentHelper.forEachNestedFrame((frame) => {
+    Misc.forEachNestedFrame((frame) => {
       frame.postMessage({ type: "enableNotifyMainFrameAboutMouseEnter" }, "*");
     });
   }
@@ -264,7 +263,7 @@ function clearPageFocusTimeout() {
 
     // let all child frames know to clear
     Misc.callAsync(() => {
-      ContentHelper.forEachNestedFrame((frame) => {
+      Misc.forEachNestedFrame((frame) => {
         frame.postMessage({ type: "clearPageFocusTimeout" }, "*");
       });
     });
