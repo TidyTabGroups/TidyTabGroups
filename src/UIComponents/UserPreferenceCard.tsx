@@ -1,5 +1,5 @@
 import React from "react";
-import { Typography, Grid, Card, CardContent, Container, Switch, Divider } from "@mui/material";
+import { Typography, Card, CardContent, Container, Divider } from "@mui/material";
 import { UserPreference, UserPreferenceProps } from "./UserPreference";
 
 export interface UserPreferenceCardProps {

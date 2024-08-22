@@ -1,13 +1,5 @@
 import { ActiveWindow } from "../model";
-import {
-  ChromeTabGroupChangeInfo,
-  ChromeTabGroupId,
-  ChromeTabGroupWithId,
-  ChromeTabId,
-  ChromeTabWithId,
-  ChromeWindowId,
-  ChromeWindowWithId,
-} from "../types/types";
+import { ChromeTabGroupChangeInfo, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import Types from "../types";

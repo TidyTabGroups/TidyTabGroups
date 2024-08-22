@@ -1,14 +1,6 @@
 import ChromeWindowHelper from "../chromeWindowHelper";
 import { getIfTabExists } from "../chromeWindowHelper/chromeWindowHelper";
-import {
-  ChromeTabGroupId,
-  ChromeTabGroupWithId,
-  ChromeTabId,
-  ChromeTabWithId,
-  ChromeWindowId,
-  ChromeWindowWithId,
-  FixedPageType,
-} from "../types/types";
+import { ChromeTabId, ChromeTabWithId, ChromeWindowId, FixedPageType } from "../types/types";
 
 export function onWindowError(windowId: ChromeWindowId) {
   // TODO: re-activate the window

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Select, MenuItem, Switch } from "@mui/material";
 import { FixedPageType } from "../types/types";
 

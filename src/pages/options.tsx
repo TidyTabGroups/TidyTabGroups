@@ -2,22 +2,8 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import Storage from "../storage";
 import { UserPreferences } from "../types/types";
-import {
-  Switch,
-  Container,
-  Divider,
-  createTheme,
-  ThemeProvider,
-  useMediaQuery,
-  Card,
-  Typography,
-  CssBaseline,
-  CardContent,
-  AppBar,
-  Toolbar,
-  Grid,
-} from "@mui/material";
-import { UserPreference, UserPreferenceCard, UserPreferenceProps } from "../UIComponents";
+import { Switch, Container, Typography, AppBar, Toolbar } from "@mui/material";
+import { UserPreferenceCard, UserPreferenceProps } from "../UIComponents";
 import { App } from "./app";
 import { FixedPageTypeSelect } from "../UIComponents";
 

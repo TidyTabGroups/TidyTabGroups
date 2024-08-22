@@ -5,7 +5,6 @@ import {
   ChromeTabWithId,
   ChromeTabGroupWithId,
   ChromeTabId,
-  ActiveWindow,
   ChromeTabGroupId,
   ActiveWindowFocusModeColors,
 } from "../types/types";
@@ -15,7 +14,6 @@ import Logger from "../logger";
 import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
 import Storage from "../storage";
 import MouseInPageTracker from "../mouseInPageTracker";
-import ChromeTabOperationRetryHandler from "../chromeTabOperationRetryHandler";
 
 const logger = Logger.createLogger("ActiveWindow", { color: "#b603fc" });
 

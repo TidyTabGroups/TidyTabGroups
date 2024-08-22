@@ -3,15 +3,7 @@ import Logger from "../logger";
 import Misc from "../misc";
 import { ActiveWindow } from "../model";
 import Types from "../types";
-import {
-  ChromeTabGroupChangeInfo,
-  ChromeTabGroupId,
-  ChromeTabGroupWithId,
-  ChromeTabId,
-  ChromeTabWithId,
-  ChromeWindowId,
-  ChromeWindowWithId,
-} from "../types/types";
+import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
 import Storage from "../storage";
 import { runActiveWindowOperation, runActiveWindowTabGroupOperation, runActiveWindowTabOperation } from "./ActiveWindowEventOperationRunner";
 

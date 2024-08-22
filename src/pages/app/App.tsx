@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { createTheme, ThemeProvider, useMediaQuery, CssBaseline } from "@mui/material";
 
 export const App: React.FC<{ children?: React.ReactNode }> = ({ children }) => {

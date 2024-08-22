@@ -5,7 +5,7 @@ import Logger from "../logger";
 import Misc from "../misc";
 import { ActiveWindow } from "../model";
 import Storage from "../storage";
-import { LocalStorageShape, ChromeWindowWithId, UserPreferences, FixedPageType } from "../types/types";
+import { LocalStorageShape } from "../types/types";
 
 const logger = Logger.createLogger("Background", { color: "pink" });
 
