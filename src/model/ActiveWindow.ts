@@ -510,15 +510,20 @@ export async function updateActiveWindowTabGroups(
 
 export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGroup: ChromeTabGroupWithId) {
   const myLogger = logger.createNestedLogger("createActiveWindowTabGroup");
+  // 1. If focus mode is enabled, update the tab group color to the focused or non-focused color
+  // 2. If the tab group is expanded but not focused, collapse the tab group
+  // 3. If the tab group title is empty, update the tab group title to the title of the first tab in the group
+  // 4. Add the new active window tab group to the active window
   try {
     const activeWindow = await getOrThrow(windowId);
     let newActiveWindowTabGroup = { ...tabGroup, useTabTitle: false };
 
-    const activeTab = (await chrome.tabs.query({ windowId, active: true }))[0] as ChromeTabWithId | undefined;
     let tabGroupUpToDate: ChromeTabGroupWithId | undefined = tabGroup;
 
+    const activeTab = (await chrome.tabs.query({ windowId, active: true }))[0] as ChromeTabWithId | undefined;
+    const isFocusedTabGroup = activeTab?.groupId === tabGroup.id;
+
     // 1
-    const isFocusedTabGroup = activeTab && activeTab.groupId === tabGroup.id;
     const { focusMode } = activeWindow;
     if (focusMode) {
       if (isFocusedTabGroup && focusMode.colors.focused !== tabGroupUpToDate.color) {
@@ -535,6 +540,16 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     }
 
     // 2
+    if (!tabGroupUpToDate.collapsed && !isFocusedTabGroup && (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups) {
+      Logger.attentionLogger.log(`collapsing tab group ${tabGroup.id}`);
+      tabGroupUpToDate = await ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroup.id, { collapsed: true });
+      if (!tabGroupUpToDate) {
+        return;
+      }
+      newActiveWindowTabGroup.collapsed = true;
+    }
+
+    // 3
     // TODO: check for `use tab title for blank tab groups` user preference
     const useTabTitle = Misc.isTabGroupTitleEmpty(tabGroupUpToDate.title);
     if (useTabTitle) {
@@ -559,7 +574,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
       }
     }
 
-    // 3
+    // 4
     await update(activeWindow.windowId, {
       tabGroups: [...activeWindow.tabGroups, newActiveWindowTabGroup],
     });
