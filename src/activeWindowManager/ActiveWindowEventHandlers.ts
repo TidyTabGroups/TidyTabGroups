@@ -312,9 +312,15 @@ export async function onTabActivated(tabId: ChromeTabId) {
 export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo) {
   const myLogger = logger.createNestedLogger("onTabUpdated");
   try {
-    // If the tab group was changed and the tab is active, focus the tab
-    // TODO: shouldnt this be run after the potential auto-grouping?
-    if (changeInfo.groupId !== undefined) {
+    const wasUngroupedOrUnpinned = changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false;
+    if (wasUngroupedOrUnpinned && (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
+      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
+        const isUngroupedAndUnpinned = tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false;
+        if (isUngroupedAndUnpinned) {
+          await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
+        }
+      });
+    } else if (changeInfo.groupId !== undefined) {
       await runActiveWindowTabOperation(tabId, async ({ tab }) => {
         const isStillTabGroupChanged = changeInfo.groupId === tab.groupId;
         if (isStillTabGroupChanged && tab.active) {
@@ -327,18 +333,6 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
       });
     }
 
-    // If the tab was ungrouped, auto-group it with the other ungrouped highlighted tabs
-    const wasUngroupedOrUnpinned = changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false;
-    if (wasUngroupedOrUnpinned && (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
-      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
-        const isUngroupedAndUnpinned = tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false;
-        if (isUngroupedAndUnpinned) {
-          await ActiveWindow.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
-        }
-      });
-    }
-
-    // If the tab group was changed or the tab title was changed, use the tab title for eligible tab groups
     if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {
       await runActiveWindowTabOperation(tabId, async ({ tab }) => {
         if (changeInfo.groupId === tab.groupId || changeInfo.title === tab.title) {
