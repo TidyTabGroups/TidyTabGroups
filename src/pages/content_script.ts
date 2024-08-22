@@ -1,5 +1,4 @@
-import DetachableDOM from "../detachableDOM";
-import { PDFViewerOverlay } from "../DOM";
+import { PDFViewerOverlay, DetachableDOM } from "../DOM";
 import Misc from "../misc";
 import ContentHelper from "../contentHelper";
 import { MouseInPageStatus } from "../types/types";

@@ -1,2 +1,3 @@
 import * as PDFViewerOverlay from "./PDFViewerOverlay";
-export { PDFViewerOverlay };
+import * as DetachableDOM from "./DetachableDOM";
+export { PDFViewerOverlay, DetachableDOM };

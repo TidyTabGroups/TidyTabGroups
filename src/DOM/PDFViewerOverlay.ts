@@ -1,4 +1,4 @@
-import DetachableDOM from "../detachableDOM";
+import * as DetachableDOM from "./DetachableDOM";
 
 // used for development purposes only
 const PDF_OVERLAY_ELEMENT_BACKGROUND: string | null = null;
