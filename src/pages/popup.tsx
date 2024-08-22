@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as Storage from "../storage";
-import { UserPreference } from "./userPreference";
+import { UserPreference } from "../UIComponents";
 import { Switch, Container, Divider, createTheme, ThemeProvider, useMediaQuery, CssBaseline, AppBar, Typography } from "@mui/material";
 import { App } from "./app";
 import Types from "../types";

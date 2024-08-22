@@ -17,9 +17,8 @@ import {
   Toolbar,
   Grid,
 } from "@mui/material";
-import { UserPreference, UserPreferenceProps } from "./userPreference";
+import { UserPreference, UserPreferenceCard, UserPreferenceProps } from "../UIComponents";
 import { App } from "./app";
-import { UserPreferenceCard } from "./userPreference/UserPreferenceCard";
 import { FixedPageTypeSelect } from "../UIComponents";
 
 Storage.start();
