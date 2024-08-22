@@ -236,15 +236,6 @@ export async function focusTabGroup(
 
 export const TAB_GROUP_COLORS: Array<chrome.tabGroups.ColorEnum> = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
 
-export function tabGroupEquals(tabGroup: ChromeTabGroupWithId, tabGroupToCompare: ChromeTabGroupWithId) {
-  const keys = Object.keys(tabGroupToCompare) as (keyof chrome.tabGroups.TabGroup)[];
-  if (keys.length !== Object.keys(tabGroup).length || keys.find((key) => tabGroupToCompare[key] !== tabGroup[key])) {
-    return false;
-  }
-
-  return true;
-}
-
 export async function getUnpinnedAndUngroupedTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
   const { tabs } = await getWindowIdAndTabs(windowIdOrTabs);
   return tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned);
@@ -306,10 +297,6 @@ export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
   });
 
   return candidateTab?.title;
-}
-
-export function isTabGroupTitleEmpty(title: chrome.tabGroups.TabGroup["title"]) {
-  return title === undefined || title === "";
 }
 
 export async function withUserInteractionErrorHandler<T>(
@@ -460,6 +447,7 @@ export async function groupTabAndHighlightedTabsWithRetryHandler(tabId: ChromeTa
 
   return await operationHandler.try(() => chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsToAutoGroup }));
 }
+
 export async function createFixedPage<T extends FixedPageType>(
   type: T,
   url: string,

@@ -306,7 +306,7 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
           chrome.tabs.query({ groupId: newTabGroupId }) as Promise<ChromeTabWithId[]>,
         ]);
 
-        if (ChromeWindowHelper.isTabGroupTitleEmpty(newTabGroup.title)) {
+        if (Misc.isTabGroupTitleEmpty(newTabGroup.title)) {
           const tabGroupUpToDate = await ChromeWindowHelper.updateTabGroupWithRetryHandler(newTabGroupId, {
             title: ChromeWindowHelper.getTabTitleForUseTabTitle(tabsInGroup) ?? `${tabsInGroup.length} tabs`,
           });
@@ -541,7 +541,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
 
     // 2
     // TODO: check for `use tab title for blank tab groups` user preference
-    const useTabTitle = ChromeWindowHelper.isTabGroupTitleEmpty(tabGroupUpToDate.title);
+    const useTabTitle = Misc.isTabGroupTitleEmpty(tabGroupUpToDate.title);
     if (useTabTitle) {
       // FIXME: remove the timeout workaround once the chromium bug is resolved: https://issues.chromium.org/issues/334965868#comment4
       await Misc.waitMs(30);
@@ -554,7 +554,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
         return;
       }
 
-      if (ChromeWindowHelper.isTabGroupTitleEmpty(tabGroupUpToDate.title)) {
+      if (Misc.isTabGroupTitleEmpty(tabGroupUpToDate.title)) {
         tabGroupUpToDate = await ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroup.id, { title: newTitle });
         if (!tabGroupUpToDate) {
           return;

@@ -1,6 +1,19 @@
 import ChromeWindowHelper from "../chromeWindowHelper";
 import { getIfTabExists } from "../chromeWindowHelper/chromeWindowHelper";
-import { ChromeTabId, ChromeTabWithId, ChromeWindowId, FixedPageType } from "../types/types";
+import { ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, FixedPageType } from "../types/types";
+
+export function tabGroupEquals(tabGroup: ChromeTabGroupWithId, tabGroupToCompare: ChromeTabGroupWithId) {
+  const keys = Object.keys(tabGroupToCompare) as (keyof chrome.tabGroups.TabGroup)[];
+  if (keys.length !== Object.keys(tabGroup).length || keys.find((key) => tabGroupToCompare[key] !== tabGroup[key])) {
+    return false;
+  }
+
+  return true;
+}
+
+export function isTabGroupTitleEmpty(title: chrome.tabGroups.TabGroup["title"]) {
+  return title === undefined || title === "";
+}
 
 export async function getTabFromTabOrTabId(tabOrTabId: ChromeTabId | ChromeTabWithId) {
   const tab = typeof tabOrTabId === "number" ? await getIfTabExists(tabOrTabId) : tabOrTabId;

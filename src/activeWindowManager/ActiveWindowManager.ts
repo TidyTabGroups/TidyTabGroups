@@ -156,7 +156,7 @@ export async function initialize(onError: (message: string) => void) {
           return;
         }
 
-        const isTabGroupUpToDate = ChromeWindowHelper.tabGroupEquals(tabGroup, tabGroupUpToDate);
+        const isTabGroupUpToDate = Misc.tabGroupEquals(tabGroup, tabGroupUpToDate);
         if (!isTabGroupUpToDate) {
           // Let the most up to date onTabGroupUpdated event handle this operation
           return;
