@@ -380,11 +380,6 @@ export async function deactivateWindow(windowId: ChromeWindowId) {
   await remove(windowId);
 }
 
-export async function getPrimaryTabGroup(windowId: ChromeWindowId) {
-  const tabGroupsOrdered = await ChromeWindowHelper.getTabGroupsOrdered(windowId);
-  return tabGroupsOrdered.length > 0 ? tabGroupsOrdered[tabGroupsOrdered.length - 1] : null;
-}
-
 export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
   const activeWindow = await getOrThrow(windowId);
 

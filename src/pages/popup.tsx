@@ -45,8 +45,7 @@ const Popup = () => {
 
     const enableFocusMode = e.target.checked;
     if (enableFocusMode) {
-      const tabs = (await chrome.tabs.query({ windowId })) as Types.ChromeTabWithId[];
-      const tabGroups = await ChromeWindowHelper.getTabGroupsOrdered(tabs);
+      const tabGroups = (await chrome.tabGroups.query({ windowId })) as Types.ChromeTabGroupWithId[];
       const { lastSeenFocusModeColors } = await Storage.getItems(["lastSeenFocusModeColors"]);
 
       newFocusMode = {

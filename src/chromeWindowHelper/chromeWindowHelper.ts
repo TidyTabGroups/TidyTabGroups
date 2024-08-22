@@ -13,30 +13,6 @@ import Logger from "../logger";
 
 const logger = Logger.createLogger("chromeWindowHelper");
 
-export async function getTabGroupsOrdered(
-  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[],
-  tabGroupsToOrderOrQueryInfo?: ChromeTabGroupWithId[] | chrome.tabGroups.QueryInfo
-) {
-  const tabGroupsToOrder = Array.isArray(tabGroupsToOrderOrQueryInfo) ? tabGroupsToOrderOrQueryInfo : undefined;
-  // Since querying tabs returns them in an ordered list, we can use that data to get the ordered list of tab group ids
-  if ((Array.isArray(windowIdOrTabs) && windowIdOrTabs.length === 0) || tabGroupsToOrder?.length === 0) {
-    return [];
-  }
-
-  const windowId = Array.isArray(windowIdOrTabs) ? windowIdOrTabs[0]?.windowId : windowIdOrTabs;
-  const tabs = Array.isArray(windowIdOrTabs) ? (windowIdOrTabs as ChromeTabWithId[]) : ((await chrome.tabs.query({ windowId })) as ChromeTabWithId[]);
-  const remainingTabGroupsToOrder = tabGroupsToOrder || (await chrome.tabGroups.query({ windowId, ...tabGroupsToOrderOrQueryInfo }));
-  const orderedTabGroups: ChromeTabGroupWithId[] = [];
-
-  tabs.forEach((tab) => {
-    if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && orderedTabGroups[orderedTabGroups.length - 1]?.id !== tab.groupId) {
-      const tabGroup = remainingTabGroupsToOrder.find((remaingTabGroupToOrder) => remaingTabGroupToOrder.id === tab.groupId);
-      orderedTabGroups.push(tabGroup!);
-    }
-  });
-  return orderedTabGroups;
-}
-
 export async function activateTabWithRetryHandler(tabId: ChromeTabId) {
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabWithId, true>();
   operationHandler.setShouldRetryOperationCallback(async () => {
@@ -168,16 +144,6 @@ export async function queryTabGroupsIfWindowExists(windowId: ChromeWindowId, oth
 export async function doesWindowExist(windowId: ChromeWindowId) {
   const window = await getIfWindowExists(windowId);
   return !!window;
-}
-
-export async function getLastAccessedTabInWindow(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
-  const tabs = Array.isArray(windowIdOrTabs) ? windowIdOrTabs : ((await chrome.tabs.query({ windowId: windowIdOrTabs })) as ChromeTabWithId[]);
-  return getLastAccessedTab(tabs);
-}
-
-export async function getLastAccessedTabInTabGroup(tabGroupIdOrTabs: ChromeTabGroupId | ChromeTabWithId[]) {
-  const tabs = Array.isArray(tabGroupIdOrTabs) ? tabGroupIdOrTabs : ((await chrome.tabs.query({ groupId: tabGroupIdOrTabs })) as ChromeTabWithId[]);
-  return getLastAccessedTab(tabs);
 }
 
 export function getLastAccessedTab(tabs: ChromeTabWithId[]) {
