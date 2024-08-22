@@ -514,7 +514,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     const activeWindow = await getOrThrow(windowId);
     let newActiveWindowTabGroup = { ...tabGroup, useTabTitle: false };
 
-    const activeTab = (await chrome.tabs.query({ windowId: tabGroup.windowId, active: true }))[0] as ChromeTabWithId | undefined;
+    const activeTab = (await chrome.tabs.query({ windowId, active: true }))[0] as ChromeTabWithId | undefined;
     let tabGroupUpToDate: ChromeTabGroupWithId | undefined = tabGroup;
 
     // 1
