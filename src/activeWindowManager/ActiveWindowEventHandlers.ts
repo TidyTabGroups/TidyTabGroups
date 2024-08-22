@@ -404,3 +404,29 @@ export async function onMouseInPageStatusChanged(activeWindow: Types.ActiveWindo
       break;
   }
 }
+
+export async function onEnabledCollapseUnfocusedTabGroups() {
+  const activeWindows = await ActiveWindow.getAll();
+  const activeTabs = (await chrome.tabs.query({ active: true })) as ChromeTabWithId[];
+  const activeTabsByWindowId = activeTabs.reduce((acc, activeTab) => {
+    acc[activeTab.windowId] = activeTab;
+    return acc;
+  }, {} as { [windowId: ChromeWindowId]: ChromeTabWithId | undefined });
+
+  await Promise.all(
+    activeWindows.map(async (activeWindow) => {
+      const activeTab = activeTabsByWindowId[activeWindow.windowId];
+      // This will effectively collapse all unfocused tab groups
+      await ActiveWindow.focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
+    })
+  );
+}
+
+export async function onEnabledAlwaysGroupTabs() {
+  const activeWindows = await ActiveWindow.getAll();
+  await Promise.all(
+    activeWindows.map(async (activeWindow) => {
+      await ActiveWindow.groupUnpinnedAndUngroupedTabs(activeWindow.windowId);
+    })
+  );
+}

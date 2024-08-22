@@ -51,30 +51,23 @@ export async function initialize(onError: (message: string) => void) {
       return;
     }
 
-    // TODO: the following logic should be queued into the operation queue
     if (!userPreferences.oldValue.collapseUnfocusedTabGroups && userPreferences.newValue.collapseUnfocusedTabGroups) {
-      const activeWindows = await ActiveWindow.getAll();
-      const activeTabs = (await chrome.tabs.query({ active: true })) as ChromeTabWithId[];
-      const activeTabsByWindowId = activeTabs.reduce((acc, activeTab) => {
-        acc[activeTab.windowId] = activeTab;
-        return acc;
-      }, {} as { [windowId: ChromeWindowId]: ChromeTabWithId | undefined });
-
-      await Promise.all(
-        activeWindows.map(async (activeWindow) => {
-          const activeTab = activeTabsByWindowId[activeWindow.windowId];
-          // This will effectively collapse all unfocused tab groups
-          await ActiveWindow.focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
-        })
+      queueOperation(
+        {
+          name: "onEnabledCollapseUnfocusedTabGroups",
+          operation: ActiveWindowEventHandlers.onEnabledCollapseUnfocusedTabGroups,
+        },
+        false
       );
     }
 
     if (!userPreferences.oldValue.alwaysGroupTabs && userPreferences.newValue.alwaysGroupTabs) {
-      const activeWindows = await ActiveWindow.getAll();
-      await Promise.all(
-        activeWindows.map(async (activeWindow) => {
-          await ActiveWindow.groupUnpinnedAndUngroupedTabs(activeWindow.windowId);
-        })
+      queueOperation(
+        {
+          name: "onEnabledAlwaysGroupTabs",
+          operation: ActiveWindowEventHandlers.onEnabledAlwaysGroupTabs,
+        },
+        false
       );
     }
   });
