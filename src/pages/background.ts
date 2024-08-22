@@ -99,7 +99,7 @@ async function getLocalStorageDefaultValues(): Promise<LocalStorageShape> {
           type: "pinnedTab",
         },
       },
-      lastSeenFocusModeColors: activeWindow?.focusMode?.colors || { focused: "pink", nonFocused: "purple" },
+      lastSeenFocusModeColors: activeWindow?.focusMode?.colors || { focused: "cyan", nonFocused: "grey" },
       lastFocusedWindowHadFocusMode: activeWindow?.focusMode ? true : false,
       lastError: null,
     };
