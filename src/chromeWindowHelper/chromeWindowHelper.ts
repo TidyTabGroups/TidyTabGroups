@@ -157,8 +157,11 @@ export function getLastAccessedTab(tabs: ChromeTabWithId[]) {
 }
 
 export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
-  const { tabs } = await getWindowIdAndTabs(windowIdOrTabs);
-  return tabs.sort((tab1, tab2) => (tab1.lastAccessed || 0) - (tab2.lastAccessed || 0));
+  const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
+  if (!windowIdAndTabs) {
+    return [];
+  }
+  return windowIdAndTabs.tabs.sort((tab1, tab2) => (tab1.lastAccessed || 0) - (tab2.lastAccessed || 0));
 }
 
 export async function focusTabGroup(
@@ -169,7 +172,12 @@ export async function focusTabGroup(
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
   }
 ) {
-  const { tabGroups } = await getWindowIdAndTabGroups(windowIdOrTabGroups);
+  const windowIdAndTabGroups = await getWindowIdAndTabGroups(windowIdOrTabGroups);
+  if (!windowIdAndTabGroups) {
+    return [];
+  }
+  const { tabGroups } = windowIdAndTabGroups;
+
   const { collapseUnfocusedTabGroups, highlightColors } = options;
   const updatedTabGroups = (await Promise.all(
     tabGroups.map(async (tabGroup) => {
@@ -203,14 +211,22 @@ export async function focusTabGroup(
 export const TAB_GROUP_COLORS: Array<chrome.tabGroups.ColorEnum> = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
 
 export async function getUnpinnedAndUngroupedTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
-  const { tabs } = await getWindowIdAndTabs(windowIdOrTabs);
-  return tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned);
+  const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
+  if (!windowIdAndTabs) {
+    return [];
+  }
+  return windowIdAndTabs.tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned);
 }
 
 export async function groupUnpinnedAndUngroupedTabsWithRetryHandler(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
   const myLogger = logger.createNestedLogger("groupUnpinnedAndUngroupedTabsWithRetryHandler");
   try {
-    const { windowId, tabs } = await getWindowIdAndTabs(windowIdOrTabs);
+    const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
+    if (!windowIdAndTabs) {
+      return;
+    }
+
+    const { windowId, tabs } = windowIdAndTabs;
     const tabIdsWithNoGroup = (await getUnpinnedAndUngroupedTabs(tabs)).map((tab) => tab.id);
     if (tabIdsWithNoGroup.length === 0) {
       return;
@@ -280,24 +296,38 @@ export async function withUserInteractionErrorHandler<T>(
 }
 
 async function getWindowIdAndTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
-  const windowId = Array.isArray(windowIdOrTabs) ? windowIdOrTabs[0]?.windowId : (windowIdOrTabs as ChromeWindowId | undefined);
-  if (windowId === undefined) {
-    return { windowId: chrome.windows.WINDOW_ID_NONE, tabs: [] };
+  let windowId: ChromeWindowId;
+  let tabs: ChromeTabWithId[];
+  if (Array.isArray(windowIdOrTabs)) {
+    if (windowIdOrTabs.length === 0) {
+      return undefined;
+    }
+
+    windowId = windowIdOrTabs[0].windowId;
+    tabs = windowIdOrTabs;
+  } else {
+    windowId = windowIdOrTabs;
+    tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
   }
 
-  const tabs = Array.isArray(windowIdOrTabs) ? (windowIdOrTabs as ChromeTabWithId[]) : ((await chrome.tabs.query({ windowId })) as ChromeTabWithId[]);
   return { windowId, tabs };
 }
 
 async function getWindowIdAndTabGroups(windowIdOrTabGroups: ChromeWindowId | ChromeTabGroupWithId[]) {
-  const windowId = Array.isArray(windowIdOrTabGroups) ? windowIdOrTabGroups[0]?.windowId : (windowIdOrTabGroups as ChromeWindowId | undefined);
-  if (windowId === undefined) {
-    return { windowId: chrome.windows.WINDOW_ID_NONE, tabGroups: [] };
+  let windowId: ChromeWindowId;
+  let tabGroups: ChromeTabGroupWithId[];
+  if (Array.isArray(windowIdOrTabGroups)) {
+    if (windowIdOrTabGroups.length === 0) {
+      return undefined;
+    }
+
+    windowId = windowIdOrTabGroups[0].windowId;
+    tabGroups = windowIdOrTabGroups;
+  } else {
+    windowId = windowIdOrTabGroups;
+    tabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
   }
 
-  const tabGroups = Array.isArray(windowIdOrTabGroups)
-    ? (windowIdOrTabGroups as ChromeTabGroupWithId[])
-    : ((await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[]);
   return { windowId, tabGroups };
 }
 
@@ -311,7 +341,11 @@ export async function focusActiveTabWithRetryHandler(
   }
 ) {
   const isTabGroupIdNone = tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
-  const { windowId, tabGroups } = await getWindowIdAndTabGroups(windowIdOrTabGroups);
+  const windowIdAndTabGroups = await getWindowIdAndTabGroups(windowIdOrTabGroups);
+  if (!windowIdAndTabGroups) {
+    return [];
+  }
+  const { windowId, tabGroups } = windowIdAndTabGroups;
 
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId[], true>();
   operationHandler.setShouldRetryOperationCallback(async () => {
@@ -341,7 +375,11 @@ export async function focusTabGroupWithRetryHandler(
   fallback: boolean = false
 ) {
   const isTabGroupIdNone = tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
-  const { windowId, tabGroups } = await getWindowIdAndTabGroups(windowIdOrTabGroups);
+  const windowIdAndTabGroups = await getWindowIdAndTabGroups(windowIdOrTabGroups);
+  if (!windowIdAndTabGroups) {
+    return [];
+  }
+  const { windowId, tabGroups } = windowIdAndTabGroups;
 
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId[], true>();
   operationHandler.setShouldRetryOperationCallback(async () => {
