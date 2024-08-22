@@ -34,6 +34,7 @@ const Popup = () => {
   }, []);
 
   async function onChangeFocusMode(e: React.ChangeEvent<HTMLInputElement>) {
+    // TODO: for encapsulation purposes, the following logic should be in ActiveWindowManager. Simply send a 'onChangeFocusMode' message and let it do the rest.
     let newFocusMode: Types.ActiveWindow["focusMode"];
     let savedTabGroupColorsToRestore: Types.ActiveWindowFocusMode["savedTabGroupColors"] | null = null;
     if (!activeWindow) {
