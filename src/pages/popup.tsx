@@ -71,7 +71,7 @@ const Popup = () => {
       // 2. focus the active tab group
       // 3. restore the colors of the tab groups that were saved before enabling focus mode
       // 4. if the window is focused, set the new lastSeenFocusModeColors and lastFocusedWindowHadFocusMode
-      const { activeWindow } = response;
+      const { activeWindow } = response as { activeWindow: Types.ActiveWindow };
       if (activeWindow) {
         // 1
         setActiveWindow(activeWindow);
@@ -120,9 +120,11 @@ const Popup = () => {
         // 4
         const window = await ChromeWindowHelper.getIfWindowExists(activeWindow.windowId);
         if (window?.focused) {
-          await Storage.setItems({
-            lastSeenFocusModeColors: activeWindow.focusMode?.colors || null,
-            lastFocusedWindowHadFocusMode: activeWindow.focusMode !== null,
+          await Storage.updateItems(["lastSeenFocusModeColors", "lastFocusedWindowHadFocusMode"], async (prev) => {
+            return {
+              lastSeenFocusModeColors: activeWindow.focusMode?.colors || prev.lastSeenFocusModeColors,
+              lastFocusedWindowHadFocusMode: activeWindow.focusMode !== null,
+            };
           });
         }
       } else {
