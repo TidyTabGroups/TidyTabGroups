@@ -167,7 +167,8 @@ const Popup = () => {
       </Typography>
     );
   } else {
-    content = <UserPreference name="Focus Mode" control={<Switch checked={activeWindow.focusMode !== null} onChange={onChangeFocusMode} />} />;
+    const enabled = activeWindow.focusMode !== null;
+    content = <UserPreference name="Focus Mode" control={<Switch checked={enabled} onChange={onChangeFocusMode} />} enabled={enabled} />;
   }
 
   return (

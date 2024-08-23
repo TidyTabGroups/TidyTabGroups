@@ -50,6 +50,7 @@ const UserPreferences = () => {
     {
       name: "Reload on error",
       control: <Switch checked={userPreferences.reloadOnError} onChange={(e) => updatePreferences({ reloadOnError: e.target.checked })} />,
+      enabled: userPreferences.reloadOnError,
     },
   ];
 
@@ -73,6 +74,7 @@ const UserPreferences = () => {
             enabled={userPreferences.createDummyFixedPageOnStartup.enabled}
           />
         ),
+        enabled: userPreferences.createDummyFixedPageOnStartup.enabled,
       },
       {
         name: "Create options page tab on startup",
@@ -92,6 +94,7 @@ const UserPreferences = () => {
             enabled={userPreferences.createOptionsFixedPageOnStartup.enabled}
           />
         ),
+        enabled: userPreferences.createOptionsFixedPageOnStartup.enabled,
       }
     );
   }
@@ -103,16 +106,19 @@ const UserPreferences = () => {
           {
             name: "Reposition focused Tabs to the end",
             control: <Switch checked={userPreferences.repositionTabs} onChange={(e) => updatePreferences({ repositionTabs: e.target.checked })} />,
+            enabled: userPreferences.repositionTabs,
           },
           {
             name: "Reposition focused Tab Groups to the end",
             control: (
               <Switch checked={userPreferences.repositionTabGroups} onChange={(e) => updatePreferences({ repositionTabGroups: e.target.checked })} />
             ),
+            enabled: userPreferences.repositionTabGroups,
           },
           {
             name: "Always group Tabs",
             control: <Switch checked={userPreferences.alwaysGroupTabs} onChange={(e) => updatePreferences({ alwaysGroupTabs: e.target.checked })} />,
+            enabled: userPreferences.alwaysGroupTabs,
           },
           {
             name: "Automatically collapse unfocused Tab Groups",
@@ -122,6 +128,7 @@ const UserPreferences = () => {
                 onChange={(e) => updatePreferences({ collapseUnfocusedTabGroups: e.target.checked })}
               />
             ),
+            enabled: userPreferences.collapseUnfocusedTabGroups,
           },
           {
             name: "Automatically activate Tab in focused Tab Group",
@@ -131,6 +138,7 @@ const UserPreferences = () => {
                 onChange={(e) => updatePreferences({ activateTabInFocusedTabGroup: e.target.checked })}
               />
             ),
+            enabled: userPreferences.activateTabInFocusedTabGroup,
           },
         ]}
         title="Functionality"

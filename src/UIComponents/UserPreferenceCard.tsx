@@ -18,7 +18,7 @@ export const UserPreferenceCard = (props: UserPreferenceCardProps) => {
       <Card sx={{ borderRadius: "10px" }}>
         <CardContent sx={{ display: "flex", flexDirection: "column", gap: "10px", ":last-child": { padding: "16px" } }}>
           {userPreferences.map((userPreference, index) => [
-            <UserPreference control={userPreference.control} name={userPreference.name} />,
+            <UserPreference {...userPreference} />,
             index === userPreferences.length - 1 ? null : <Divider />,
           ])}
         </CardContent>
