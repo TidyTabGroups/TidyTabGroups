@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import Storage from "../storage";
 import { UserPreference } from "../UIComponents";
-import { Switch, Container, Typography } from "@mui/material";
+import { Switch, Container, Typography, CircularProgress, Box, AppBar, Toolbar } from "@mui/material";
 import { App } from "./app";
 import Types from "../types";
 import ChromeWindowHelper from "../chromeWindowHelper";
@@ -15,20 +15,22 @@ Storage.start();
 
 const Popup = () => {
   const myLogger = logger.createNestedLogger("Popup");
-  const [activeWindow, setActiveWindow] = useState<Types.ActiveWindow | undefined | null>(null);
-  const isLoading = activeWindow === null;
-  const noActiveWindow = activeWindow === undefined;
+  const [activeWindow, setActiveWindow] = useState<Types.ActiveWindow | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       // the current window the popup is open in
       const window = (await chrome.windows.getCurrent()) as Types.ChromeWindowWithId;
       chrome.runtime.sendMessage({ type: "getActiveWindow", data: { windowId: window.id } }, (response) => {
-        if (response.activeWindow) {
-          setActiveWindow(response.activeWindow);
+        if (response.error) {
+          setError(response.error);
         } else {
-          myLogger.error("No activeWindow in response", response.error);
+          setActiveWindow(response.activeWindow ?? null);
         }
+
+        setIsLoading(false);
       });
     })();
   }, []);
@@ -127,19 +129,45 @@ const Popup = () => {
     });
   }
 
+  let content: React.ReactNode;
+
   if (isLoading) {
-    return null;
+    content = (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100%",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  } else if (error) {
+    content = (
+      <Typography variant="h6" gutterBottom>
+        {error}
+      </Typography>
+    );
+  } else if (activeWindow === null) {
+    content = (
+      <Typography variant="h6" gutterBottom>
+        This window isnt active
+      </Typography>
+    );
+  } else {
+    content = <UserPreference name="Focus Mode" control={<Switch checked={activeWindow.focusMode !== null} onChange={onChangeFocusMode} />} />;
   }
 
   return (
-    <Container maxWidth="md" sx={{ height: "100vh", width: "50vw", padding: "24px" }}>
-      {noActiveWindow ? (
-        <Typography variant="h6" gutterBottom>
-          This window isnt active
-        </Typography>
-      ) : (
-        <UserPreference name="Focus Mode" control={<Switch checked={activeWindow.focusMode !== null} onChange={onChangeFocusMode} />} />
-      )}
+    <Container sx={{ height: "100vh", display: "flex", flexDirection: "column", gap: 2, padding: 0 }}>
+      <AppBar position="static">
+        <Toolbar>
+          <img src="/icon.png" alt="Logo" style={{ marginRight: "10px" }} />
+        </Toolbar>
+      </AppBar>
+      <Container sx={{ flexGrow: 1, overflow: "auto" }}>{content}</Container>
     </Container>
   );
 };
