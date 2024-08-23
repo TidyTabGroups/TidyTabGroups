@@ -461,7 +461,7 @@ export async function updateActiveWindowTabGroup(
   }
 
   let updatedTabGroup: Types.ActiveWindowTabGroup | null = null;
-  const activeWindow = await update(windowId, {
+  await update(windowId, {
     tabGroups: activeWindowTabGroups.map((otherTabGroup) => {
       if (otherTabGroup.id === tabGroupId) {
         updatedTabGroup = Object.assign(otherTabGroup, updateProps);
@@ -475,7 +475,7 @@ export async function updateActiveWindowTabGroup(
     throw new Error(`updateActiveWindowTabGroup::tabGroupId ${tabGroupId} not found in windowId ${windowId}`);
   }
 
-  return activeWindow;
+  return updatedTabGroup;
 }
 
 export async function updateActiveWindowTabGroups(
