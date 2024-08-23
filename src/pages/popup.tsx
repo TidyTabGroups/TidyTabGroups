@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import Storage from "../storage";
 import { UserPreference } from "../UIComponents";
-import { Switch, Container, Typography, CircularProgress, Box, AppBar, Toolbar } from "@mui/material";
+import { Switch, Container, Typography, CircularProgress, Box, AppBar, Toolbar, IconButton } from "@mui/material";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import { App } from "./app";
 import Types from "../types";
 import ChromeWindowHelper from "../chromeWindowHelper";
@@ -129,6 +131,14 @@ const Popup = () => {
     });
   }
 
+  const openOptionsPage = () => {
+    chrome.runtime.openOptionsPage();
+  };
+
+  const closePopup = () => {
+    window.close();
+  };
+
   let content: React.ReactNode;
 
   if (isLoading) {
@@ -163,8 +173,18 @@ const Popup = () => {
   return (
     <Container sx={{ height: "100vh", display: "flex", flexDirection: "column", gap: 2, padding: 0 }}>
       <AppBar position="static">
-        <Toolbar>
-          <img src="/icon.png" alt="Logo" style={{ marginRight: "10px" }} />
+        <Toolbar sx={{ justifyContent: "space-between" }}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <img src="/icon.png" alt="Logo" style={{ marginRight: "10px" }} />
+          </Box>
+          <Box>
+            <IconButton onClick={openOptionsPage} sx={{ color: "gray" }}>
+              <SettingsOutlinedIcon fontSize="small" />
+            </IconButton>
+            <IconButton onClick={closePopup} sx={{ color: "gray" }}>
+              <CloseOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
       <Container sx={{ flexGrow: 1, overflow: "auto" }}>{content}</Container>
