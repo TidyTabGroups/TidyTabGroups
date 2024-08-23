@@ -1,5 +1,5 @@
 import { ActiveWindow } from "../model";
-import { ChromeTabGroupChangeInfo, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../types/types";
+import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import Types from "../types";
@@ -289,7 +289,7 @@ export async function initialize(onError: (message: string) => void) {
 
     myLogger.log(`message:`, message);
 
-    const messageTypes = ["getActiveWindow", "updateActiveWindow"];
+    const messageTypes = ["getActiveWindow", "updateActiveWindow", "getActiveWindowTabGroup"];
     if (!messageTypes.includes(message.type)) {
       return;
     }
@@ -310,6 +310,10 @@ export async function initialize(onError: (message: string) => void) {
               };
               const updatedActiveWindow = await ActiveWindow.update(windowId, updateProps);
               sendResponse({ activeWindow: updatedActiveWindow });
+            } else if (message.type === messageTypes[2]) {
+              const { windowId, tabGroupId } = message.data as { windowId: ChromeWindowId; tabGroupId: ChromeTabGroupId };
+              const activeWindowTabGroup = await ActiveWindow.getActiveWindowTabGroup(windowId, tabGroupId);
+              sendResponse({ activeWindowTabGroup });
             } else {
               throw new Error("message type is invalid");
             }
