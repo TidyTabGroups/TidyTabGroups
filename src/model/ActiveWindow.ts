@@ -601,23 +601,24 @@ async function runFocusTabGroupLikeOperation(
 
   const tabGroups = await operation(focusTabGroupOptions);
   if (tabGroups) {
-    await mergeIntoActiveWindowTabGroups(
+    return await mergeIntoActiveWindowTabGroups(
       windowId,
       // TODO: we should only updated the properties that were actually updated from the ChromeWindowHelper.focusTabGroup
       //  call instead of naivly always updating the collapsed and color properties
       tabGroups.map((tabGroup) => ({ id: tabGroup.id, collapsed: tabGroup.collapsed, color: tabGroup.color }))
     );
   }
+  return activeWindow;
 }
 
 export async function focusActiveTab(windowId: ChromeWindowId, tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
-  await runFocusTabGroupLikeOperation(windowId, (focusTabGroupOptions) =>
+  return await runFocusTabGroupLikeOperation(windowId, (focusTabGroupOptions) =>
     ChromeWindowHelper.focusActiveTabWithRetryHandler(tabId, tabGroupId, windowId, focusTabGroupOptions)
   );
 }
 
 export async function focusTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
-  await runFocusTabGroupLikeOperation(windowId, (focusTabGroupOptions) =>
+  return await runFocusTabGroupLikeOperation(windowId, (focusTabGroupOptions) =>
     ChromeWindowHelper.focusTabGroupWithRetryHandler(tabGroupId, windowId, focusTabGroupOptions)
   );
 }
@@ -702,7 +703,7 @@ export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, t
     }
     return activeWindowTabGroup;
   });
-  await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
+  return await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
 }
 
 export async function blurTabGroupsIfNoActiveTab(windowId: ChromeWindowId) {
