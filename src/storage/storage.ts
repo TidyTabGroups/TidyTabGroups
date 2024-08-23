@@ -53,7 +53,7 @@ export async function addChangeListener<T extends keyof LocalStorageShape>(
 }
 
 export async function removeChangeListener<T extends keyof LocalStorageShape>(
-  listener: (changes: { [key in T]?: { newValue?: LocalStorageShape[key]; oldValue?: LocalStorageShape[key] } }) => void
+  listener: (changes: { [key in T]?: { newValue: LocalStorageShape[key]; oldValue: LocalStorageShape[key] } }) => void
 ) {
   await waitForReady();
   chrome.storage.onChanged.removeListener(listener as (changes: { [key in keyof LocalStorageShape]?: chrome.storage.StorageChange }) => void);
