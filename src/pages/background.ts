@@ -63,24 +63,7 @@ async function onError(message: string) {
 
 async function initializeStorage() {
   try {
-    const defaultValues = await getLocalStorageDefaultValues();
-    const keys = Object.keys(defaultValues) as (keyof LocalStorageShape)[];
-    const items = await chrome.storage.local.get(keys);
-    const missingItems = keys.filter((key) => !items.hasOwnProperty(key));
-    const newItems = missingItems.reduce((acc, key) => ({ ...acc, [key]: defaultValues[key] }), {});
-    await chrome.storage.local.set(newItems);
-    Storage.start();
-  } catch (error) {
-    throw new Error(`initializeStorage::An error occurred while initializing the storage: ${error}`);
-  }
-}
-
-async function getLocalStorageDefaultValues(): Promise<LocalStorageShape> {
-  try {
-    const currentWindow = await ChromeWindowHelper.getIfCurrentWindowExists();
-    const activeWindow = currentWindow ? await ActiveWindow.get(currentWindow.id) : null;
-
-    return {
+    const defaultValues = {
       userPreferences: {
         /* Functionality */
         repositionTabs: false,
@@ -99,12 +82,18 @@ async function getLocalStorageDefaultValues(): Promise<LocalStorageShape> {
           type: "pinnedTab",
         },
       },
-      lastSeenFocusModeColors: activeWindow?.focusMode?.colors || { focused: "cyan", nonFocused: "grey" },
-      lastFocusedWindowHadFocusMode: activeWindow?.focusMode ? true : false,
+      lastSeenFocusModeColors: { focused: "cyan", nonFocused: "grey" },
+      lastFocusedWindowHadFocusMode: false,
       lastError: null,
     };
+    const keys = Object.keys(defaultValues) as (keyof LocalStorageShape)[];
+    const items = await chrome.storage.local.get(keys);
+    const missingItems = keys.filter((key) => !items.hasOwnProperty(key));
+    const newItems = missingItems.reduce((acc, key) => ({ ...acc, [key]: defaultValues[key] }), {});
+    await chrome.storage.local.set(newItems);
+    Storage.start();
   } catch (error) {
-    throw new Error(`getLocalStorageDefaultValues::An error occurred while getting the default values: ${error}`);
+    throw new Error(`initializeStorage::An error occurred while initializing the storage: ${error}`);
   }
 }
 
