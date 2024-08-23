@@ -452,3 +452,17 @@ export async function onChangeKeepTabGroupOpen(windowId: ChromeWindowId, tabGrou
   }
   return await ActiveWindow.updateActiveWindowTabGroup(windowId, tabGroupId, updatedProps);
 }
+
+export async function onChangeFocusMode(windowId: ChromeWindowId, enabled: boolean) {
+  const myLogger = logger.createNestedLogger("onChangeFocusMode");
+  try {
+    await ActiveWindow.getOrThrow(windowId);
+    if (enabled) {
+      return await ActiveWindow.enableFocusMode(windowId);
+    } else {
+      return await ActiveWindow.disableFocusMode(windowId);
+    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
+}

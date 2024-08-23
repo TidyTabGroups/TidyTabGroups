@@ -720,3 +720,81 @@ export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId) {
     await createActiveWindowTabGroup(windowId, tabGroup);
   }
 }
+
+export async function enableFocusMode(windowId: ChromeWindowId) {
+  const myLogger = logger.createNestedLogger("enableFocusMode");
+  try {
+    if ((await getOrThrow(windowId)).focusMode) {
+      throw new Error("Focus mode is already enabled");
+    }
+
+    const [tabGroups, { lastSeenFocusModeColors }] = await Promise.all([
+      chrome.tabGroups.query({ windowId }) as Promise<Types.ChromeTabGroupWithId[]>,
+      Storage.getItems(["lastSeenFocusModeColors"]),
+    ]);
+
+    await update(windowId, {
+      focusMode: {
+        colors: lastSeenFocusModeColors,
+        savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
+      },
+    });
+
+    const focusTabGroupOperation = async () => {
+      const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (ChromeTabWithId | undefined)[];
+      return await focusTabGroup(windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
+    };
+
+    const setLastFocusedWindowHadFocusModeOperation = async () => {
+      const window = await ChromeWindowHelper.getIfWindowExists(windowId);
+      if (window?.focused) {
+        await Storage.setItems({
+          lastFocusedWindowHadFocusMode: true,
+        });
+      }
+    };
+
+    const [activeWindow] = await Promise.all([focusTabGroupOperation(), setLastFocusedWindowHadFocusModeOperation()]);
+    return activeWindow;
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
+}
+
+export async function disableFocusMode(windowId: ChromeWindowId) {
+  const myLogger = logger.createNestedLogger("disableFocusMode");
+  try {
+    const activeWindow = await getOrThrow(windowId);
+    const { focusMode } = activeWindow;
+    if (!focusMode) {
+      throw new Error("Focus mode is already disabled");
+    }
+
+    const tabGroups = (await chrome.tabGroups.query({ windowId })) as Types.ChromeTabGroupWithId[];
+    let colorIndex = 0;
+    // Remove grey, just because it's not a very nice color
+    const colors = ChromeWindowHelper.TAB_GROUP_COLORS.filter((color) => color !== "grey");
+    const updatedTabGroups = (
+      await Promise.all(
+        tabGroups.map((tabGroup) => {
+          let newColor: chrome.tabGroups.ColorEnum;
+          const savedColor = focusMode.savedTabGroupColors.find((savedColor) => savedColor.tabGroupId === tabGroup.id)?.color;
+          if (savedColor) {
+            newColor = savedColor;
+          } else {
+            newColor = colors[colorIndex++ % colors.length];
+          }
+
+          return ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroup.id, { color: newColor });
+        })
+      )
+    ).filter((tabGroup) => tabGroup !== undefined);
+    await mergeIntoActiveWindowTabGroups(
+      windowId,
+      updatedTabGroups.map((tabGroup) => ({ id: tabGroup.id, color: tabGroup.color }))
+    );
+    return await update(windowId, { focusMode: null });
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
+}
