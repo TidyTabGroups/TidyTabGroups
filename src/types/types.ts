@@ -36,6 +36,7 @@ export interface ActiveWindowTabGroup {
   collapsed: chrome.tabGroups.TabGroup["collapsed"];
   windowId: ChromeWindowId;
   useTabTitle: boolean;
+  keepOpen: boolean;
 }
 
 export type ChromeId = number;

@@ -3,7 +3,15 @@ import Logger from "../logger";
 import Misc from "../misc";
 import { ActiveWindow } from "../model";
 import Types from "../types";
-import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId, ChromeWindowWithId } from "../types/types";
+import {
+  ActiveWindowTabGroup,
+  ChromeTabGroupChangeInfo,
+  ChromeTabGroupId,
+  ChromeTabId,
+  ChromeTabWithId,
+  ChromeWindowId,
+  ChromeWindowWithId,
+} from "../types/types";
 import Storage from "../storage";
 import { runActiveWindowOperation, runActiveWindowTabGroupOperation, runActiveWindowTabOperation } from "./ActiveWindowEventOperationRunner";
 
@@ -429,4 +437,18 @@ export async function onEnabledAlwaysGroupTabs() {
       await ActiveWindow.groupUnpinnedAndUngroupedTabs(activeWindow.windowId);
     })
   );
+}
+
+export async function onChangeKeepTabGroupOpen(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId, enabled: boolean) {
+  const updatedProps: Partial<ActiveWindowTabGroup> = { keepOpen: enabled };
+  if (enabled) {
+    const tabGroup = await chrome.tabGroups.get(tabGroupId);
+    if (tabGroup.collapsed) {
+      const tabGroupUpToDate = await ChromeWindowHelper.updateTabGroupWithRetryHandler(tabGroupId, { collapsed: false });
+      if (tabGroupUpToDate) {
+        updatedProps.collapsed = tabGroupUpToDate.collapsed;
+      }
+    }
+  }
+  return await ActiveWindow.updateActiveWindowTabGroup(windowId, tabGroupId, updatedProps);
 }

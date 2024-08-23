@@ -289,7 +289,7 @@ export async function initialize(onError: (message: string) => void) {
 
     myLogger.log(`message:`, message);
 
-    const messageTypes = ["getActiveWindow", "updateActiveWindow", "getActiveWindowTabGroup"];
+    const messageTypes = ["getActiveWindow", "updateActiveWindow", "onChangeKeepTabGroupOpen", "getActiveWindowTabGroup"];
     if (!messageTypes.includes(message.type)) {
       return;
     }
@@ -311,6 +311,14 @@ export async function initialize(onError: (message: string) => void) {
               const updatedActiveWindow = await ActiveWindow.update(windowId, updateProps);
               sendResponse({ activeWindow: updatedActiveWindow });
             } else if (message.type === messageTypes[2]) {
+              const { windowId, tabGroupId, enabled } = message.data as {
+                windowId: ChromeWindowId;
+                tabGroupId: ChromeTabGroupId;
+                enabled: boolean;
+              };
+              const activeWindowTabGroup = await ActiveWindowEventHandlers.onChangeKeepTabGroupOpen(windowId, tabGroupId, enabled);
+              sendResponse({ activeWindowTabGroup });
+            } else if (message.type === messageTypes[3]) {
               const { windowId, tabGroupId } = message.data as { windowId: ChromeWindowId; tabGroupId: ChromeTabGroupId };
               const activeWindowTabGroup = await ActiveWindow.getActiveWindowTabGroup(windowId, tabGroupId);
               sendResponse({ activeWindowTabGroup });

@@ -516,7 +516,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
   // 4. Add the new active window tab group to the active window
   try {
     const activeWindow = await getOrThrow(windowId);
-    let newActiveWindowTabGroup = { ...tabGroup, useTabTitle: false };
+    let newActiveWindowTabGroup = { ...tabGroup, useTabTitle: false, keepOpen: false };
 
     let tabGroupUpToDate: ChromeTabGroupWithId | undefined = tabGroup;
 
@@ -592,9 +592,11 @@ async function runFocusTabGroupLikeOperation(
   }) => Promise<ChromeTabGroupWithId[] | undefined>
 ) {
   const activeWindow = await getOrThrow(windowId);
+  const collapseIgnoreSet = new Set(activeWindow.tabGroups.filter((tabGroup) => tabGroup.keepOpen).map((tabGroup) => tabGroup.id));
   const focusTabGroupOptions = {
     collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
     highlightColors: activeWindow.focusMode?.colors,
+    collapseIgnoreSet,
   };
 
   const tabGroups = await operation(focusTabGroupOptions);
