@@ -12,7 +12,7 @@ export const UserPreferenceCard = (props: UserPreferenceCardProps) => {
 
   return (
     <Container>
-      <Typography variant="h6" component={"h1"} gutterBottom color="GrayText">
+      <Typography variant="h5" component={"h1"} gutterBottom color="GrayText">
         {title}
       </Typography>
       <Card sx={{ borderRadius: "10px" }}>
