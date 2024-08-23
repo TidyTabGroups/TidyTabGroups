@@ -588,6 +588,7 @@ async function runFocusTabGroupLikeOperation(
   operation: (focusTabGroupOptions: {
     collapseUnfocusedTabGroups: boolean;
     highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
+    collapseIgnoreSet?: Set<ChromeTabGroupId>;
   }) => Promise<ChromeTabGroupWithId[] | undefined>
 ) {
   const activeWindow = await getOrThrow(windowId);
