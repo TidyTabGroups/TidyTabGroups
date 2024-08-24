@@ -1,4 +1,5 @@
 import { ActiveWindow } from "../model";
+import * as ActiveWindowMethods from "./ActiveWindowMethods";
 import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../types/types";
 import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
@@ -435,9 +436,9 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   logger.log(`onInstalled::Extension was installed because of: ${details.reason}`);
   if (details.reason === "install") {
     // TODO: open the onboarding page
-    await ActiveWindow.activateAllWindows();
+    await ActiveWindowMethods.activateAllWindows();
   } else {
-    await ActiveWindow.reactivateAllWindows();
+    await ActiveWindowMethods.reactivateAllWindows();
   }
 
   // inject the content script into all tabs
