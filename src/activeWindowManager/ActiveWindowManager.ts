@@ -10,14 +10,6 @@ import Misc from "../misc";
 
 const logger = Logger.createLogger("ActiveWindowManager", { color: "#fcba03" });
 
-const TAB_NOT_UP_TO_DATE_MESSAGE = (tabOrTabId: ChromeTabId | chrome.tabs.Tab) => {
-  if (typeof tabOrTabId === "number") {
-    return `tab is not up to date, tabId: ${tabOrTabId}`;
-  } else {
-    return `tabUpToDate not found - tabId: ${tabOrTabId.id}, tab.title: ${tabOrTabId.title}`;
-  }
-};
-
 export async function initialize(onError: (message: string) => void) {
   let asyncInitializationSteps = new Promise<void>(async (resolve, reject) => {
     const myLogger = logger.createNestedLogger("initialize::asyncInitializationSteps");
@@ -28,7 +20,6 @@ export async function initialize(onError: (message: string) => void) {
           async (activeWindow) => {
             const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tab.id);
             if (!tabUpToDate) {
-              logger.warn(TAB_NOT_UP_TO_DATE_MESSAGE(tab));
               return;
             }
 
@@ -80,7 +71,6 @@ export async function initialize(onError: (message: string) => void) {
     const myLogger = logger.createNestedLogger("windows.onCreated");
     const windowId = window.id;
     if (windowId === undefined || window.type !== "normal") {
-      myLogger.warn("window is not valid:", window);
       return;
     }
 
