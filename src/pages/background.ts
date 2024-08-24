@@ -1,9 +1,7 @@
 import ActiveWindowManager from "../activeWindowManager";
-import ChromeWindowHelper from "../chromeWindowHelper";
 import Database from "../database";
 import Logger from "../logger";
 import Misc from "../misc";
-import { ActiveWindow } from "../model";
 import Storage from "../storage";
 import { LocalStorageShape } from "../types/types";
 
