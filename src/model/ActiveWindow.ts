@@ -478,36 +478,6 @@ export async function updateActiveWindowTabGroup(
   return updatedTabGroup;
 }
 
-export async function updateActiveWindowTabGroups(
-  windowId: ChromeWindowId,
-  updatePropsList: ({ id: Types.ActiveWindowTabGroup["id"] } & Partial<Types.ActiveWindowTabGroup>)[]
-) {
-  const activeWindowTabGroups = (await get(windowId))?.tabGroups;
-  if (activeWindowTabGroups === undefined) {
-    throw new Error(`updateActiveWindowTabGroups::windowId ${windowId} not found`);
-  }
-
-  const updatedTabGroups: Types.ActiveWindowTabGroup[] = [];
-  const newActiveWindowTabGroups = activeWindowTabGroups.map((otherTabGroup) => {
-    const updateProps = updatePropsList.find((updateProps) => updateProps.id === otherTabGroup.id);
-    if (updateProps !== undefined) {
-      const updatedTabGroup = Object.assign(otherTabGroup, updateProps);
-      updatedTabGroups.push(updatedTabGroup);
-      return updatedTabGroup;
-    }
-    return otherTabGroup;
-  });
-
-  if (updatedTabGroups.length !== updatePropsList.length) {
-    const notUpdatedTabGroupIds = updatePropsList
-      .map((updateProps) => updateProps.id)
-      .filter((id) => !activeWindowTabGroups.find((tabGroup) => tabGroup.id === id));
-    throw new Error(`updateActiveWindowTabGroups::tabGroupIds ${notUpdatedTabGroupIds} not found in windowId ${windowId}`);
-  }
-
-  return await update(windowId, { tabGroups: newActiveWindowTabGroups });
-}
-
 export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGroup: ChromeTabGroupWithId) {
   const myLogger = logger.createNestedLogger("createActiveWindowTabGroup");
   // 1. If focus mode is enabled, update the tab group color to the focused or non-focused color
