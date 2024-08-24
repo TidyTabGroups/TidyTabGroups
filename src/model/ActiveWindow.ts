@@ -195,6 +195,88 @@ export async function update(id: Types.ActiveWindow["windowId"], updatedProperti
   return updateInternal(id, updatedProperties);
 }
 
+export function chromeTabGroupToActiveWindowTabGroup(
+  tabGroup: chrome.tabGroups.TabGroup,
+  otherProperties?: { useTabTitle: Types.ActiveWindowTabGroup["useTabTitle"] }
+) {
+  const activeWindowTabGroup = {
+    id: tabGroup.id,
+    windowId: tabGroup.windowId,
+    color: tabGroup.color,
+    collapsed: tabGroup.collapsed,
+    useTabTitle: false,
+    ...otherProperties,
+  } as Types.ActiveWindowTabGroup;
+
+  if (tabGroup.title !== undefined) {
+    activeWindowTabGroup.title = tabGroup.title;
+  }
+
+  return activeWindowTabGroup;
+}
+
+export async function getActiveWindowTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  return (await getOrThrow(windowId)).tabGroups.find((tabGroup) => tabGroup.id === tabGroupId);
+}
+
+export async function getActiveWindowTabGroupOrThrow(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  const activeWindowTabGroup = await getActiveWindowTabGroup(windowId, tabGroupId);
+  if (!activeWindowTabGroup) {
+    throw new Error(`getActiveWindowTabGroupOrThrow::tabGroupId ${tabGroupId} not found in windowId ${windowId}`);
+  }
+
+  return activeWindowTabGroup;
+}
+
+export async function updateActiveWindowTabGroup(
+  windowId: ChromeWindowId,
+  tabGroupId: ChromeTabGroupId,
+  updateProps: Partial<Types.ActiveWindowTabGroup> = {}
+) {
+  const activeWindowTabGroups = (await get(windowId))?.tabGroups;
+  if (activeWindowTabGroups === undefined) {
+    throw new Error(`updateActiveWindowTabGroup::windowId ${windowId} not found`);
+  }
+
+  let updatedTabGroup: Types.ActiveWindowTabGroup | null = null;
+  await update(windowId, {
+    tabGroups: activeWindowTabGroups.map((otherTabGroup) => {
+      if (otherTabGroup.id === tabGroupId) {
+        updatedTabGroup = Object.assign(otherTabGroup, updateProps);
+        return updatedTabGroup;
+      }
+      return otherTabGroup;
+    }),
+  });
+
+  if (updatedTabGroup === null) {
+    throw new Error(`updateActiveWindowTabGroup::tabGroupId ${tabGroupId} not found in windowId ${windowId}`);
+  }
+
+  return updatedTabGroup;
+}
+
+type TabGroupUpdatePropertiesWithId = { id: chrome.tabGroups.TabGroup["id"] } & Partial<chrome.tabGroups.UpdateProperties>;
+export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, tabGroups: TabGroupUpdatePropertiesWithId[]) {
+  const activeWindow = await getOrThrow(windowId);
+
+  const tabGroupsById: { [tabGroupId: ChromeTabGroupId]: TabGroupUpdatePropertiesWithId } = tabGroups.reduce(
+    (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
+    {}
+  );
+
+  const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => {
+    if (tabGroupsById[activeWindowTabGroup.id]) {
+      return {
+        ...activeWindowTabGroup,
+        ...tabGroupsById[activeWindowTabGroup.id],
+      } as Types.ActiveWindowTabGroup;
+    }
+    return activeWindowTabGroup;
+  });
+  return await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
+}
+
 export function isActivatingAllWindows() {
   return activatingAllWindows;
 }
@@ -417,67 +499,6 @@ export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId
   }
 }
 
-export function chromeTabGroupToActiveWindowTabGroup(
-  tabGroup: chrome.tabGroups.TabGroup,
-  otherProperties?: { useTabTitle: Types.ActiveWindowTabGroup["useTabTitle"] }
-) {
-  const activeWindowTabGroup = {
-    id: tabGroup.id,
-    windowId: tabGroup.windowId,
-    color: tabGroup.color,
-    collapsed: tabGroup.collapsed,
-    useTabTitle: false,
-    ...otherProperties,
-  } as Types.ActiveWindowTabGroup;
-
-  if (tabGroup.title !== undefined) {
-    activeWindowTabGroup.title = tabGroup.title;
-  }
-
-  return activeWindowTabGroup;
-}
-
-export async function getActiveWindowTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
-  return (await getOrThrow(windowId)).tabGroups.find((tabGroup) => tabGroup.id === tabGroupId);
-}
-
-export async function getActiveWindowTabGroupOrThrow(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
-  const activeWindowTabGroup = await getActiveWindowTabGroup(windowId, tabGroupId);
-  if (!activeWindowTabGroup) {
-    throw new Error(`getActiveWindowTabGroupOrThrow::tabGroupId ${tabGroupId} not found in windowId ${windowId}`);
-  }
-
-  return activeWindowTabGroup;
-}
-
-export async function updateActiveWindowTabGroup(
-  windowId: ChromeWindowId,
-  tabGroupId: ChromeTabGroupId,
-  updateProps: Partial<Types.ActiveWindowTabGroup> = {}
-) {
-  const activeWindowTabGroups = (await get(windowId))?.tabGroups;
-  if (activeWindowTabGroups === undefined) {
-    throw new Error(`updateActiveWindowTabGroup::windowId ${windowId} not found`);
-  }
-
-  let updatedTabGroup: Types.ActiveWindowTabGroup | null = null;
-  await update(windowId, {
-    tabGroups: activeWindowTabGroups.map((otherTabGroup) => {
-      if (otherTabGroup.id === tabGroupId) {
-        updatedTabGroup = Object.assign(otherTabGroup, updateProps);
-        return updatedTabGroup;
-      }
-      return otherTabGroup;
-    }),
-  });
-
-  if (updatedTabGroup === null) {
-    throw new Error(`updateActiveWindowTabGroup::tabGroupId ${tabGroupId} not found in windowId ${windowId}`);
-  }
-
-  return updatedTabGroup;
-}
-
 export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGroup: ChromeTabGroupWithId) {
   const myLogger = logger.createNestedLogger("createActiveWindowTabGroup");
   // 1. If focus mode is enabled, update the tab group color to the focused or non-focused color
@@ -652,27 +673,6 @@ export async function useTabTitleForEligebleTabGroups() {
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
-}
-
-type TabGroupUpdatePropertiesWithId = { id: chrome.tabGroups.TabGroup["id"] } & Partial<chrome.tabGroups.UpdateProperties>;
-export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, tabGroups: TabGroupUpdatePropertiesWithId[]) {
-  const activeWindow = await getOrThrow(windowId);
-
-  const tabGroupsById: { [tabGroupId: ChromeTabGroupId]: TabGroupUpdatePropertiesWithId } = tabGroups.reduce(
-    (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
-    {}
-  );
-
-  const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => {
-    if (tabGroupsById[activeWindowTabGroup.id]) {
-      return {
-        ...activeWindowTabGroup,
-        ...tabGroupsById[activeWindowTabGroup.id],
-      } as Types.ActiveWindowTabGroup;
-    }
-    return activeWindowTabGroup;
-  });
-  return await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
 }
 
 export async function blurTabGroupsIfNoActiveTab(windowId: ChromeWindowId) {
