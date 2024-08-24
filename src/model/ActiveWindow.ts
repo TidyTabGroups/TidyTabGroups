@@ -654,7 +654,6 @@ export async function useTabTitleForEligebleTabGroups() {
   }
 }
 
-// TODO: use this where currently applicable
 type TabGroupUpdatePropertiesWithId = { id: chrome.tabGroups.TabGroup["id"] } & Partial<chrome.tabGroups.UpdateProperties>;
 export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, tabGroups: TabGroupUpdatePropertiesWithId[]) {
   const activeWindow = await getOrThrow(windowId);
