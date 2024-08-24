@@ -165,6 +165,15 @@ function updateInternal(id: Types.ActiveWindow["windowId"], updatedProperties: P
   return updatedActiveWindow as Types.ActiveWindow;
 }
 
+function clearInternal() {
+  throwIfNotSynced("clearInternal");
+  activeWindows = [];
+  ActiveWindowDatabase.clear().catch((error) => {
+    // TODO: bubble error up to global level
+    logger.error(`reactivateAllWindows::failed to clear database: ${error}`);
+  });
+}
+
 export async function getOrThrow(id: Types.ActiveWindow["windowId"]) {
   await waitForSync(id);
   return getOrThrowInternal(id);
@@ -193,6 +202,11 @@ export async function remove(id: Types.ActiveWindow["windowId"]) {
 export async function update(id: Types.ActiveWindow["windowId"], updatedProperties: Partial<Types.ActiveWindow>) {
   await waitForSync(id);
   return updateInternal(id, updatedProperties);
+}
+
+export async function clear() {
+  await waitForSync();
+  return clearInternal();
 }
 
 export function chromeTabGroupToActiveWindowTabGroup(
@@ -316,11 +330,7 @@ export async function reactivateAllWindows() {
     const [windows, previousActiveWindows] = await Promise.all([chrome.windows.getAll() as Promise<ChromeWindowWithId[]>, getAll()]);
     const windowIds = windows.map((window) => window.id);
 
-    activeWindows = [];
-    ActiveWindowDatabase.clear().catch((error) => {
-      // TODO: bubble error up to global level
-      logger.error(`reactivateAllWindows::failed to clear database: ${error}`);
-    });
+    await clear();
 
     await Promise.all(
       windowIds.map(async (windowId) => {
