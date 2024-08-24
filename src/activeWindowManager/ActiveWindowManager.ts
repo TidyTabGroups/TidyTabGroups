@@ -179,18 +179,18 @@ export async function initialize(onError: (message: string) => void) {
 
   chrome.tabs.onCreated.addListener((tab: chrome.tabs.Tab) => {
     const myLogger = logger.createNestedLogger("tabs.onCreated");
+    const tabId = tab.id;
+    if (tabId === undefined) {
+      return;
+    }
+
     queueOperation(
       {
         name: myLogger.getPrefixedMessage("onTabCreated"),
         operation: async () => {
           const myMyLogger = myLogger.createNestedLogger("onTabCreated");
-          if (!tab.id) {
-            myMyLogger.warn(`tab.id not found for tab:`, tab);
-            return;
-          }
-
           myMyLogger.log(`tab.title: '${tab.title}', tab.groupId: ${tab.groupId}:`);
-          return ActiveWindowEventHandlers.onTabCreated(tab.id);
+          return ActiveWindowEventHandlers.onTabCreated(tabId);
         },
       },
       false
