@@ -23,6 +23,7 @@ interface CurrentActiveWindowTabGroupInfo {
 Storage.start();
 
 const Popup = () => {
+  const [currentWindowId, setCurrentWindowId] = useState<Types.ChromeWindowId | null>(null);
   const [activeWindow, setActiveWindow] = useState<Types.ActiveWindow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +35,15 @@ const Popup = () => {
       const myLogger = logger.createNestedLogger("componentDidMount");
       try {
         const currentWindow = (await chrome.windows.getCurrent()) as Types.ChromeWindowWithId;
-        const [activeWindow, currentActiveWindowTabGroupInfo, userPreferences] = await Promise.all([
-          fetchActiveWindow(currentWindow.id),
-          fetchCurrentTabGroupInfo(currentWindow.id),
-          fetchUserPreferences(),
-        ]);
+        const [activeWindow, userPreferences] = await Promise.all([fetchActiveWindow(currentWindow.id), fetchUserPreferences()]);
 
-        setActiveWindow(activeWindow);
+        let currentActiveWindowTabGroupInfo: CurrentActiveWindowTabGroupInfo | null = null;
+        if (activeWindow) {
+          currentActiveWindowTabGroupInfo = await fetchCurrentTabGroupInfo(currentWindow.id);
+        }
+
+        setCurrentWindowId(currentWindow.id);
+        setActiveWindow(activeWindow ?? null);
         setCurrentActiveWindowTabGroupInfo(currentActiveWindowTabGroupInfo);
         setUserPreferences(userPreferences);
       } catch (error) {
@@ -49,6 +52,8 @@ const Popup = () => {
         setIsLoading(false);
       }
     });
+
+    chrome.windows.onRemoved.addListener(onCurrentWindowRemoved);
 
     // All the events that can potentially change the current tab group
     chrome.tabs.onActivated.addListener(onTabEditEventForCurrentActiveWindowTabGroup);
@@ -61,6 +66,8 @@ const Popup = () => {
     Storage.addChangeListener<"userPreferences">(onStorageChange);
 
     return () => {
+      chrome.windows.onRemoved.removeListener(onCurrentWindowRemoved);
+
       chrome.tabs.onActivated.removeListener(onTabEditEventForCurrentActiveWindowTabGroup);
       chrome.tabs.onAttached.removeListener(onTabEditEventForCurrentActiveWindowTabGroup);
       chrome.tabs.onDetached.removeListener(onTabEditEventForCurrentActiveWindowTabGroup);
@@ -71,6 +78,31 @@ const Popup = () => {
       Storage.removeChangeListener<"userPreferences">(onStorageChange);
     };
   }, []);
+  useEffect(() => {
+    onActiveWindowChanged();
+  }, [activeWindow]);
+
+  async function onActiveWindowChanged() {
+    const myLogger = logger.createNestedLogger("onActiveWindowChanged");
+    try {
+      if (activeWindow !== null) {
+        const currentActiveWindowTabGroupInfo = await fetchCurrentTabGroupInfo(activeWindow.windowId);
+        setCurrentActiveWindowTabGroupInfo(currentActiveWindowTabGroupInfo);
+      } else {
+        setCurrentActiveWindowTabGroupInfo(null);
+      }
+    } catch (error) {
+      throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+    }
+  }
+
+  function onCurrentWindowRemoved() {
+    setCurrentWindowId(null);
+    setActiveWindow(null);
+    setCurrentActiveWindowTabGroupInfo(null);
+
+    closePopup();
+  }
 
   async function onStorageChange(changes: {
     userPreferences?:
@@ -92,6 +124,23 @@ const Popup = () => {
 
     const currentActiveWindowTabGroupInfo = await fetchCurrentTabGroupInfo(activeWindow.windowId);
     setCurrentActiveWindowTabGroupInfo(currentActiveWindowTabGroupInfo);
+  }
+
+  async function onChangeActivateCurrentWindow(e: React.ChangeEvent<HTMLInputElement>) {
+    const myLogger = logger.createNestedLogger("onChangeActivateCurrentWindow");
+    try {
+      if (currentWindowId === null) {
+        throw new Error("onChangeActivateCurrentWindow called with no currentWindowId");
+      }
+
+      const { activeWindow } = await messageActiveWindowManager<{ activeWindow: Types.ActiveWindow | undefined }>({
+        type: "onChangeActivateCurrentWindow",
+        data: { windowId: currentWindowId, enabled: e.target.checked },
+      });
+      setActiveWindow(activeWindow ?? null);
+    } catch (error) {
+      setError(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+    }
   }
 
   async function onChangeFocusMode(e: React.ChangeEvent<HTMLInputElement>) {
@@ -169,34 +218,36 @@ const Popup = () => {
         {error}
       </Typography>
     );
-  } else if (activeWindow === null) {
-    content = (
-      <Typography variant="h6" gutterBottom>
-        This window isnt active
-      </Typography>
-    );
   } else {
-    const currentTabGroupPreferences: UserPreferenceProps[] = [];
+    const currentWindowPreferences: UserPreferenceProps[] = [
+      {
+        name: "Enable Tidy Tab Groups",
+        control: <Switch checked={activeWindow !== null} onChange={onChangeActivateCurrentWindow} />,
+        enabled: activeWindow !== null,
+      },
+    ];
 
-    if (currentActiveWindowTabGroupInfo && userPreferences) {
-      if (userPreferences.collapseUnfocusedTabGroups) {
-        currentTabGroupPreferences.push({
-          name: "Keep open",
-          control: <Switch checked={currentActiveWindowTabGroupInfo.keepOpen} onChange={onChangeKeepTabGroupOpen} />,
-          enabled: currentActiveWindowTabGroupInfo.keepOpen,
-        });
-      }
+    if (activeWindow !== null) {
+      const focusModeEnabled = activeWindow.focusMode !== null;
+      currentWindowPreferences.push({
+        name: "Focus Mode",
+        control: <Switch checked={focusModeEnabled} onChange={onChangeFocusMode} />,
+        enabled: focusModeEnabled,
+      });
     }
 
-    const focusModeEnabled = activeWindow.focusMode !== null;
+    const currentTabGroupPreferences: UserPreferenceProps[] = [];
+    if (currentActiveWindowTabGroupInfo && userPreferences!.collapseUnfocusedTabGroups) {
+      currentTabGroupPreferences.push({
+        name: "Keep open",
+        control: <Switch checked={currentActiveWindowTabGroupInfo.keepOpen} onChange={onChangeKeepTabGroupOpen} />,
+        enabled: currentActiveWindowTabGroupInfo.keepOpen,
+      });
+    }
+
     content = (
       <Box display="flex" flexDirection="column" gap={2}>
-        <UserPreferenceCard
-          title="Current Window"
-          userPreferences={[
-            { name: "Focus Mode", control: <Switch checked={focusModeEnabled} onChange={onChangeFocusMode} />, enabled: focusModeEnabled },
-          ]}
-        />
+        <UserPreferenceCard title="Current Window" userPreferences={currentWindowPreferences} />
         {currentTabGroupPreferences.length > 0 && <UserPreferenceCard title="Current Tab Group" userPreferences={currentTabGroupPreferences} />}
       </Box>
     );
@@ -284,4 +335,18 @@ function openOptionsPage() {
 
 function closePopup() {
   window.close();
+}
+
+async function messageActiveWindowManager<R>(message: any): Promise<R> {
+  const myLogger = logger.createNestedLogger("messageActiveWindowManager");
+  try {
+    const response = (await chrome.runtime.sendMessage(message)) as { error: unknown; data: R };
+    if (response.error) {
+      throw new Error("Active window manager message responded with an error: " + Misc.getErrorMessage(response.error));
+    } else {
+      return response.data;
+    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
 }

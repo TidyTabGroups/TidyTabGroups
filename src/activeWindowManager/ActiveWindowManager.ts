@@ -280,7 +280,14 @@ export async function initialize(onError: (message: string) => void) {
 
     myLogger.log(`message:`, message);
 
-    const messageTypes = ["getActiveWindow", "updateActiveWindow", "onChangeKeepTabGroupOpen", "getActiveWindowTabGroup", "onChangeFocusMode"];
+    const messageTypes = [
+      "getActiveWindow",
+      "updateActiveWindow",
+      "onChangeKeepTabGroupOpen",
+      "getActiveWindowTabGroup",
+      "onChangeFocusMode",
+      "onChangeActivateCurrentWindow",
+    ];
     if (!messageTypes.includes(message.type)) {
       return;
     }
@@ -317,6 +324,10 @@ export async function initialize(onError: (message: string) => void) {
               const { windowId, enabled } = message.data as { windowId: ChromeWindowId; enabled: boolean };
               const activeWindow = await ActiveWindowEventHandlers.onChangeFocusMode(windowId, enabled);
               sendResponse({ activeWindow });
+            } else if (message.type === messageTypes[5]) {
+              const { windowId, enabled } = message.data as { windowId: ChromeWindowId; enabled: boolean };
+              const activeWindow = await ActiveWindowEventHandlers.onChangeActivateCurrentWindow(windowId, enabled);
+              sendResponse({ data: { activeWindow } });
             } else {
               throw new Error("message type is invalid");
             }

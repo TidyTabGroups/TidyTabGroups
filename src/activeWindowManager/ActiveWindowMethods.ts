@@ -179,7 +179,7 @@ export async function activateWindow(windowId: ChromeWindowId) {
   windowsBeingActivated.push(windowId);
 
   try {
-    await activateWindowInternal(windowId);
+    return await activateWindowInternal(windowId);
   } catch (error) {
     throw new Error(`activateWindow::${error}`);
   } finally {

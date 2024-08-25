@@ -467,3 +467,23 @@ export async function onChangeFocusMode(windowId: ChromeWindowId, enabled: boole
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
 }
+
+export async function onChangeActivateCurrentWindow(windowId: ChromeWindowId, enabled: boolean) {
+  const myLogger = logger.createNestedLogger("onChangeActivateCurrentWindow");
+  try {
+    const activeWindow = await ActiveWindow.get(windowId);
+    if (enabled) {
+      if (activeWindow) {
+        throw new Error(`Current window with id ${windowId} is already active`);
+      }
+      return await ActiveWindowMethods.activateWindow(windowId);
+    } else {
+      if (!activeWindow) {
+        throw new Error(`Current window with id ${windowId} is not active`);
+      }
+      return await ActiveWindowMethods.deactivateWindow(windowId);
+    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
+}
