@@ -17,18 +17,18 @@ export async function initialize(onError: (message: string) => void) {
     try {
       await MouseInPageTracker.initialize();
       MouseInPageTracker.addOnChangeListener((status, tab: ChromeTabWithId) => {
-        queueOperationIfWindowIsActive(
-          async (activeWindow) => {
-            const tabUpToDate = await ChromeWindowHelper.getIfTabExists(tab.id);
-            if (!tabUpToDate) {
-              return;
-            }
+        queueOperation(
+          {
+            name: "MouseInPageTracker.addOnChangeListener",
+            operation: async () => {
+              if (status !== MouseInPageTracker.getStatus()) {
+                return;
+              }
 
-            await ActiveWindowEventHandlers.onMouseInPageStatusChanged(activeWindow, tabUpToDate, status);
+              await ActiveWindowEventHandlers.onMouseInPageStatusChanged(tab.id, status);
+            },
           },
-          tab.windowId,
-          false,
-          "onMouseEnterPage"
+          false
         );
       });
       resolve();

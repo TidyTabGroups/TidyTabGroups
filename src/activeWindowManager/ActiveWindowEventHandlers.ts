@@ -538,18 +538,20 @@ export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: Chro
   }
 }
 
-export async function onMouseInPageStatusChanged(activeWindow: Types.ActiveWindow, tab: ChromeTabWithId, status: Types.MouseInPageStatus) {
+export async function onMouseInPageStatusChanged(tabId: ChromeTabId, status: Types.MouseInPageStatus) {
   const myLogger = logger.createNestedLogger("onMouseInPageStatusChanged");
-  myLogger.log(`tabId: ${tab.id} status: ${status}`);
+  myLogger.log(`tabId: ${tabId} status: ${status}`);
 
   switch (status) {
     case "entered":
       await ActiveWindowMethods.useTabTitleForEligebleTabGroups();
       break;
     case "focused":
-      if (tab.active && !tab.pinned) {
-        await ActiveWindowMethods.repositionTab(tab.windowId, tab.id);
-      }
+      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
+        if (tab.active && !tab.pinned) {
+          await ActiveWindowMethods.repositionTab(tab.windowId, tab.id);
+        }
+      });
       break;
   }
 }
