@@ -16,25 +16,26 @@ export async function initialize(onError: (message: string) => void) {
     const myLogger = logger.createNestedLogger("initialize::asyncInitializationSteps");
     try {
       await MouseInPageTracker.initialize();
-      MouseInPageTracker.addOnChangeListener((status, tab: ChromeTabWithId) => {
-        queueOperation(
-          {
-            name: "MouseInPageTracker.addOnChangeListener",
-            operation: async () => {
-              if (status !== MouseInPageTracker.getStatus()) {
-                return;
-              }
-
-              await ActiveWindowEventHandlers.onMouseInPageStatusChanged(tab.id, status);
-            },
-          },
-          false
-        );
-      });
       resolve();
     } catch (error) {
       reject(myLogger.getPrefixedMessage(`error initializing: ${error}`));
     }
+  });
+
+  MouseInPageTracker.addOnChangeListener((status, tab: ChromeTabWithId) => {
+    queueOperation(
+      {
+        name: "MouseInPageTracker.addOnChangeListener",
+        operation: async () => {
+          if (status !== (await MouseInPageTracker.getStatus())) {
+            return;
+          }
+
+          await ActiveWindowEventHandlers.onMouseInPageStatusChanged(tab.id, status);
+        },
+      },
+      false
+    );
   });
 
   Storage.addChangeListener(async (changes) => {

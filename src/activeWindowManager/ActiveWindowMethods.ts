@@ -373,7 +373,7 @@ export async function useTabTitleForEligebleTabGroups() {
       chrome.windows.getAll({ windowTypes: ["normal"], populate: true }) as Promise<(ChromeWindowWithId & { tabs: ChromeTabWithId[] })[]>,
     ]);
     const activeWindowsSet = new Set(activeWindows.map((activeWindow) => activeWindow.windowId));
-    const mouseInPage = MouseInPageTracker.isInPage();
+    const mouseInPage = await MouseInPageTracker.isInPage();
 
     await Promise.all(
       windows.map(async (window) => {
