@@ -445,11 +445,7 @@ export async function initialize(onError: (message: string) => void) {
 
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   logger.log(`onInstalled::Extension was installed because of: ${details.reason}`);
-  if (details.reason === "install") {
-    await ActiveWindowMethods.activateAllWindows();
-  } else {
-    await ActiveWindowMethods.reactivateAllWindows();
-  }
+  await ActiveWindowMethods.reactivateAllWindows();
 
   // inject the content script into all tabs
   const tabs = (await chrome.tabs.query({})) as ChromeTabWithId[];
