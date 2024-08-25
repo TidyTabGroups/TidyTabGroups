@@ -150,16 +150,12 @@ const Popup = () => {
         throw new Error("onChangeFocusMode called with no active window");
       }
 
-      const response = await chrome.runtime.sendMessage({
+      const response = await messageActiveWindowManager<{ activeWindow: Types.ActiveWindow }>({
         type: "onChangeFocusMode",
         data: { windowId: activeWindow.windowId, enabled: e.target.checked },
       });
 
-      if (response.error) {
-        throw new Error(response.error);
-      } else {
-        setActiveWindow(response.activeWindow);
-      }
+      setActiveWindow(response.activeWindow);
     } catch (error) {
       setError(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
     }
@@ -177,22 +173,12 @@ const Popup = () => {
       }
 
       const { windowId } = activeWindow;
-      const response = await chrome.runtime.sendMessage({
+      const { activeWindowTabGroup } = await messageActiveWindowManager<{ activeWindowTabGroup: Types.ActiveWindowTabGroup }>({
         type: "onChangeKeepTabGroupOpen",
         data: { windowId, tabGroupId: currentActiveWindowTabGroupInfo.id, enabled: e.target.checked },
       });
 
-      if (response.error) {
-        throw new Error(response.error);
-      } else {
-        const { activeWindowTabGroup } = response;
-        setCurrentActiveWindowTabGroupInfo({
-          id: activeWindowTabGroup.id,
-          title: activeWindowTabGroup.title,
-          color: activeWindowTabGroup.color,
-          keepOpen: activeWindowTabGroup.keepOpen,
-        });
-      }
+      setCurrentActiveWindowTabGroupInfo(getCurrentActiveWindowTabGroupInfo(activeWindowTabGroup));
     } catch (error) {
       setError(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
     }
@@ -290,7 +276,8 @@ async function fetchCurrentTabGroupInfo(windowId: Types.ChromeWindowId): Promise
       return null;
     }
 
-    return await fetchActiveWindowTabGroup(activeTab.windowId, activeTab.groupId);
+    const activeWindowTabGroup = await fetchActiveWindowTabGroup(activeTab.windowId, activeTab.groupId);
+    return activeWindowTabGroup ? getCurrentActiveWindowTabGroupInfo(activeWindowTabGroup) : null;
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
@@ -299,12 +286,11 @@ async function fetchCurrentTabGroupInfo(windowId: Types.ChromeWindowId): Promise
 async function fetchActiveWindow(windowId: Types.ChromeWindowId) {
   const myLogger = logger.createNestedLogger("fetchActiveWindow");
   try {
-    const response = await chrome.runtime.sendMessage({ type: "getActiveWindow", data: { windowId } });
-    if (response.error) {
-      throw new Error(response.error);
-    } else {
-      return response.activeWindow ?? null;
-    }
+    const { activeWindow } = await messageActiveWindowManager<{ activeWindow: Types.ActiveWindow | undefined }>({
+      type: "getActiveWindow",
+      data: { windowId },
+    });
+    return activeWindow ?? null;
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
@@ -313,12 +299,12 @@ async function fetchActiveWindow(windowId: Types.ChromeWindowId) {
 async function fetchActiveWindowTabGroup(windowId: Types.ChromeWindowId, tabGroupId: Types.ChromeTabGroupWithId["id"]) {
   const myLogger = logger.createNestedLogger("fetchActiveWindowTabGroup");
   try {
-    const response = await chrome.runtime.sendMessage({ type: "getActiveWindowTabGroup", data: { windowId, tabGroupId } });
-    if (response.error) {
-      throw new Error(response.error);
-    } else {
-      return response.activeWindowTabGroup ?? null;
-    }
+    const { activeWindowTabGroup } = await messageActiveWindowManager<{ activeWindowTabGroup: Types.ActiveWindowTabGroup | undefined }>({
+      type: "getActiveWindowTabGroup",
+      data: { windowId, tabGroupId },
+    });
+
+    return activeWindowTabGroup ?? null;
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
@@ -349,4 +335,13 @@ async function messageActiveWindowManager<R>(message: any): Promise<R> {
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
+}
+
+function getCurrentActiveWindowTabGroupInfo(activeWindowTabGroup: Types.ActiveWindowTabGroup) {
+  return {
+    id: activeWindowTabGroup.id,
+    title: activeWindowTabGroup.title,
+    color: activeWindowTabGroup.color,
+    keepOpen: activeWindowTabGroup.keepOpen,
+  };
 }

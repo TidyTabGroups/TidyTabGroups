@@ -300,7 +300,7 @@ export async function initialize(onError: (message: string) => void) {
             if (message.type === messageTypes[0]) {
               const { windowId } = message.data as { windowId: ChromeWindowId };
               const activeWindow = await ActiveWindow.get(windowId);
-              sendResponse({ activeWindow });
+              sendResponse({ data: { activeWindow } });
             } else if (message.type === messageTypes[1]) {
               const { windowId, updateProps } = message.data as {
                 windowId: Types.ActiveWindow["windowId"];
@@ -315,15 +315,15 @@ export async function initialize(onError: (message: string) => void) {
                 enabled: boolean;
               };
               const activeWindowTabGroup = await ActiveWindowEventHandlers.onChangeKeepTabGroupOpen(windowId, tabGroupId, enabled);
-              sendResponse({ activeWindowTabGroup });
+              sendResponse({ data: { activeWindowTabGroup } });
             } else if (message.type === messageTypes[3]) {
               const { windowId, tabGroupId } = message.data as { windowId: ChromeWindowId; tabGroupId: ChromeTabGroupId };
               const activeWindowTabGroup = await ActiveWindow.getActiveWindowTabGroup(windowId, tabGroupId);
-              sendResponse({ activeWindowTabGroup });
+              sendResponse({ data: { activeWindowTabGroup } });
             } else if (message.type === messageTypes[4]) {
               const { windowId, enabled } = message.data as { windowId: ChromeWindowId; enabled: boolean };
               const activeWindow = await ActiveWindowEventHandlers.onChangeFocusMode(windowId, enabled);
-              sendResponse({ activeWindow });
+              sendResponse({ data: { activeWindow } });
             } else if (message.type === messageTypes[5]) {
               const { windowId, enabled } = message.data as { windowId: ChromeWindowId; enabled: boolean };
               const activeWindow = await ActiveWindowEventHandlers.onChangeActivateCurrentWindow(windowId, enabled);
