@@ -12,7 +12,7 @@ import Misc from "../misc";
 const logger = Logger.createLogger("ActiveWindowManager", { color: "#fcba03" });
 
 export async function initialize(onError: (message: string) => void) {
-  let asyncInitializationSteps = new Promise<void>(async (resolve, reject) => {
+  const asyncInitializationSteps = new Promise<void>(async (resolve, reject) => {
     const myLogger = logger.createNestedLogger("initialize::asyncInitializationSteps");
     try {
       await MouseInPageTracker.initialize();
