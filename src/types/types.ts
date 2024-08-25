@@ -61,7 +61,7 @@ export type ChromeTabGroupChangeInfo = {
 export interface LocalStorageShape {
   userPreferences: UserPreferences;
   lastSeenFocusModeColors: ActiveWindowFocusModeColors;
-  lastFocusedWindowHadFocusMode: boolean;
+  lastFocusedWindowHadFocusMode: boolean; // FIXME: This used to be used for enabling focus mode for newly created windows, but currently has no use.
   lastError: string | null;
 }
 
@@ -74,6 +74,7 @@ export interface UserPreferences {
   alwaysGroupTabs: boolean;
   collapseUnfocusedTabGroups: boolean;
   activateTabInFocusedTabGroup: boolean;
+  enableFocusModeForNewWindows: boolean;
   /* Other */
   reloadOnError: boolean;
   createDummyFixedPageOnStartup: {

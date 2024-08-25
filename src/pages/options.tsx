@@ -140,6 +140,16 @@ const UserPreferences = () => {
             ),
             enabled: userPreferences.activateTabInFocusedTabGroup,
           },
+          {
+            name: "Enable Focus Mode for newly created windows",
+            control: (
+              <Switch
+                checked={userPreferences.enableFocusModeForNewWindows}
+                onChange={(e) => updatePreferences({ enableFocusModeForNewWindows: e.target.checked })}
+              />
+            ),
+            enabled: userPreferences.enableFocusModeForNewWindows,
+          },
         ]}
         title="Functionality"
       />

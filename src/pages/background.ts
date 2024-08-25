@@ -69,6 +69,7 @@ async function initializeStorage() {
         alwaysGroupTabs: true,
         collapseUnfocusedTabGroups: true,
         activateTabInFocusedTabGroup: true,
+        enableFocusModeForNewWindows: true,
         /* Other */
         reloadOnError: process.env.NODE_ENV === "production",
         createDummyFixedPageOnStartup: {
