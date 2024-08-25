@@ -65,7 +65,7 @@ async function initializeStorage() {
       userPreferences: {
         /* Functionality */
         repositionTabs: false,
-        repositionTabGroups: false,
+        repositionTabGroups: true,
         alwaysGroupTabs: true,
         collapseUnfocusedTabGroups: true,
         activateTabInFocusedTabGroup: true,
