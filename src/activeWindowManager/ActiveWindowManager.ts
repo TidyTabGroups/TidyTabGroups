@@ -446,7 +446,6 @@ export async function initialize(onError: (message: string) => void) {
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   logger.log(`onInstalled::Extension was installed because of: ${details.reason}`);
   if (details.reason === "install") {
-    // TODO: open the onboarding page
     await ActiveWindowMethods.activateAllWindows();
   } else {
     await ActiveWindowMethods.reactivateAllWindows();
