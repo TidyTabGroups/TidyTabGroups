@@ -7,7 +7,6 @@ import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import { App } from "./app";
 import Types from "../types";
-import ChromeWindowHelper from "../chromeWindowHelper";
 import Logger from "../logger";
 import Misc from "../misc";
 
