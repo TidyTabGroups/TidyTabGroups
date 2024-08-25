@@ -457,6 +457,4 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   for (const tab of tabs) {
     chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["js/vendor.js", "js/content_script.js"] });
   }
-
-  // Misc.openDummyTab();
 }
