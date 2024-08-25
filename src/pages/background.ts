@@ -61,7 +61,7 @@ async function onError(message: string) {
 
 async function initializeStorage() {
   try {
-    const defaultValues = {
+    const defaultValues: LocalStorageShape = {
       userPreferences: {
         /* Functionality */
         repositionTabs: false,
