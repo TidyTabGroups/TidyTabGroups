@@ -446,6 +446,13 @@ export async function initialize(onError: (message: string) => void) {
 
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   logger.log(`onInstalled::Extension was installed because of: ${details.reason}`);
+
+  if (details.reason === "update" && details.previousVersion === "0.0.4") {
+    await Storage.updateItems("userPreferences", (prev) => {
+      return { userPreferences: { ...prev.userPreferences, repositionTabs: false, repositionTabGroups: false, alwaysGroupTabs: false } };
+    });
+  }
+
   await ActiveWindowMethods.reactivateAllWindows();
 
   // inject the content script into all tabs
