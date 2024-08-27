@@ -254,7 +254,7 @@ const Popup = () => {
           </Box>
         </Toolbar>
       </AppBar>
-      <Container sx={{ flexGrow: 1, overflow: "auto" }}>{content}</Container>
+      <Container sx={{ flexGrow: 1, overflow: "auto", padding: 0 }}>{content}</Container>
     </Container>
   );
 };
