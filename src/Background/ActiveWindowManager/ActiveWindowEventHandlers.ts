@@ -461,15 +461,19 @@ export async function onTabActivated(tabId: ChromeTabId) {
 export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo) {
   const myLogger = logger.createNestedLogger("onTabUpdated");
   try {
+    let didAutoGroup = false;
     const wasUngroupedOrUnpinned = changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false;
     if (wasUngroupedOrUnpinned && (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
       await runActiveWindowTabOperation(tabId, async ({ tab }) => {
         const isUngroupedAndUnpinned = tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false;
         if (isUngroupedAndUnpinned) {
+          didAutoGroup = true;
           await ActiveWindowMethods.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
         }
       });
-    } else if (changeInfo.groupId !== undefined) {
+    }
+
+    if (changeInfo.groupId !== undefined && !didAutoGroup) {
       await runActiveWindowTabOperation(tabId, async ({ tab }) => {
         const isStillTabGroupChanged = changeInfo.groupId === tab.groupId;
         if (isStillTabGroupChanged && tab.active) {
