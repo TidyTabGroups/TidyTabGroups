@@ -453,6 +453,10 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
     });
   }
 
+  if (details.reason === "install") {
+    await Misc.waitMs(500);
+  }
+
   await ActiveWindowMethods.reactivateAllWindows();
 
   // inject the content script into all tabs
