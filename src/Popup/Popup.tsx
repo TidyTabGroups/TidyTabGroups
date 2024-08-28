@@ -242,7 +242,7 @@ const Popup = () => {
       <AppBar position="static">
         <Toolbar sx={{ justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
-            <img src="/icon.png" alt="Logo" style={{ marginRight: "10px" }} />
+            <img src="/assets/logo_96x96.png" alt="Logo" style={{ marginRight: "10px", width: "24px", height: "24px" }} />
           </Box>
           <Box>
             <IconButton onClick={openOptionsPage} sx={{ color: "gray" }}>

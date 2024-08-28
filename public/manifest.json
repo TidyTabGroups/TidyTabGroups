@@ -1,13 +1,17 @@
 {
   "manifest_version": 3,
 
-  "name": "Tidy Tabs",
-  "description": "Tired of tab chaos? Automatically collapse, effortlessly group, and intelligently position tabs with Tidy Tab Groups.",
+  "name": "Tidy Tab Groups",
+  "description": "Tired of tab clutter? Keep tidy by effortlessly grouping, automatically collapsing, and intelligently positioning tabs.",
   "version": "1.0",
 
   "action": {
-    "default_icon": "icon.png",
     "default_popup": "popup.html"
+  },
+
+  "icons": {
+    "48": "assets/logo_48x48.png",
+    "96": "assets/logo_96x96.png"
   },
 
   "options_page": "options.html",

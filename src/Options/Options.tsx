@@ -178,7 +178,7 @@ root.render(
               textDecoration: "none",
             }}
           >
-            TIDY TABS SETTINGS
+            Tidy Tab Groups - Settings
           </Typography>
         </Toolbar>
       </Container>
