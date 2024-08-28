@@ -64,12 +64,12 @@ async function initializeStorage() {
     const defaultValues: LocalStorageShape = {
       userPreferences: {
         /* Functionality */
-        repositionTabs: false,
+        repositionTabs: true,
         repositionTabGroups: true,
         alwaysGroupTabs: true,
         collapseUnfocusedTabGroups: true,
         activateTabInFocusedTabGroup: true,
-        enableFocusModeForNewWindows: true,
+        enableFocusModeForNewWindows: false,
         /* Other */
         reloadOnError: process.env.NODE_ENV === "production",
         createDummyFixedPageOnStartup: {
