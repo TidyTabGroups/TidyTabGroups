@@ -130,7 +130,7 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
 
         if (Misc.isTabGroupTitleEmpty(newTabGroup.title)) {
           const tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(newTabGroupId, {
-            title: ChromeWindowMethods.getTabTitleForUseTabTitle(tabsInGroup) ?? `${tabsInGroup.length} tabs`,
+            title: ChromeWindowMethods.getTabTitleForUseTabTitle(tabsInGroup) ?? Misc.DEFAULT_TAB_GROUP_TITLE,
           });
 
           if (tabGroupUpToDate) {
