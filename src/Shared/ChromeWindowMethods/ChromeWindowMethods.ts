@@ -162,7 +162,7 @@ export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowI
   if (!windowIdAndTabs) {
     return [];
   }
-  return windowIdAndTabs.tabs.sort((tab1, tab2) => (tab1.lastAccessed || 0) - (tab2.lastAccessed || 0));
+  return windowIdAndTabs.tabs.sort((tab1, tab2) => (tab2.lastAccessed || 0) - (tab1.lastAccessed || 0));
 }
 
 export async function focusTabGroup(

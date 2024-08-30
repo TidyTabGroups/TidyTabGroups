@@ -395,10 +395,10 @@ export async function onTabCreated(tabId: ChromeTabId) {
       const tabsOrderedByLastAccessed = await ChromeWindowMethods.getTabsOrderedByLastAccessed(tabs);
       let lastActiveTab: ChromeTabWithId | undefined;
       // the last active tab could be this tab if it is activated, in that case, get the previous last active tab
-      if (tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 1]?.id === tab.id) {
-        lastActiveTab = tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 2] as ChromeTabWithId | undefined;
+      if (tabsOrderedByLastAccessed[0]?.id === tab.id) {
+        lastActiveTab = tabsOrderedByLastAccessed[1] as ChromeTabWithId | undefined;
       } else {
-        lastActiveTab = tabsOrderedByLastAccessed[tabsOrderedByLastAccessed.length - 1] as ChromeTabWithId | undefined;
+        lastActiveTab = tabsOrderedByLastAccessed[0] as ChromeTabWithId | undefined;
       }
 
       if (
