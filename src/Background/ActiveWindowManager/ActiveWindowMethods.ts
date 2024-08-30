@@ -12,6 +12,7 @@ import {
   ChromeTabWithId,
   ChromeTabGroupWithId,
   ChromeTabId,
+  FocusTabGroupOptions,
 } from "../../Shared/Types/Types";
 import Storage from "../../Shared/Storage";
 
@@ -316,11 +317,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
 
 async function runFocusTabGroupLikeOperation(
   windowId: ChromeWindowId,
-  operation: (focusTabGroupOptions: {
-    collapseUnfocusedTabGroups: boolean;
-    highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
-    collapseIgnoreSet?: Set<ChromeTabGroupId>;
-  }) => Promise<ChromeTabGroupWithId[] | undefined>
+  operation: (focusTabGroupOptions: FocusTabGroupOptions) => Promise<ChromeTabGroupWithId[] | undefined>
 ) {
   const activeWindow = await ActiveWindowModel.getOrThrow(windowId);
   const collapseIgnoreSet = new Set(activeWindow.tabGroups.filter((tabGroup) => tabGroup.keepOpen).map((tabGroup) => tabGroup.id));

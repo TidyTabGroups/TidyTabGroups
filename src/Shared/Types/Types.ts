@@ -96,3 +96,10 @@ export type YesOrNo = "yes" | "no";
 export type YesOrNoOrNA = "yes" | "no" | "n/a";
 
 export type MouseInPageStatus = "entered" | "focused" | "left";
+
+export type FocusTabGroupOptions = {
+  collapseUnfocusedTabGroups: boolean;
+  highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
+  collapseIgnoreSet?: Set<ChromeTabGroupId>;
+  blurIgnoreSet?: Set<ChromeTabGroupId>;
+};

@@ -6,6 +6,7 @@ import {
   ChromeTabGroupId,
   ChromeWindowWithId,
   FixedPageType,
+  FocusTabGroupOptions,
 } from "../Types/Types";
 import Misc from "../Misc";
 import ChromeTabOperationRetryHandler from "../ChromeTabOperationRetryHandler";
@@ -167,11 +168,7 @@ export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowI
 export async function focusTabGroup(
   tabGroupId: ChromeTabGroupId,
   windowIdOrTabGroups: ChromeTabGroupWithId[] | ChromeWindowId,
-  options: {
-    collapseUnfocusedTabGroups: boolean;
-    highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
-    collapseIgnoreSet?: Set<ChromeTabGroupId>;
-  }
+  options: FocusTabGroupOptions
 ) {
   const windowIdAndTabGroups = await getWindowIdAndTabGroups(windowIdOrTabGroups);
   if (!windowIdAndTabGroups) {
@@ -179,7 +176,7 @@ export async function focusTabGroup(
   }
   const { tabGroups } = windowIdAndTabGroups;
 
-  const { collapseUnfocusedTabGroups, highlightColors, collapseIgnoreSet } = options;
+  const { collapseUnfocusedTabGroups, highlightColors, collapseIgnoreSet, blurIgnoreSet } = options;
   const updatedTabGroups = (await Promise.all(
     tabGroups.map(async (tabGroup) => {
       const updateProps: chrome.tabGroups.UpdateProperties = {};
@@ -193,10 +190,12 @@ export async function focusTabGroup(
         }
       } else {
         const isInCollapseIgnoreSet = collapseIgnoreSet?.has(tabGroup.id);
+        const isInBlurIgnoreSet = blurIgnoreSet?.has(tabGroup.id);
+
         if (collapseUnfocusedTabGroups && !tabGroup.collapsed && !isInCollapseIgnoreSet) {
           updateProps.collapsed = true;
         }
-        if (highlightColors?.nonFocused && highlightColors.nonFocused !== tabGroup.color) {
+        if (highlightColors?.nonFocused && highlightColors.nonFocused !== tabGroup.color && !isInBlurIgnoreSet) {
           updateProps.color = highlightColors.nonFocused;
         }
       }
@@ -337,11 +336,7 @@ export async function focusActiveTabWithRetryHandler(
   tabId: ChromeTabId,
   tabGroupId: ChromeTabGroupId,
   windowIdOrTabGroups: ChromeTabGroupWithId[] | ChromeWindowId,
-  focusTabGroupOptions: {
-    collapseUnfocusedTabGroups: boolean;
-    highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
-    collapseIgnoreSet?: Set<ChromeTabGroupId>;
-  }
+  focusTabGroupOptions: FocusTabGroupOptions
 ) {
   const isTabGroupIdNone = tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
   const windowIdAndTabGroups = await getWindowIdAndTabGroups(windowIdOrTabGroups);
@@ -371,11 +366,7 @@ export async function focusActiveTabWithRetryHandler(
 export async function focusTabGroupWithRetryHandler(
   tabGroupId: ChromeTabGroupId,
   windowIdOrTabGroups: ChromeTabGroupWithId[] | ChromeWindowId,
-  options: {
-    collapseUnfocusedTabGroups: boolean;
-    highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum };
-    collapseIgnoreSet?: Set<ChromeTabGroupId>;
-  },
+  options: FocusTabGroupOptions,
   fallback: boolean = false
 ) {
   const isTabGroupIdNone = tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE;
