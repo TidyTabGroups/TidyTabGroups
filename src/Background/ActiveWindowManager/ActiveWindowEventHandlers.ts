@@ -587,7 +587,7 @@ export async function onEnabledAlwaysGroupTabs() {
 }
 
 export async function onChangeKeepTabGroupOpen(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId, enabled: boolean) {
-  const updatedProps: Partial<ActiveWindowTabGroup> = { keepOpen: enabled };
+  const updatedProps: { keepOpen: boolean; collapsed?: boolean } = { keepOpen: enabled };
   if (enabled) {
     const tabGroup = await chrome.tabGroups.get(tabGroupId);
     if (tabGroup.collapsed) {
