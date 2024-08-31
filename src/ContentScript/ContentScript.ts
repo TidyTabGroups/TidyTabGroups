@@ -42,8 +42,6 @@ if (isPDFViewer) {
 
 let listenToPageFocusEvents = true;
 let pageFocusTimeoutId: number | null = null;
-let initialMousePosition: { x: number; y: number } | null = null;
-const MINIMUM_MOUSE_MOVEMENT_PX = 2;
 let mouseInPageStatus: MouseInPageStatus = "left";
 let notifyMainFrameAboutMouseEnter = true;
 
@@ -68,6 +66,9 @@ if (isMainFrame) {
       }
 
       setMouseInPageStatus("entered");
+      if (listenToPageFocusEvents) {
+        startPageFocusTimeout();
+      }
     },
     true
   );
@@ -193,20 +194,8 @@ DetachableDOM.addEventListener(
   "mousemove",
   (event) => {
     onMouseEnterRelatedEvent();
-    // @ts-ignore
-    const { screenX, screenY } = event;
-
-    if (initialMousePosition === null) {
-      initialMousePosition = { x: screenX, y: screenY };
-    }
-
     if (listenToPageFocusEvents) {
-      const hasMovedMouseMinimum =
-        Math.abs(screenX - initialMousePosition.x) > MINIMUM_MOUSE_MOVEMENT_PX ||
-        Math.abs(screenY - initialMousePosition.y) > MINIMUM_MOUSE_MOVEMENT_PX;
-      if (hasMovedMouseMinimum) {
-        startPageFocusTimeout();
-      }
+      startPageFocusTimeout();
     }
   },
   true
@@ -249,7 +238,6 @@ function clearPageFocusTimeout() {
     return;
   }
 
-  initialMousePosition = null;
   listenToPageFocusEvents = true;
 
   if (isPDFViewer) {
