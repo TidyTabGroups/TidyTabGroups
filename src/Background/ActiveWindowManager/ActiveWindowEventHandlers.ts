@@ -633,3 +633,18 @@ export async function onChangeActivateCurrentWindow(windowId: ChromeWindowId, en
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
 }
+
+export async function onChangeHighlightPrevActiveTabGroup(enabled: boolean) {
+  const myLogger = logger.createNestedLogger("onChangeHighlightPrevActiveTabGroup");
+  try {
+    const activeWindows = await ActiveWindowModel.getAll();
+    await Promise.all(
+      activeWindows.map(async (activeWindow) => {
+        const [activeTab] = (await chrome.tabs.query({ active: true, windowId: activeWindow.windowId })) as (ChromeTabWithId | undefined)[];
+        return await ActiveWindowMethods.focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
+      })
+    );
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
+}

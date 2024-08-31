@@ -63,6 +63,16 @@ export async function initialize(onError: (message: string) => void) {
         false
       );
     }
+
+    if (userPreferences.oldValue.highlightPrevActiveTabGroup !== userPreferences.newValue.highlightPrevActiveTabGroup) {
+      queueOperation(
+        {
+          name: "onChangeHighlightPrevActiveTabGroup",
+          operation: () => ActiveWindowEventHandlers.onChangeHighlightPrevActiveTabGroup(userPreferences.newValue.highlightPrevActiveTabGroup),
+        },
+        false
+      );
+    }
   });
 
   chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {

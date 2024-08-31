@@ -174,12 +174,32 @@ export async function focusTabGroup(
   if (!windowIdAndTabGroups) {
     return [];
   }
-  const { tabGroups } = windowIdAndTabGroups;
+  const { windowId, tabGroups } = windowIdAndTabGroups;
+  const { collapseUnfocusedTabGroups, highlightColors, collapseIgnoreSet } = options;
 
-  const { collapseUnfocusedTabGroups, highlightColors, collapseIgnoreSet, blurIgnoreSet } = options;
+  let prevActiveTabGroupToHighlightInfo: { id: ChromeTabGroupId; color: chrome.tabGroups.ColorEnum } | undefined;
+  if (highlightColors?.highlightPrevActiveTabGroup && tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+    const tabsOrderedByLastAccessed = await getTabsOrderedByLastAccessed(windowId);
+    const prevActiveTabGroupId = tabsOrderedByLastAccessed.find((tab) => tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)?.groupId;
+    if (prevActiveTabGroupId !== undefined) {
+      prevActiveTabGroupToHighlightInfo = {
+        id: prevActiveTabGroupId,
+        color: highlightColors.focused,
+      };
+    }
+  }
+
   const updatedTabGroups = (await Promise.all(
     tabGroups.map(async (tabGroup) => {
       const updateProps: chrome.tabGroups.UpdateProperties = {};
+
+      if (
+        prevActiveTabGroupToHighlightInfo &&
+        tabGroup.id === prevActiveTabGroupToHighlightInfo.id &&
+        prevActiveTabGroupToHighlightInfo.color !== tabGroup.color
+      ) {
+        updateProps.color = prevActiveTabGroupToHighlightInfo.color;
+      }
 
       if (tabGroup.id === tabGroupId) {
         if (tabGroup.collapsed) {
@@ -190,12 +210,12 @@ export async function focusTabGroup(
         }
       } else {
         const isInCollapseIgnoreSet = collapseIgnoreSet?.has(tabGroup.id);
-        const isInBlurIgnoreSet = blurIgnoreSet?.has(tabGroup.id);
+        const isPrevActiveTabGroupToHighlight = tabGroup.id === prevActiveTabGroupToHighlightInfo?.id;
 
         if (collapseUnfocusedTabGroups && !tabGroup.collapsed && !isInCollapseIgnoreSet) {
           updateProps.collapsed = true;
         }
-        if (highlightColors?.nonFocused && highlightColors.nonFocused !== tabGroup.color && !isInBlurIgnoreSet) {
+        if (highlightColors?.nonFocused && highlightColors.nonFocused !== tabGroup.color && !isPrevActiveTabGroupToHighlight) {
           updateProps.color = highlightColors.nonFocused;
         }
       }

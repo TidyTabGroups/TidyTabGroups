@@ -143,12 +143,15 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
     }
 
     const [activeTab] = (await chrome.tabs.query({ windowId, active: true })) as (ChromeTabWithId | undefined)[];
+    const { userPreferences } = await Storage.getItems("userPreferences");
     await ChromeWindowMethods.focusTabGroupWithRetryHandler(
       activeTab ? activeTab.groupId : chrome.tabGroups.TAB_GROUP_ID_NONE,
       windowId,
       {
-        collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
-        highlightColors: newFocusModeColors ?? undefined,
+        collapseUnfocusedTabGroups: userPreferences.collapseUnfocusedTabGroups,
+        highlightColors: newFocusModeColors
+          ? { ...newFocusModeColors, highlightPrevActiveTabGroup: userPreferences.highlightPrevActiveTabGroup }
+          : undefined,
       },
       true
     );
@@ -273,7 +276,6 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
 
     // 2
     if (!tabGroupUpToDate.collapsed && !isFocusedTabGroup && (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups) {
-      Logger.attentionLogger.log(`collapsing tab group ${tabGroup.id}`);
       tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { collapsed: true });
       if (!tabGroupUpToDate) {
         return;
@@ -320,10 +322,15 @@ async function runFocusTabGroupLikeOperation(
   operation: (focusTabGroupOptions: FocusTabGroupOptions) => Promise<ChromeTabGroupWithId[] | undefined>
 ) {
   const activeWindow = await ActiveWindowModel.getOrThrow(windowId);
+
   const collapseIgnoreSet = new Set(activeWindow.tabGroups.filter((tabGroup) => tabGroup.keepOpen).map((tabGroup) => tabGroup.id));
+  const { userPreferences } = await Storage.getItems("userPreferences");
+
   const focusTabGroupOptions = {
-    collapseUnfocusedTabGroups: (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups,
-    highlightColors: activeWindow.focusMode?.colors,
+    collapseUnfocusedTabGroups: userPreferences.collapseUnfocusedTabGroups,
+    highlightColors: activeWindow.focusMode?.colors
+      ? { ...activeWindow.focusMode.colors, highlightPrevActiveTabGroup: userPreferences.highlightPrevActiveTabGroup }
+      : undefined,
     collapseIgnoreSet,
   };
 
@@ -340,9 +347,14 @@ async function runFocusTabGroupLikeOperation(
 }
 
 export async function focusActiveTab(windowId: ChromeWindowId, tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
-  return await runFocusTabGroupLikeOperation(windowId, (focusTabGroupOptions) =>
-    ChromeWindowMethods.focusActiveTabWithRetryHandler(tabId, tabGroupId, windowId, focusTabGroupOptions)
-  );
+  const myLogger = logger.createNestedLogger("focusActiveTab");
+  try {
+    return await runFocusTabGroupLikeOperation(windowId, (focusTabGroupOptions) =>
+      ChromeWindowMethods.focusActiveTabWithRetryHandler(tabId, tabGroupId, windowId, focusTabGroupOptions)
+    );
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
 }
 
 export async function focusTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {

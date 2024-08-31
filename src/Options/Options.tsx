@@ -148,6 +148,16 @@ const UserPreferences = () => {
             ),
             enabled: userPreferences.enableFocusModeForNewWindows,
           },
+          {
+            name: "Highlight previous active Tab Group",
+            control: (
+              <Switch
+                checked={userPreferences.highlightPrevActiveTabGroup}
+                onChange={(e) => updatePreferences({ highlightPrevActiveTabGroup: e.target.checked })}
+              />
+            ),
+            enabled: userPreferences.highlightPrevActiveTabGroup,
+          },
         ]}
         title="Functionality"
       />
