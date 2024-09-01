@@ -377,6 +377,7 @@ export async function autoGroupTabAndHighlightedTabs(windowId: ChromeWindowId, t
   }
 }
 
+// TODO: This should be broken down into smaller functions
 export async function useTabTitleForEligebleTabGroups() {
   const myLogger = logger.createNestedLogger("autoNameAllTabGroups");
   try {
