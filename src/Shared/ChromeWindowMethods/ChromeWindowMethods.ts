@@ -299,7 +299,11 @@ export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
     }
   });
 
-  return candidateTab?.title;
+  // Remove leading digit in parentheses and any space characters after it from the tab title (e.g. "(7) Notion" -> "Notion")
+  // TODO: add a user setting to toggle this behavior
+  const LEADING_DIGIT_IN_PARENTHESES_REGEX = /^\(\d+\)\s*/;
+  const cleanedTitle = candidateTab?.title ? candidateTab.title.replace(LEADING_DIGIT_IN_PARENTHESES_REGEX, "") : undefined;
+  return cleanedTitle;
 }
 
 export async function withUserInteractionErrorHandler<T>(
