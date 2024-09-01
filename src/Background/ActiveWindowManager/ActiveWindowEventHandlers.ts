@@ -291,28 +291,39 @@ export async function onTabGroupUpdated(
 
           await ActiveWindowModel.updateActiveWindowTabGroup(tabGroup.windowId, tabGroup.id, { color: tabGroupUpToDate.color });
         } else {
-          const activeTab = (await chrome.tabs.query({ windowId: tabGroup.windowId, active: true }))[0] as ChromeTabWithId | undefined;
-          if (activeTab) {
-            const focusedTabGroupId = activeTab.groupId;
-            const isFocusedTabGroup = tabGroup.id === focusedTabGroupId;
-            let newFocusModeColors;
+          const [lastAccessedTabGroupId, activeTab, userPreferences] = await Promise.all([
+            ChromeWindowMethods.getLastAccessedTabGroupId(tabGroup.windowId),
+            (await chrome.tabs.query({ windowId: tabGroup.windowId, active: true }))[0] as ChromeTabWithId | undefined,
+            getUserPreferences(),
+          ]);
 
-            if (isFocusedTabGroup) {
-              // 2
-              newFocusModeColors = { ...activeWindow.focusMode.colors, focused: tabGroup.color };
-              await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
-            } else {
-              // 3
-              newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: tabGroup.color };
-              await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
-              // this will effectively update the color of all other non-focused tab groups
-              await ActiveWindowMethods.focusTabGroup(activeWindow.windowId, focusedTabGroupId);
-            }
+          let focusedTabGroupId: ChromeTabGroupId;
+          if (userPreferences.highlightPrevActiveTabGroup && lastAccessedTabGroupId !== undefined) {
+            focusedTabGroupId = lastAccessedTabGroupId;
+          } else if (activeTab) {
+            focusedTabGroupId = activeTab.groupId;
+          } else {
+            focusedTabGroupId = chrome.tabGroups.TAB_GROUP_ID_NONE;
+          }
 
-            const window = await ChromeWindowMethods.getIfWindowExists(tabGroup.windowId);
-            if (window?.focused) {
-              await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors });
-            }
+          const isFocusedTabGroup = tabGroup.id === focusedTabGroupId;
+          let newFocusModeColors;
+
+          if (isFocusedTabGroup) {
+            // 2
+            newFocusModeColors = { ...activeWindow.focusMode.colors, focused: tabGroup.color };
+            await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
+          } else {
+            // 3
+            newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: tabGroup.color };
+            await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
+            // this will effectively update the color of all other non-focused tab groups
+            await ActiveWindowMethods.focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
+          }
+
+          const window = await ChromeWindowMethods.getIfWindowExists(tabGroup.windowId);
+          if (window?.focused) {
+            await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors });
           }
         }
       });

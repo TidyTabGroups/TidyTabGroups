@@ -179,8 +179,7 @@ export async function focusTabGroup(
 
   let prevActiveTabGroupToHighlightInfo: { id: ChromeTabGroupId; color: chrome.tabGroups.ColorEnum } | undefined;
   if (highlightColors?.highlightPrevActiveTabGroup && tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-    const tabsOrderedByLastAccessed = await getTabsOrderedByLastAccessed(windowId);
-    const prevActiveTabGroupId = tabsOrderedByLastAccessed.find((tab) => tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)?.groupId;
+    const prevActiveTabGroupId = await getLastAccessedTabGroupId(windowId);
     if (prevActiveTabGroupId !== undefined) {
       prevActiveTabGroupToHighlightInfo = {
         id: prevActiveTabGroupId,
@@ -519,4 +518,9 @@ export async function createFixedPage<T extends FixedPageType>(
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
+}
+
+export async function getLastAccessedTabGroupId(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+  const tabsOrderedByLastAccessed = await getTabsOrderedByLastAccessed(windowIdOrTabs);
+  return tabsOrderedByLastAccessed.find((tab) => tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)?.groupId;
 }
