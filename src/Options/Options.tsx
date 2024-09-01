@@ -158,6 +158,13 @@ const UserPreferences = () => {
             ),
             enabled: userPreferences.highlightPrevActiveTabGroup,
           },
+          {
+            name: "Set titles for new tab groups",
+            control: (
+              <Switch checked={userPreferences.setTabGroupTitle} onChange={(e) => updatePreferences({ setTabGroupTitle: e.target.checked })} />
+            ),
+            enabled: userPreferences.setTabGroupTitle,
+          },
         ]}
         title="Functionality"
       />

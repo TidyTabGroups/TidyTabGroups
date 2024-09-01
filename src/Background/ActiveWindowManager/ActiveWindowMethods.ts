@@ -120,8 +120,12 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
       await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors, lastFocusedWindowHadFocusMode: true });
     }
 
+    const getUserPreferences = Misc.lazyCall(async () => {
+      return (await Storage.getItems("userPreferences")).userPreferences;
+    });
+
     let useTabTitleForGroupId: ChromeTabGroupId | null = null;
-    if ((await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
+    if ((await getUserPreferences()).alwaysGroupTabs) {
       const newTabGroupId = await ChromeWindowMethods.groupUnpinnedAndUngroupedTabsWithRetryHandler(windowId);
       if (newTabGroupId) {
         const [newTabGroup, tabsInGroup] = await Promise.all([
@@ -129,13 +133,12 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
           chrome.tabs.query({ groupId: newTabGroupId }) as Promise<ChromeTabWithId[]>,
         ]);
 
-        if (Misc.isTabGroupTitleEmpty(newTabGroup.title)) {
+        if (Misc.isTabGroupTitleEmpty(newTabGroup.title) && (await getUserPreferences()).setTabGroupTitle) {
           const tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(newTabGroupId, {
             title: ChromeWindowMethods.getTabTitleForUseTabTitle(tabsInGroup) ?? Misc.DEFAULT_TAB_GROUP_TITLE,
           });
 
           if (tabGroupUpToDate) {
-            // TODO: check for `use tab title for blank tab groups` user preference
             useTabTitleForGroupId = newTabGroupId;
           }
         }
@@ -258,6 +261,10 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     const activeTab = (await chrome.tabs.query({ windowId, active: true }))[0] as ChromeTabWithId | undefined;
     const isFocusedTabGroup = activeTab?.groupId === tabGroup.id;
 
+    const getUserPreferences = Misc.lazyCall(async () => {
+      return (await Storage.getItems("userPreferences")).userPreferences;
+    });
+
     // 1
     const { focusMode } = activeWindow;
     if (focusMode) {
@@ -275,7 +282,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     }
 
     // 2
-    if (!tabGroupUpToDate.collapsed && !isFocusedTabGroup && (await Storage.getItems("userPreferences")).userPreferences.collapseUnfocusedTabGroups) {
+    if (!tabGroupUpToDate.collapsed && !isFocusedTabGroup && (await getUserPreferences()).collapseUnfocusedTabGroups) {
       tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { collapsed: true });
       if (!tabGroupUpToDate) {
         return;
@@ -284,8 +291,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     }
 
     // 3
-    // TODO: check for `use tab title for blank tab groups` user preference
-    const useTabTitle = Misc.isTabGroupTitleEmpty(tabGroupUpToDate.title);
+    const useTabTitle = Misc.isTabGroupTitleEmpty(tabGroupUpToDate.title) && (await getUserPreferences()).setTabGroupTitle;
     if (useTabTitle) {
       // FIXME: remove the timeout workaround once the chromium bug is resolved: https://issues.chromium.org/issues/334965868#comment4
       await Misc.waitMs(30);
@@ -381,6 +387,11 @@ export async function autoGroupTabAndHighlightedTabs(windowId: ChromeWindowId, t
 export async function useTabTitleForEligebleTabGroups() {
   const myLogger = logger.createNestedLogger("autoNameAllTabGroups");
   try {
+    const { userPreferences } = await Storage.getItems("userPreferences");
+    if (!userPreferences.setTabGroupTitle) {
+      return;
+    }
+
     const [activeWindows, windows] = await Promise.all([
       ActiveWindowModel.getAll(),
       chrome.windows.getAll({ windowTypes: ["normal"], populate: true }) as Promise<(ChromeWindowWithId & { tabs: ChromeTabWithId[] })[]>,

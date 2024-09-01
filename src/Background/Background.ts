@@ -71,6 +71,7 @@ async function initializeStorage() {
         activateTabInFocusedTabGroup: true,
         enableFocusModeForNewWindows: false,
         highlightPrevActiveTabGroup: true,
+        setTabGroupTitle: true,
         /* Other */
         reloadOnError: process.env.NODE_ENV === "production",
         createDummyFixedPageOnStartup: {

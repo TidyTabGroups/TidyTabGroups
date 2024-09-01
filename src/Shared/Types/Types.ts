@@ -76,6 +76,7 @@ export interface UserPreferences {
   activateTabInFocusedTabGroup: boolean;
   enableFocusModeForNewWindows: boolean;
   highlightPrevActiveTabGroup: boolean;
+  setTabGroupTitle: boolean;
   /* Other */
   reloadOnError: boolean;
   createDummyFixedPageOnStartup: {
