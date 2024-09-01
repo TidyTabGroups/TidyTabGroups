@@ -15,7 +15,7 @@ import Logger from "../Shared/Logger";
 
 // FIXME: There might be cases where the main frame is not accessible, but the subframes are. In this case, the mouse tracker logic will not work.
 
-const logger = Logger.createLogger("content_script");
+const logger = process.env.NODE_ENV === "production" ? undefined : Logger.createLogger("content_script");
 const isMainFrame = window === window.top;
 
 // Ping-pong message to check if the content script is running
@@ -113,11 +113,11 @@ DetachableDOM.addEventListener(window, "message", (event) => {
     return;
   }
 
-  const myLogger = logger.createNestedLogger("message");
+  const myLogger = logger?.createNestedLogger("message");
   if (type === "startPageFocusTimeout") {
     // this message is sent only to the main frame by a nested frame when it wants to start the page focus timeout
     if (!isMainFrame) {
-      myLogger.warn("the startPageFocusTimeout message should only be sent to the main frame");
+      myLogger?.warn("the startPageFocusTimeout message should only be sent to the main frame");
       return;
     }
 
@@ -127,7 +127,7 @@ DetachableDOM.addEventListener(window, "message", (event) => {
   } else if (type === "clearPageFocusTimeout") {
     // this message is sent by the main frame to all nested frames when it wants to clear the page focus timeout
     if (isMainFrame) {
-      myLogger.warn("the clearPageFocusTimeout message should not be sent to the main frame");
+      myLogger?.warn("the clearPageFocusTimeout message should not be sent to the main frame");
       return;
     }
 
@@ -136,7 +136,7 @@ DetachableDOM.addEventListener(window, "message", (event) => {
     }
   } else if (type === "mouseEnteredRelatedEvent") {
     if (!isMainFrame) {
-      myLogger.warn("the mouseEnteredRelatedEvent message should only be sent to the main frame");
+      myLogger?.warn("the mouseEnteredRelatedEvent message should only be sent to the main frame");
       return;
     }
 
@@ -145,7 +145,7 @@ DetachableDOM.addEventListener(window, "message", (event) => {
     }
   } else if (type === "enableNotifyMainFrameAboutMouseEnter") {
     if (isMainFrame) {
-      myLogger.warn("enableNotifyMainFrameAboutMouseEnter should only be sent to subframes");
+      myLogger?.warn("enableNotifyMainFrameAboutMouseEnter should only be sent to subframes");
       return;
     }
 
@@ -202,9 +202,9 @@ DetachableDOM.addEventListener(
 );
 
 function startPageFocusTimeout() {
-  const myLogger = logger.createNestedLogger("startPageFocusTimeout");
+  const myLogger = logger?.createNestedLogger("startPageFocusTimeout");
   if (!listenToPageFocusEvents) {
-    myLogger.warn("should not be called when listenToPageFocusEvents is false - isMainFrame: ", isMainFrame);
+    myLogger?.warn("should not be called when listenToPageFocusEvents is false - isMainFrame: ", isMainFrame);
     return;
   }
 
@@ -221,7 +221,7 @@ function startPageFocusTimeout() {
   }
 
   if (pageFocusTimeoutId !== null) {
-    myLogger.warn("pageFocusTimeoutId should be null");
+    myLogger?.warn("pageFocusTimeoutId should be null");
     return;
   }
 
@@ -232,9 +232,9 @@ function startPageFocusTimeout() {
 }
 
 function clearPageFocusTimeout() {
-  const myLogger = logger.createNestedLogger("clearPageFocusTimeout");
+  const myLogger = logger?.createNestedLogger("clearPageFocusTimeout");
   if (listenToPageFocusEvents) {
-    myLogger.warn("should not be called when listenToPageFocusEvents is true - isMainFrame: ", isMainFrame);
+    myLogger?.warn("should not be called when listenToPageFocusEvents is true - isMainFrame: ", isMainFrame);
     return;
   }
 
@@ -260,14 +260,14 @@ function clearPageFocusTimeout() {
 }
 
 function setMouseInPageStatus(status: MouseInPageStatus) {
-  const myLogger = logger.createNestedLogger("setMouseInPageStatus");
+  const myLogger = logger?.createNestedLogger("setMouseInPageStatus");
   if (!isMainFrame) {
-    myLogger.warn("should only be called in the main frame");
+    myLogger?.warn("should only be called in the main frame");
     return;
   }
 
   if (mouseInPageStatus === status) {
-    myLogger.warn("cannot set the same mouseInPageStatus: ", status);
+    myLogger?.warn("cannot set the same mouseInPageStatus: ", status);
     return;
   }
 
