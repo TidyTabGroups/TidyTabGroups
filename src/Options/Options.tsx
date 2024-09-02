@@ -139,6 +139,18 @@ const UserPreferences = () => {
             enabled: userPreferences.activateTabInFocusedTabGroup,
           },
           {
+            name: "Set titles for new tab groups",
+            control: (
+              <Switch checked={userPreferences.setTabGroupTitle} onChange={(e) => updatePreferences({ setTabGroupTitle: e.target.checked })} />
+            ),
+            enabled: userPreferences.setTabGroupTitle,
+          },
+        ]}
+        title="General Functionality"
+      />
+      <UserPreferenceCard
+        userPreferences={[
+          {
             name: "Enable Focus Mode for newly created windows",
             control: (
               <Switch
@@ -158,15 +170,8 @@ const UserPreferences = () => {
             ),
             enabled: userPreferences.highlightPrevActiveTabGroup,
           },
-          {
-            name: "Set titles for new tab groups",
-            control: (
-              <Switch checked={userPreferences.setTabGroupTitle} onChange={(e) => updatePreferences({ setTabGroupTitle: e.target.checked })} />
-            ),
-            enabled: userPreferences.setTabGroupTitle,
-          },
         ]}
-        title="Functionality"
+        title="Focus Mode"
       />
       <UserPreferenceCard userPreferences={otherUserPreferences} title="Other" />
     </Container>
