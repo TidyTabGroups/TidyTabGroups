@@ -254,6 +254,11 @@ export async function onTabGroupUpdated(
         tabGroup.id,
         async ({ tabGroup }) => {
           await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { color: changeInfo.color });
+
+          if (!activeWindow.focusMode) {
+            return;
+          }
+
           if (wasTitleUpdated) {
             // FIXME: this is a workaround for a chromium bug where updating the title of a newly created tab group
             // causes the color to be reset back to its original color. We need to reset back to it's previous color.
