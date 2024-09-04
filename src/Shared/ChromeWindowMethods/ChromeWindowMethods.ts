@@ -157,6 +157,62 @@ export function getLastAccessedTab(tabs: ChromeTabWithId[]) {
   return lastAccessedTab;
 }
 
+function getLastAccessedOrGreatestIndexTabHelper(tabs: ChromeTabWithId[]) {
+  let curr: ChromeTabWithId | undefined = tabs.find((tab) => tab.active);
+  if (curr) {
+    return curr;
+  }
+
+  tabs.forEach((tab) => {
+    if (curr === undefined) {
+      curr = tab;
+      return;
+    }
+
+    if (tab.lastAccessed !== undefined) {
+      if (curr.lastAccessed === undefined || tab.lastAccessed > curr.lastAccessed) {
+        curr = tab;
+      }
+    } else if (curr.lastAccessed === undefined && tab.index > curr.index) {
+      curr = tab;
+    }
+  });
+
+  return curr;
+}
+
+export async function getLastAccessedOrGreatestIndexTabByGroupId(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+  const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
+  if (!windowIdAndTabs) {
+    return {};
+  }
+
+  const { tabs } = windowIdAndTabs;
+  const lastActiveTabByTagGroupId: { [tagGroupId: number]: ChromeTabWithId } = {};
+  tabs.forEach((tab) => {
+    const curr = lastActiveTabByTagGroupId[tab.groupId];
+    if (!curr) {
+      lastActiveTabByTagGroupId[tab.groupId] = tab;
+      return;
+    }
+
+    const bestTab = getLastAccessedOrGreatestIndexTabHelper([curr, tab]) as ChromeTabWithId;
+    lastActiveTabByTagGroupId[tab.groupId] = bestTab;
+  });
+
+  return lastActiveTabByTagGroupId;
+}
+
+export async function getLastAccessedOrGreatestIndexTab(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+  const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
+  if (!windowIdAndTabs) {
+    return;
+  }
+
+  const { tabs } = windowIdAndTabs;
+  return getLastAccessedOrGreatestIndexTabHelper(tabs);
+}
+
 export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
   const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
   if (!windowIdAndTabs) {

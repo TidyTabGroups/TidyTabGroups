@@ -196,7 +196,7 @@ export async function clear() {
 
 export function chromeTabGroupToActiveWindowTabGroup(
   tabGroup: chrome.tabGroups.TabGroup,
-  otherProperties?: { useTabTitle: Types.ActiveWindowTabGroup["useTabTitle"] }
+  otherProperties?: { useTabTitle: Types.ActiveWindowTabGroup["useTabTitle"]; lastActiveTabId: Types.ActiveWindowTabGroup["lastActiveTabId"] }
 ) {
   const activeWindowTabGroup = {
     id: tabGroup.id,
@@ -225,6 +225,9 @@ export async function getActiveWindowTabGroupOrThrow(windowId: ChromeWindowId, t
   }
 
   return activeWindowTabGroup;
+}
+export async function getAllActiveWindowTabGroups() {
+  return (await getAll()).flatMap((activeWindow) => activeWindow.tabGroups);
 }
 
 export async function updateActiveWindowTabGroup(

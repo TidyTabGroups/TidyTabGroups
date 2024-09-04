@@ -249,10 +249,6 @@ export async function onTabGroupUpdated(
 
     myLogger.log(`id: ${tabGroup.id}, title: ${tabGroup.title}`);
 
-    const getUserPreferences = Misc.lazyCall(async () => {
-      return (await Storage.getItems("userPreferences")).userPreferences;
-    });
-
     if (wasColorUpdated) {
       await runActiveWindowTabGroupOperation(
         tabGroup.id,
@@ -277,44 +273,14 @@ export async function onTabGroupUpdated(
     }
 
     if (wasExpanded) {
-      await runActiveWindowTabGroupOperation(tabGroup.id, async ({ tabGroup }) => {
-        const isStillExpanded = !tabGroup.collapsed;
-        if (!isStillExpanded) {
-          return;
-        }
-
-        // 4: Set ActiveWindowTabGroup.collapsed to false
-        await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: false });
-
-        const [activeTabInGroup] = await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id, active: true });
-        if (!activeTabInGroup && (await getUserPreferences()).activateTabInFocusedTabGroup) {
-          // 5
-          const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
-          if (tabsInGroup.length === 0) {
-            return;
-          }
-
-          const lastAccessedTabInTabGroup = ChromeWindowMethods.getLastAccessedTab(tabsInGroup);
-          const tabToActivate = lastAccessedTabInTabGroup ? lastAccessedTabInTabGroup : tabsInGroup[tabsInGroup.length - 1];
-
-          // start loading the tab now (before waiting for the animations to finish)
-          if (tabToActivate.status === "unloaded") {
-            chrome.tabs.update(tabToActivate.id, { url: tabToActivate.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
-          }
-          // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
-          const timeToWaitBeforeActivation = Misc.serviceWorkerJustWokeUp() ? 100 : 250;
-          await Misc.waitMs(timeToWaitBeforeActivation);
-
-          const tabGroupUpToDate = await ChromeWindowMethods.getIfTabGroupExists(tabGroup.id);
-          if (!tabGroupUpToDate) {
-            return;
-          }
-
-          if (!tabGroupUpToDate.collapsed) {
-            await ChromeWindowMethods.activateTabWithRetryHandler(tabToActivate.id);
-          }
-        }
-      });
+      await runActiveWindowTabGroupOperation(
+        tabGroup.id,
+        async () => {
+          await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: false });
+          await ActiveWindowMethods.activateLastActiveTabInGroup(activeWindow.windowId, tabGroup.id);
+        },
+        { collapsed: false }
+      );
     }
 
     if (wasCollapsed) {
@@ -410,6 +376,16 @@ export async function onTabActivated(tabId: ChromeTabId) {
       },
       { active: true }
     );
+
+    await runActiveWindowTabOperation(
+      tabId,
+      async ({ tab }) => {
+        if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+          await ActiveWindowModel.updateActiveWindowTabGroup(tab.windowId, tab.groupId, { lastActiveTabId: tab.id });
+        }
+      },
+      { active: true }
+    );
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -439,6 +415,10 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
         },
         { groupId: changeInfo.groupId, active: true }
       );
+    }
+
+    if (changeInfo.groupId !== undefined) {
+      await ActiveWindowMethods.updateLastActiveTabIdForTabGroupWithTabId(tabId);
     }
 
     if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {

@@ -37,6 +37,7 @@ export interface ActiveWindowTabGroup {
   windowId: ChromeWindowId;
   useTabTitle: boolean;
   keepOpen: boolean;
+  lastActiveTabId: ChromeTabId | null;
 }
 
 export type ChromeId = number;
