@@ -83,7 +83,7 @@ async function initializeStorage() {
           type: "pinnedTab",
         },
       },
-      lastSeenFocusModeColors: { focused: "cyan", nonFocused: "grey" },
+      lastSeenFocusModeColors: { focused: process.env.NODE_ENV === "development" ? "yellow" : "cyan", nonFocused: "grey" },
       lastFocusedWindowHadFocusMode: false,
       lastError: null,
     };
