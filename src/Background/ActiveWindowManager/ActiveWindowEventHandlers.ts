@@ -402,14 +402,14 @@ export async function onTabCreated(tabId: ChromeTabId) {
 export async function onTabActivated(tabId: ChromeTabId) {
   const myLogger = logger.createNestedLogger("onTabActivated");
   try {
-    await runActiveWindowTabOperation(tabId, async ({ tab }) => {
-      myLogger.log(`title: '${tab.title}', groupId: ${tab.groupId}`);
-      if (!tab.active) {
-        return;
-      }
-
-      await ActiveWindowMethods.focusActiveTab(tab.windowId, tab.id, tab.groupId);
-    });
+    await runActiveWindowTabOperation(
+      tabId,
+      async ({ tab }) => {
+        myLogger.log(`title: '${tab.title}', groupId: ${tab.groupId}`);
+        await ActiveWindowMethods.focusActiveTab(tab.windowId, tab.id, tab.groupId);
+      },
+      { active: true }
+    );
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -421,29 +421,30 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     let didAutoGroup = false;
     const wasUngroupedOrUnpinned = changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false;
     if (wasUngroupedOrUnpinned && (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
-      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
-        const isUngroupedAndUnpinned = tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false;
-        if (isUngroupedAndUnpinned) {
+      await runActiveWindowTabOperation(
+        tabId,
+        async ({ tab }) => {
           didAutoGroup = true;
           await ActiveWindowMethods.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
-        }
-      });
+        },
+        { groupId: chrome.tabGroups.TAB_GROUP_ID_NONE, pinned: false }
+      );
     }
 
-    if (changeInfo.groupId !== undefined && !didAutoGroup) {
-      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
-        const isStillTabGroupChanged = changeInfo.groupId === tab.groupId;
-        if (isStillTabGroupChanged && tab.active) {
+    if (changeInfo.groupId !== undefined && !didAutoGroup /* If the tab was auto-grouped, then it was already focused */) {
+      await runActiveWindowTabOperation(
+        tabId,
+        async ({ tab }) => {
           await ActiveWindowMethods.focusActiveTab(tab.windowId, tab.id, tab.groupId);
-        }
-      });
+        },
+        { groupId: changeInfo.groupId, active: true }
+      );
     }
 
     if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {
-      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
-        if (changeInfo.groupId === tab.groupId || changeInfo.title === tab.title) {
-          await ActiveWindowMethods.useTabTitleForEligebleTabGroups();
-        }
+      await runActiveWindowTabOperation(tabId, () => ActiveWindowMethods.useTabTitleForEligebleTabGroups(), {
+        groupId: changeInfo.groupId,
+        title: changeInfo.title,
       });
     }
   } catch (error) {
