@@ -32,31 +32,15 @@ async function runActiveWindowOperation(
 
 async function runActiveWindowTabGroupOperation<T extends Partial<ChromeTabGroupWithId>>(
   tabGroupId: ChromeTabGroupId,
-  operation: (context: {
-    activeWindow: Types.ActiveWindow;
-    tabGroup: ChromeTabGroupWithId;
-    matchingTabGroupProperties: { [key in keyof T]: boolean };
-  }) => Promise<void>,
-  tabGroupPropertiesToMatch?: T | undefined
+  operation: (context: { activeWindow: Types.ActiveWindow; tabGroup: ChromeTabGroupWithId }) => Promise<void>,
+  requiredPropertiesToMatch?: Partial<Record<keyof ChromeTabGroupWithId, any>>
 ) {
-  const { isValid, activeWindow, tabGroupUpToDate } = await validateTabGroupUpToDateAndActiveWindow(tabGroupId);
+  const { isValid, activeWindow, tabGroupUpToDate } = await validateTabGroupUpToDateAndActiveWindow(tabGroupId, requiredPropertiesToMatch);
   if (!isValid) {
     return;
   }
 
-  const matchingTabGroupProperties = {} as { [key in keyof T]: boolean };
-  if (tabGroupPropertiesToMatch) {
-    (Object.keys(tabGroupPropertiesToMatch) as (keyof T)[]).forEach((key) => {
-      const propertyToMatch = tabGroupPropertiesToMatch[key];
-      if (key in tabGroupUpToDate && tabGroupUpToDate[key as keyof ChromeTabGroupWithId] === propertyToMatch) {
-        matchingTabGroupProperties[key] = true;
-      } else {
-        matchingTabGroupProperties[key] = false;
-      }
-    });
-  }
-
-  await operation({ activeWindow, tabGroup: tabGroupUpToDate, matchingTabGroupProperties });
+  await operation({ activeWindow, tabGroup: tabGroupUpToDate });
 }
 
 async function runActiveWindowTabOperation(
@@ -108,7 +92,10 @@ async function validateTabUpToDateAndActiveWindow(
   return { isValid: true, activeWindow, tabUpToDate };
 }
 
-async function validateTabGroupUpToDateAndActiveWindow(groupId: ChromeTabGroupId): Promise<
+async function validateTabGroupUpToDateAndActiveWindow(
+  groupId: ChromeTabGroupId,
+  requiredPropertiesToMatch?: Partial<Record<keyof ChromeTabGroupWithId, any>>
+): Promise<
   | {
       isValid: true;
       activeWindow: Types.ActiveWindow;
@@ -123,6 +110,14 @@ async function validateTabGroupUpToDateAndActiveWindow(groupId: ChromeTabGroupId
   const tabGroupUpToDate = await ChromeWindowMethods.getIfTabGroupExists(groupId);
   if (!tabGroupUpToDate) {
     return { isValid: false, activeWindow: undefined, tabGroupUpToDate: undefined };
+  }
+
+  if (requiredPropertiesToMatch) {
+    for (const [key, value] of Object.entries(requiredPropertiesToMatch)) {
+      if (tabGroupUpToDate[key as keyof ChromeTabGroupWithId] !== value) {
+        return { isValid: false, activeWindow: undefined, tabGroupUpToDate: undefined };
+      }
+    }
   }
 
   const activeWindow = await ActiveWindowModel.get(tabGroupUpToDate.windowId);
@@ -246,13 +241,6 @@ export async function onTabGroupUpdated(
   changeInfo: ChromeTabGroupChangeInfo
 ) {
   const myLogger = logger.createNestedLogger("onTabGroupUpdated");
-  // 1. handle the case where the tab group's focus mode color is overridden
-  //      due to a chromium bug when creating new tab groups
-  // 2. if the tab group is focused, update the active window's focus mode focused color
-  // 3. if the tab group is NOT focused, update the active window's focus mode nonFocused color
-  // 4. if the tab group was expanded, set ActiveWindowTabGroup.collapsed to false
-  // 5. if the tab group was expanded, activate the last active tab in the group
-  // 6. if the tab group's title is updated, then set it's useSetTabTitle to false
   try {
     const wasColorUpdated = changeInfo.color !== undefined;
     const wasExpanded = changeInfo.collapsed === false;
@@ -266,67 +254,26 @@ export async function onTabGroupUpdated(
     });
 
     if (wasColorUpdated) {
-      await runActiveWindowTabGroupOperation(tabGroup.id, async ({ tabGroup }) => {
-        const isStillColorUpdated = tabGroup.color === changeInfo.color;
-        if (!isStillColorUpdated) {
-          return;
-        }
+      await runActiveWindowTabGroupOperation(
+        tabGroup.id,
+        async ({ tabGroup }) => {
+          await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { color: changeInfo.color });
+          if (wasTitleUpdated) {
+            // FIXME: this is a workaround for a chromium bug where updating the title of a newly created tab group
+            // causes the color to be reset back to its original color. We need to reset back to it's previous color.
+            // Remove once the Chromium bug is fixed: https://issues.chromium.org/issues/334965868
+            const tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { color: activeWindowTabGroup.color });
+            if (!tabGroupUpToDate) {
+              return;
+            }
 
-        await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { color: changeInfo.color });
-
-        if (activeWindow.focusMode === null) {
-          return;
-        }
-
-        const isTitleStillUpdated = tabGroup.title === changeInfo.title;
-        if (isTitleStillUpdated) {
-          // 1
-          // FIXME: this is a workaround for a chromium bug where updating the title of a newly created tab group
-          // causes the color to be reset back to its original color. We need to reset back to it's previous color.
-          // Remove once the Chromium bug is fixed: https://issues.chromium.org/issues/334965868
-          const tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { color: activeWindowTabGroup.color });
-          if (!tabGroupUpToDate) {
-            return;
-          }
-
-          await ActiveWindowModel.updateActiveWindowTabGroup(tabGroup.windowId, tabGroup.id, { color: tabGroupUpToDate.color });
-        } else {
-          const [lastAccessedTabGroupId, activeTab, userPreferences] = await Promise.all([
-            ChromeWindowMethods.getLastAccessedTabGroupId(tabGroup.windowId),
-            (await chrome.tabs.query({ windowId: tabGroup.windowId, active: true }))[0] as ChromeTabWithId | undefined,
-            getUserPreferences(),
-          ]);
-
-          let focusedTabGroupId: ChromeTabGroupId;
-          if (userPreferences.highlightPrevActiveTabGroup && lastAccessedTabGroupId !== undefined) {
-            focusedTabGroupId = lastAccessedTabGroupId;
-          } else if (activeTab) {
-            focusedTabGroupId = activeTab.groupId;
+            await ActiveWindowModel.updateActiveWindowTabGroup(tabGroup.windowId, tabGroup.id, { color: tabGroupUpToDate.color });
           } else {
-            focusedTabGroupId = chrome.tabGroups.TAB_GROUP_ID_NONE;
+            await ActiveWindowMethods.updateFocusModeColorForTabGroupWithColor(activeWindow.windowId, tabGroup.id, changeInfo.color!);
           }
-
-          const isFocusedTabGroup = tabGroup.id === focusedTabGroupId;
-          let newFocusModeColors;
-
-          if (isFocusedTabGroup) {
-            // 2
-            newFocusModeColors = { ...activeWindow.focusMode.colors, focused: tabGroup.color };
-            await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
-          } else {
-            // 3
-            newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: tabGroup.color };
-            await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
-            // this will effectively update the color of all other non-focused tab groups
-            await ActiveWindowMethods.focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
-          }
-
-          const window = await ChromeWindowMethods.getIfWindowExists(tabGroup.windowId);
-          if (window?.focused) {
-            await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors });
-          }
-        }
-      });
+        },
+        { color: changeInfo.color }
+      );
     }
 
     if (wasExpanded) {
@@ -371,22 +318,21 @@ export async function onTabGroupUpdated(
     }
 
     if (wasCollapsed) {
-      await runActiveWindowTabGroupOperation(tabGroup.id, async ({ tabGroup }) => {
-        const isStillCollapsed = tabGroup.collapsed;
-        if (isStillCollapsed) {
-          await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: true });
-        }
-      });
+      await runActiveWindowTabGroupOperation(
+        tabGroup.id,
+        () => ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: true }),
+        { collapsed: true }
+      );
     }
 
     // 6
     if (wasTitleUpdated) {
-      await runActiveWindowTabGroupOperation(tabGroup.id, async ({ tabGroup }) => {
-        const isStillTitleUpdated = tabGroup.title === changeInfo.title;
-        if (isStillTitleUpdated) {
-          await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { title: tabGroup.title, useTabTitle: false });
-        }
-      });
+      await runActiveWindowTabGroupOperation(
+        tabGroup.id,
+        ({ tabGroup }) =>
+          ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { title: tabGroup.title, useTabTitle: false }),
+        { title: changeInfo.title }
+      );
     }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));

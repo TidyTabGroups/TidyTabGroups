@@ -528,3 +528,52 @@ export async function disableFocusMode(windowId: ChromeWindowId) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
 }
+
+export async function updateFocusModeColorForTabGroupWithColor(
+  windowId: ChromeWindowId,
+  groupId: ChromeTabGroupId,
+  color: chrome.tabGroups.ColorEnum
+) {
+  const myLogger = logger.createNestedLogger("updateFocusModeColorForTabGroupWithColor");
+  try {
+    const activeWindow = await ActiveWindowModel.getOrThrow(windowId);
+    if (activeWindow.focusMode === null) {
+      return;
+    }
+
+    const [lastAccessedTabGroupId, activeTab, { userPreferences }] = await Promise.all([
+      ChromeWindowMethods.getLastAccessedTabGroupId(windowId),
+      (await chrome.tabs.query({ windowId, active: true }))[0] as ChromeTabWithId | undefined,
+      Storage.getItems("userPreferences"),
+    ]);
+
+    let focusedTabGroupId: ChromeTabGroupId;
+    if (userPreferences.highlightPrevActiveTabGroup && lastAccessedTabGroupId !== undefined) {
+      focusedTabGroupId = lastAccessedTabGroupId;
+    } else if (activeTab) {
+      focusedTabGroupId = activeTab.groupId;
+    } else {
+      focusedTabGroupId = chrome.tabGroups.TAB_GROUP_ID_NONE;
+    }
+
+    const isFocusedTabGroup = groupId === focusedTabGroupId;
+    let newFocusModeColors;
+
+    if (isFocusedTabGroup) {
+      newFocusModeColors = { ...activeWindow.focusMode.colors, focused: color };
+      await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
+    } else {
+      newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: color };
+      await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
+      // this will effectively update the color of all other non-focused tab groups
+      await focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
+    }
+
+    const window = await ChromeWindowMethods.getIfWindowExists(windowId);
+    if (window?.focused) {
+      await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors });
+    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
+}
