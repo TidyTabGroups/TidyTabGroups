@@ -253,6 +253,7 @@ export async function onTabGroupUpdated(
       await runActiveWindowTabGroupOperation(
         tabGroup.id,
         async ({ tabGroup }) => {
+          const prevActiveWindowTabGroupColor = activeWindowTabGroup.color;
           await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { color: changeInfo.color });
 
           if (!activeWindow.focusMode) {
@@ -263,7 +264,9 @@ export async function onTabGroupUpdated(
             // FIXME: this is a workaround for a chromium bug where updating the title of a newly created tab group
             // causes the color to be reset back to its original color. We need to reset back to it's previous color.
             // Remove once the Chromium bug is fixed: https://issues.chromium.org/issues/334965868
-            const tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { color: activeWindowTabGroup.color });
+            const tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, {
+              color: prevActiveWindowTabGroupColor,
+            });
             if (!tabGroupUpToDate) {
               return;
             }
