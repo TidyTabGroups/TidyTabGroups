@@ -2,8 +2,8 @@
   "manifest_version": 3,
 
   "name": "Tidy Tab Groups",
-  "description": "Tired of tab clutter? Keep tidy by effortlessly grouping, automatically collapsing, and intelligently positioning tabs.",
-  "version": "0.0.4",
+  "description": "Tired of tab clutter? Effortlessly keep your tab bar neat & tidy with Tidy Tab Groups.",
+  "version": "0.1.1",
 
   "action": {
     "default_popup": "popup.html"
