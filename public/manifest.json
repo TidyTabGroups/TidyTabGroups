@@ -3,7 +3,7 @@
 
   "name": "Tidy Tab Groups",
   "description": "Tired of tab clutter? Keep tidy by effortlessly grouping, automatically collapsing, and intelligently positioning tabs.",
-  "version": "1.0",
+  "version": "0.0.4",
 
   "action": {
     "default_popup": "popup.html"
