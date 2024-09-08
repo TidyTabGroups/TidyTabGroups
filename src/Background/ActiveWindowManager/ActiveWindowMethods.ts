@@ -234,10 +234,10 @@ export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId
     return (await Storage.getItems("userPreferences")).userPreferences;
   });
 
-  // if the tab is in a tab group, lastRelativeTabIndex will be the last tab in the group, otherwise it will be the last tab in the window
+  // If the tab is in a tab group, lastRelativeTabIndex will be the last tab in the group, otherwise it will be the last tab in the window
   let lastRelativeTabIndex = tabs[tabs.length - 1].index;
 
-  // reposition the tab's group to the end
+  /* Reposition the tab's group to the end */
   if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
     const tabsInGroup = tabs.filter((otherTab) => otherTab.groupId === tab.groupId);
     const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
@@ -248,10 +248,14 @@ export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId
     }
   }
 
-  // reposition the tab to the end
-  // if the tab opened any un-accessed tabs that are positioned after it, then dont move it
+  /* Reposition the tab to the end */
+  if (tab.index > lastRelativeTabIndex || !(await getUserPreferences()).repositionTabs) {
+    return;
+  }
+
+  // If the tab opened any un-accessed tabs that are positioned after it, then dont move it
   const hasOpenedUnaccessedTabs = tabs.some((t) => t.openerTabId === tab.id && t.lastAccessed === undefined && t.index > tab.index);
-  if (tab.index < lastRelativeTabIndex && !hasOpenedUnaccessedTabs && (await getUserPreferences()).repositionTabs) {
+  if (!hasOpenedUnaccessedTabs) {
     await ChromeWindowMethods.moveTabWithRetryHandler(tabId, { index: lastRelativeTabIndex });
   }
 }
