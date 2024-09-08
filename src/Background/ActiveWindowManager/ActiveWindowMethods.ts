@@ -254,8 +254,8 @@ export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId
   }
 
   // If the tab opened any un-accessed tabs that are positioned after it, then dont move it
-  const hasOpenedUnaccessedTabs = tabs.some((t) => t.openerTabId === tab.id && t.lastAccessed === undefined && t.index > tab.index);
-  if (!hasOpenedUnaccessedTabs) {
+  const isOpenerOfUnaccessedTabs = tabs.some((t) => t.openerTabId === tab.id && t.lastAccessed === undefined && t.index > tab.index);
+  if (!isOpenerOfUnaccessedTabs) {
     await ChromeWindowMethods.moveTabWithRetryHandler(tabId, { index: lastRelativeTabIndex });
   }
 }
