@@ -321,22 +321,22 @@ export async function onTabCreated(tabId: ChromeTabId) {
 
   try {
     await runActiveWindowTabOperation(tabId, async ({ activeWindow, tab }) => {
-      // 1
-      const tabs = (await chrome.tabs.query({ windowId: tab.windowId })) as ChromeTabWithId[];
-      const tabsOrderedByLastAccessed = await ChromeWindowMethods.getTabsOrderedByLastAccessed(tabs);
-      let lastActiveTab: ChromeTabWithId | undefined;
-      // the last active tab could be this tab if it is activated, in that case, get the previous last active tab
-      if (tabsOrderedByLastAccessed[0]?.id === tab.id) {
-        lastActiveTab = tabsOrderedByLastAccessed[1] as ChromeTabWithId | undefined;
-      } else {
-        lastActiveTab = tabsOrderedByLastAccessed[0] as ChromeTabWithId | undefined;
-      }
-
       if (
         !tab.pinned &&
         tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
         (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs
       ) {
+        // 1
+        const tabs = (await chrome.tabs.query({ windowId: tab.windowId })) as ChromeTabWithId[];
+        const tabsOrderedByLastAccessed = await ChromeWindowMethods.getTabsOrderedByLastAccessed(tabs);
+        let lastActiveTab: ChromeTabWithId | undefined;
+        // the last active tab could be this tab if it is activated, in that case, get the previous last active tab
+        if (tabsOrderedByLastAccessed[0]?.id === tab.id) {
+          lastActiveTab = tabsOrderedByLastAccessed[1] as ChromeTabWithId | undefined;
+        } else {
+          lastActiveTab = tabsOrderedByLastAccessed[0] as ChromeTabWithId | undefined;
+        }
+
         let existingGroupId: ChromeTabGroupId | undefined;
         if (lastActiveTab && lastActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
           // 2
