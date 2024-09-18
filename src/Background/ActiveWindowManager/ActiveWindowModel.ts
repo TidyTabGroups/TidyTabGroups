@@ -226,6 +226,7 @@ export async function getActiveWindowTabGroupOrThrow(windowId: ChromeWindowId, t
 
   return activeWindowTabGroup;
 }
+
 export async function getAllActiveWindowTabGroups() {
   return (await getAll()).flatMap((activeWindow) => activeWindow.tabGroups);
 }
