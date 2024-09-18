@@ -360,7 +360,7 @@ async function runFocusTabGroupLikeOperation(
 
   const tabGroups = await operation(focusTabGroupOptions);
   if (tabGroups) {
-    return await ActiveWindowModel.mergeIntoActiveWindowTabGroups(
+    return await ActiveWindowModel.updateActiveWindowTabGroups(
       windowId,
       // TODO: we should only updated the properties that were actually updated from the ChromeWindowMethods.focusTabGroup
       //  call instead of naivly always updating the collapsed and color properties
@@ -537,7 +537,7 @@ export async function disableFocusMode(windowId: ChromeWindowId) {
         })
       )
     ).filter((tabGroup) => tabGroup !== undefined);
-    await ActiveWindowModel.mergeIntoActiveWindowTabGroups(
+    await ActiveWindowModel.updateActiveWindowTabGroups(
       windowId,
       updatedTabGroups.map((tabGroup) => ({ id: tabGroup.id, color: tabGroup.color }))
     );

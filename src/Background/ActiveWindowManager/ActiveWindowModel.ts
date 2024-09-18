@@ -230,6 +230,7 @@ export async function getAllActiveWindowTabGroups() {
   return (await getAll()).flatMap((activeWindow) => activeWindow.tabGroups);
 }
 
+// TODO: Use updateActiveWindowTabGroups with a single tabGroup for this implementation
 export async function updateActiveWindowTabGroup(
   windowId: ChromeWindowId,
   tabGroupId: ChromeTabGroupId,
@@ -259,7 +260,7 @@ export async function updateActiveWindowTabGroup(
 }
 
 type TabGroupUpdatePropertiesWithId = { id: chrome.tabGroups.TabGroup["id"] } & Partial<chrome.tabGroups.UpdateProperties>;
-export async function mergeIntoActiveWindowTabGroups(windowId: ChromeWindowId, tabGroups: TabGroupUpdatePropertiesWithId[]) {
+export async function updateActiveWindowTabGroups(windowId: ChromeWindowId, tabGroups: TabGroupUpdatePropertiesWithId[]) {
   const activeWindow = await getOrThrow(windowId);
 
   const tabGroupsById: { [tabGroupId: ChromeTabGroupId]: TabGroupUpdatePropertiesWithId } = tabGroups.reduce(
