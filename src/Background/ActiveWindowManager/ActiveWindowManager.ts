@@ -76,6 +76,9 @@ export async function initialize(onError: (message: string) => void) {
   });
 
   chrome.runtime.onInstalled.addListener((details: chrome.runtime.InstalledDetails) => {
+    const myLogger = logger.createNestedLogger("onInstalled");
+    myLogger.log("details", details);
+
     queueOperation({ name: "onInstalled", operation: () => onInstalled(details) }, true);
   });
 
@@ -83,8 +86,11 @@ export async function initialize(onError: (message: string) => void) {
     const myLogger = logger.createNestedLogger("windows.onCreated");
     const windowId = window.id;
     if (windowId === undefined || window.type !== "normal") {
+      myLogger.log(`windowId is not valid or window type is not 'normal', ignoring operation: windowId: ${windowId}, window.type: ${window.type}`);
       return;
     }
+
+    myLogger.log(`windowId: ${windowId}`);
 
     queueOperation(
       {
@@ -102,11 +108,16 @@ export async function initialize(onError: (message: string) => void) {
   });
 
   chrome.windows.onRemoved.addListener((windowId: ChromeWindowId) => {
+    const myLogger = logger.createNestedLogger("windows.onRemoved");
+    myLogger.log(`windowId: ${windowId}`);
+
     queueOperationIfWindowIsActive(ActiveWindowEventHandlers.onWindowRemoved, windowId, true, "onWindowRemoved");
   });
 
   chrome.windows.onFocusChanged.addListener((windowId: ChromeWindowId) => {
     const myLogger = logger.createNestedLogger("windows.onFocusChanged");
+    myLogger.log(`windowId: ${windowId}`);
+
     queueOperation(
       {
         name: myLogger.getPrefixedMessage("onFocusChanged"),
@@ -118,6 +129,8 @@ export async function initialize(onError: (message: string) => void) {
 
   chrome.tabGroups.onCreated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
     const myLogger = logger.createNestedLogger("tabGroups.onCreated");
+    myLogger.log(`tabGroup.title: ${tabGroup.title}, tabGroup.id: ${tabGroup.id}`);
+
     queueOperationIfWindowIsActive(
       async (activeWindow) => {
         const tabGroupUpToDate = await ChromeWindowMethods.getIfTabGroupExists(tabGroup.id);
@@ -134,6 +147,8 @@ export async function initialize(onError: (message: string) => void) {
 
   chrome.tabGroups.onRemoved.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
     const myLogger = logger.createNestedLogger("tabGroups.onRemoved");
+    myLogger.log(`tabGroup.title: ${tabGroup.title}, tabGroup.id: ${tabGroup.id}`);
+
     queueOperationIfWindowIsActive(
       (activeWindow) => ActiveWindowEventHandlers.onTabGroupRemoved(activeWindow, tabGroup),
       tabGroup.windowId,
@@ -144,6 +159,8 @@ export async function initialize(onError: (message: string) => void) {
 
   chrome.tabGroups.onUpdated.addListener((tabGroup: chrome.tabGroups.TabGroup) => {
     const myLogger = logger.createNestedLogger("tabGroups.onUpdated");
+    myLogger.log(`tabGroup.title: ${tabGroup.title}, tabGroup.id: ${tabGroup.id}`);
+
     queueOperationIfWindowIsActive(
       async (activeWindow) => {
         let tabGroupUpToDate = await ChromeWindowMethods.getIfTabGroupExists(tabGroup.id);
@@ -183,8 +200,11 @@ export async function initialize(onError: (message: string) => void) {
     const myLogger = logger.createNestedLogger("tabs.onCreated");
     const tabId = tab.id;
     if (tabId === undefined) {
+      myLogger.log(`tabId is not valid, ignoring operation: tabId: ${tabId}`);
       return;
     }
+
+    myLogger.log(`tab.title: '${tab.title}', tab.groupId: ${tab.groupId}`);
 
     queueOperation(
       {
@@ -192,6 +212,7 @@ export async function initialize(onError: (message: string) => void) {
         operation: async () => {
           const myMyLogger = myLogger.createNestedLogger("onTabCreated");
           myMyLogger.log(`tab.title: '${tab.title}', tab.groupId: ${tab.groupId}:`);
+
           return ActiveWindowEventHandlers.onTabCreated(tabId);
         },
       },
@@ -201,6 +222,8 @@ export async function initialize(onError: (message: string) => void) {
 
   chrome.tabs.onActivated.addListener((activeInfo: chrome.tabs.TabActiveInfo) => {
     const myLogger = logger.createNestedLogger("tabs.onActivated");
+    myLogger.log("activeInfo.tabId", activeInfo.tabId);
+
     queueOperation(
       {
         name: myLogger.getPrefixedMessage("onTabActivated"),
@@ -216,12 +239,14 @@ export async function initialize(onError: (message: string) => void) {
   });
 
   chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-    const myLogger = logger.createNestedLogger("tabs.onUpdated");
     // only handle these changeInfo properties
     const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title", "pinned"];
     if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
       return;
     }
+
+    const myLogger = logger.createNestedLogger("tabs.onUpdated");
+    myLogger.log(`tabId: ${tabId}, title: ${tab.title}, changeInfo: `, changeInfo);
 
     queueOperation(
       {
@@ -239,6 +264,8 @@ export async function initialize(onError: (message: string) => void) {
 
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
     const myLogger = logger.createNestedLogger("tabs.onRemoved");
+    myLogger.log(`tabId: ${tabId}, removeInfo: `, removeInfo);
+
     queueOperationIfWindowIsActive(
       async (activeWindow) => {
         const myMyLogger = myLogger.createNestedLogger("onTabRemoved");
@@ -254,6 +281,8 @@ export async function initialize(onError: (message: string) => void) {
 
   chrome.tabs.onAttached.addListener((tabId: ChromeTabId, attachInfo: chrome.tabs.TabAttachInfo) => {
     const myLogger = logger.createNestedLogger("tabs.onAttached");
+    myLogger.log(`tab.id: '${tabId}', attachInfo.newWindowId: ${attachInfo.newWindowId}`);
+
     queueOperation(
       {
         name: myLogger.getPrefixedMessage("onTabAttached"),
@@ -269,6 +298,8 @@ export async function initialize(onError: (message: string) => void) {
 
   chrome.tabs.onDetached.addListener((tabId: ChromeTabId, detachInfo: chrome.tabs.TabDetachInfo) => {
     const myLogger = logger.createNestedLogger("tabs.onDetached");
+    myLogger.log(`tabId: ${tabId}, detachInfo.oldWindowId: ${detachInfo.oldWindowId}`);
+
     queueOperationIfWindowIsActive(
       async (activeWindow) => {
         const myMyLogger = myLogger.createNestedLogger("onTabDetached");
@@ -284,6 +315,8 @@ export async function initialize(onError: (message: string) => void) {
 
   chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
     const myLogger = logger.createNestedLogger("onMessage");
+    myLogger.log(`message:`, message);
+
     if (!message || !message.type) {
       myLogger.warn(`message is not valid - message: ${message}, sender: ${sender}`);
       return;
