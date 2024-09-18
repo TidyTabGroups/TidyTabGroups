@@ -267,6 +267,11 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
   // 3. If the tab group title is empty, update the tab group title to the title of the first tab in the group
   // 4. Add the new active window tab group to the active window
   try {
+    const existingActiveWindowTabGroup = await ActiveWindowModel.getActiveWindowTabGroup(windowId, tabGroup.id);
+    if (existingActiveWindowTabGroup) {
+      throw new Error(`tabGroup with id ${tabGroup.id} already exists in window with id ${windowId}`);
+    }
+
     const activeWindow = await ActiveWindowModel.getOrThrow(windowId);
     const tabsInGroup = (await chrome.tabs.query({ windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
     const lastAccessedOrGreatestIndexTab = await ChromeWindowMethods.getLastAccessedOrGreatestIndexTab(tabsInGroup);
