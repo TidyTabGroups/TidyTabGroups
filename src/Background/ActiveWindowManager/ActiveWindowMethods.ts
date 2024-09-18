@@ -333,9 +333,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     }
 
     // 4
-    await ActiveWindowModel.update(activeWindow.windowId, {
-      tabGroups: [...activeWindow.tabGroups, newActiveWindowTabGroup],
-    });
+    await ActiveWindowModel.addActiveWindowTabGroup(windowId, newActiveWindowTabGroup);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }

@@ -226,9 +226,7 @@ export async function onTabGroupRemoved(activeWindow: Types.ActiveWindow, tabGro
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
     // 1
-    await ActiveWindowModel.update(activeWindow.windowId, {
-      tabGroups: activeWindow.tabGroups.filter((otherTabGroup) => otherTabGroup.id !== tabGroup.id),
-    });
+    await ActiveWindowModel.removeActiveWindowTabGroup(activeWindow.windowId, tabGroup.id);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }

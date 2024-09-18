@@ -231,6 +231,15 @@ export async function getAllActiveWindowTabGroups() {
   return (await getAll()).flatMap((activeWindow) => activeWindow.tabGroups);
 }
 
+export async function addActiveWindowTabGroup(windowId: ChromeWindowId, tabGroup: Types.ActiveWindowTabGroup) {
+  const existingTabGroup = await getActiveWindowTabGroup(windowId, tabGroup.id);
+  if (existingTabGroup) {
+    throw new Error(`addActiveWindowTabGroup::tabGroupId ${tabGroup.id} already exists in windowId ${windowId}`);
+  }
+
+  return await update(windowId, { tabGroups: [...(await getOrThrow(windowId)).tabGroups, tabGroup] });
+}
+
 // TODO: Use updateActiveWindowTabGroups with a single tabGroup for this implementation
 export async function updateActiveWindowTabGroup(
   windowId: ChromeWindowId,
@@ -279,4 +288,8 @@ export async function updateActiveWindowTabGroups(windowId: ChromeWindowId, tabG
     return activeWindowTabGroup;
   });
   return await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
+}
+
+export async function removeActiveWindowTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  return await update(windowId, { tabGroups: (await getOrThrow(windowId)).tabGroups.filter((tabGroup) => tabGroup.id !== tabGroupId) });
 }
