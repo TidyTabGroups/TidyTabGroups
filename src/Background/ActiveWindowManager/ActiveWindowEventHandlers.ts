@@ -315,10 +315,6 @@ export async function onTabGroupUpdated(
 
 export async function onTabCreated(tabId: ChromeTabId) {
   const myLogger = logger.createNestedLogger("onTabCreated");
-  // 1. get the lastActiveTab
-  // 2. if the tab is not pinned nor in a group, and the last active tab was in a group, add the tab to the last active tab group
-  // 3. if the tab is not pinned nor in a group, create a group for it
-
   try {
     await runActiveWindowTabOperation(tabId, async ({ activeWindow, tab }) => {
       if (
@@ -326,24 +322,24 @@ export async function onTabCreated(tabId: ChromeTabId) {
         tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE &&
         (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs
       ) {
-        // 1
+        // Get the previously active tab
         const tabs = (await chrome.tabs.query({ windowId: tab.windowId })) as ChromeTabWithId[];
         const tabsOrderedByLastAccessed = await ChromeWindowMethods.getTabsOrderedByLastAccessed(tabs);
-        let lastActiveTab: ChromeTabWithId | undefined;
+        let prevActiveTab: ChromeTabWithId | undefined;
         // the last active tab could be this tab if it is activated, in that case, get the previous last active tab
         if (tabsOrderedByLastAccessed[0]?.id === tab.id) {
-          lastActiveTab = tabsOrderedByLastAccessed[1] as ChromeTabWithId | undefined;
+          prevActiveTab = tabsOrderedByLastAccessed[1] as ChromeTabWithId | undefined;
         } else {
-          lastActiveTab = tabsOrderedByLastAccessed[0] as ChromeTabWithId | undefined;
+          prevActiveTab = tabsOrderedByLastAccessed[0] as ChromeTabWithId | undefined;
         }
 
         let existingGroupId: ChromeTabGroupId | undefined;
-        if (lastActiveTab && lastActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-          // 2
-          myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${lastActiveTab.title}'`);
-          existingGroupId = lastActiveTab.groupId;
+        if (prevActiveTab && prevActiveTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+          // If the previous active tab was in a group, add the tab to the last active tab group
+          myLogger.log(`adding created tab '${tab.title}' to last active tab group: '${prevActiveTab.title}'`);
+          existingGroupId = prevActiveTab.groupId;
         } else {
-          // 3
+          // Otherwise, create a new tab group for it
           myLogger.log(`creating new tab group for tab: '${tab.title}'`);
           existingGroupId = undefined;
         }
