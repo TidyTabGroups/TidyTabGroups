@@ -137,7 +137,7 @@ export async function initialize(onError: (message: string) => void) {
         if (!tabGroupUpToDate) {
           return;
         }
-        return ActiveWindowEventHandlers.onTabGroupCreated(activeWindow, tabGroupUpToDate);
+        return await ActiveWindowEventHandlers.onTabGroupCreated(activeWindow, tabGroupUpToDate);
       },
       tabGroup.windowId,
       false,
@@ -213,7 +213,7 @@ export async function initialize(onError: (message: string) => void) {
           const myMyLogger = myLogger.createNestedLogger("onTabCreated");
           myMyLogger.log(`tab.title: '${tab.title}', tab.groupId: ${tab.groupId}:`);
 
-          return ActiveWindowEventHandlers.onTabCreated(tabId);
+          return await ActiveWindowEventHandlers.onTabCreated(tabId);
         },
       },
       false
