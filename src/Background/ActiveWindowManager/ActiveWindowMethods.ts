@@ -667,3 +667,24 @@ export async function updateFocusModeColorForTabGroupWithColor(
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
 }
+
+export async function createActiveWindowTabGroupIfNotExists(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+  const myLogger = logger.createNestedLogger("createActiveWindowTabGroupIfNotExists");
+  try {
+    const [tabGroup, activeWindowTabGroup] = await Promise.all([
+      ChromeWindowMethods.getIfTabGroupExists(tabGroupId),
+      ActiveWindowModel.getActiveWindowTabGroup(windowId, tabGroupId),
+    ]);
+
+    if (!tabGroup) {
+      myLogger.warn(`tab group with id ${tabGroupId} does not exist`);
+      return;
+    }
+
+    if (!activeWindowTabGroup) {
+      return await createActiveWindowTabGroup(windowId, tabGroup);
+    }
+  } catch (error) {
+    throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
+  }
+}

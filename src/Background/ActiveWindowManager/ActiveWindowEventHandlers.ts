@@ -316,17 +316,9 @@ export async function onTabCreated(tabId: ChromeTabId) {
   try {
     await runActiveWindowTabOperation(tabId, async ({ activeWindow, tab }) => {
       if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-        /* If the tab's group is not in the active window, add it */
-        const existingActiveWindowTabGroup = activeWindow.tabGroups.find((tabGroup) => tabGroup.id === tab.groupId);
-        if (!existingActiveWindowTabGroup) {
-          myLogger.log(`tab '${tab.title}' is in a group that doesn't exist in the active window`);
-          const tabGroup = await ChromeWindowMethods.getIfTabGroupExists(tab.groupId);
-          if (tabGroup) {
-            await ActiveWindowMethods.createActiveWindowTabGroup(activeWindow.windowId, tabGroup);
-          } else {
-            myLogger.warn(`tab group with id ${tab.groupId} does not exist`);
-          }
-        }
+        // We create the active window tab group now because subsequent events that need it (e.g. onTabActivated)
+        //   could be called before the onTabGroupCreated event
+        await ActiveWindowMethods.createActiveWindowTabGroupIfNotExists(activeWindow.windowId, tab.groupId);
         return;
       }
 
