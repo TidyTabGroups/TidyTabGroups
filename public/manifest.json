@@ -2,8 +2,8 @@
   "manifest_version": 3,
 
   "name": "Tidy Tab Groups",
-  "description": "Tired of tab clutter? Effortlessly keep your tabs tidy and your mind focused with Tidy Tab Groups.",
-  "version": "0.1.1",
+  "description": "Tired of tab clutter? Effortlessly group, collapse, and organize your tabs with Tidy Tab Groups.",
+  "version": "0.1.2",
 
   "action": {
     "default_popup": "popup.html"
