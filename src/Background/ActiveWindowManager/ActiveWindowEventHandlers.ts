@@ -327,7 +327,10 @@ export async function onTabCreated(tabId: ChromeTabId) {
             myLogger.warn(`tab group with id ${tab.groupId} does not exist`);
           }
         }
-      } else if (!tab.pinned && (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
+        return;
+      }
+
+      if (!tab.pinned && (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
         /* Auto-group tab */
 
         // Get the previously active tab
