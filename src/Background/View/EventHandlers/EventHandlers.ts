@@ -15,7 +15,7 @@ import {
 import Storage from "../../../Shared/Storage";
 import * as ActiveWindowOperationRunner from "./OperationRunner";
 
-const logger = Logger.createLogger("ActiveWindowManager::EventHandlers", { color: "#4287f5" });
+const logger = Logger.createLogger("Background::View::EventHandlers", { color: "#4287f5" });
 
 export async function onWindowCreated(window: ChromeWindowWithId) {
   const myLogger = logger.createNestedLogger("onWindowCreated");

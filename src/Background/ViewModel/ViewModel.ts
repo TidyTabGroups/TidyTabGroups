@@ -17,7 +17,7 @@ import {
 } from "../../Shared/Types/Types";
 import Storage from "../../Shared/Storage";
 
-const logger = Logger.createLogger("ActiveWindowManager::ViewModel");
+const logger = Logger.createLogger("Background::ViewModel");
 
 let windowsBeingActivated: ChromeWindowId[] = [];
 let activatingAllWindows = false;

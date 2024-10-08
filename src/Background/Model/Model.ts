@@ -4,7 +4,7 @@ import Misc from "../../Shared/Misc";
 import Logger from "../../Shared/Logger";
 import * as Database from "./Database";
 
-const logger = Logger.createLogger("ActiveWindowManager::Model", { color: "#b603fc" });
+const logger = Logger.createLogger("Background::Model", { color: "#b603fc" });
 
 let activeWindows: Types.ActiveWindow[] = [];
 

@@ -9,7 +9,7 @@ import EventHandlers from "./EventHandlers";
 import * as MouseInPageTracker from "../MouseInPageTracker";
 import Misc from "../../Shared/Misc";
 
-const logger = Logger.createLogger("ActiveWindowManager", { color: "#fcba03" });
+const logger = Logger.createLogger("Background::View", { color: "#fcba03" });
 
 export async function initialize(onError: (message: string) => void) {
   const asyncInitializationSteps = new Promise<void>(async (resolve, reject) => {
