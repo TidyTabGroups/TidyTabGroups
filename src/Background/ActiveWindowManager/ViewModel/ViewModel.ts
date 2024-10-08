@@ -1,9 +1,9 @@
-import ChromeWindowMethods from "../../Shared/ChromeWindowMethods";
-import Logger from "../../Shared/Logger";
-import Misc from "../../Shared/Misc";
-import Model from "./Model";
-import * as MouseInPageTracker from "./MouseInPageTracker";
-import Types from "../../Shared/Types";
+import ChromeWindowMethods from "../../../Shared/ChromeWindowMethods";
+import Logger from "../../../Shared/Logger";
+import Misc from "../../../Shared/Misc";
+import Model from "../Model";
+import * as MouseInPageTracker from "../MouseInPageTracker";
+import Types from "../../../Shared/Types";
 import {
   ChromeWindowId,
   ChromeWindowWithId,
@@ -14,10 +14,10 @@ import {
   ChromeTabId,
   FocusTabGroupOptions,
   ActiveWindowTabGroup,
-} from "../../Shared/Types/Types";
-import Storage from "../../Shared/Storage";
+} from "../../../Shared/Types/Types";
+import Storage from "../../../Shared/Storage";
 
-const logger = Logger.createLogger("ActiveWindowMethods");
+const logger = Logger.createLogger("ActiveWindowManager::ViewModel");
 
 let windowsBeingActivated: ChromeWindowId[] = [];
 let activatingAllWindows = false;

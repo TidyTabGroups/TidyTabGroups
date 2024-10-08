@@ -1,5 +1,5 @@
 import Model from "./Model";
-import * as ActiveWindowMethods from "./ActiveWindowMethods";
+import ViewModel from "./ViewModel";
 import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../../Shared/Types/Types";
 import ChromeWindowMethods from "../../Shared/ChromeWindowMethods";
 import Logger from "../../Shared/Logger";
@@ -500,7 +500,7 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
     await Misc.waitMs(500);
   }
 
-  await ActiveWindowMethods.reactivateAllWindows();
+  await ViewModel.reactivateAllWindows();
 
   // inject the content script into all tabs
   const tabs = (await chrome.tabs.query({})) as ChromeTabWithId[];

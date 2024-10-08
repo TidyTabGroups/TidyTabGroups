@@ -2,7 +2,7 @@ import ChromeWindowMethods from "../../../Shared/ChromeWindowMethods";
 import Logger from "../../../Shared/Logger";
 import Misc from "../../../Shared/Misc";
 import Model from "../Model";
-import * as ActiveWindowMethods from "../ActiveWindowMethods";
+import ViewModel from "../ViewModel";
 import Types from "../../../Shared/Types";
 import {
   ChromeTabGroupChangeInfo,
@@ -22,7 +22,7 @@ export async function onWindowCreated(window: ChromeWindowWithId) {
   myLogger.log(`window:`, window);
 
   try {
-    const newActiveWindow = await ActiveWindowMethods.activateWindow(window.id);
+    const newActiveWindow = await ViewModel.activateWindow(window.id);
     myLogger.log(`newActiveWindow:`, newActiveWindow);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -36,7 +36,7 @@ export async function onWindowRemoved(activeWindow: Types.ActiveWindow) {
   myLogger.log(`windowId:`, windowId);
 
   try {
-    await ActiveWindowMethods.deactivateWindow(windowId);
+    await ViewModel.deactivateWindow(windowId);
     myLogger.log(`deactivated window:`, windowId);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
@@ -62,7 +62,7 @@ export async function onWindowFocusChanged(windowId: ChromeWindowId) {
     }
 
     // 2
-    await ActiveWindowMethods.useTabTitleForEligebleTabGroups();
+    await ViewModel.useTabTitleForEligebleTabGroups();
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -78,7 +78,7 @@ export async function onTabGroupCreated(activeWindow: Types.ActiveWindow, tabGro
       return;
     }
 
-    await ActiveWindowMethods.createActiveWindowTabGroup(activeWindow.windowId, tabGroup);
+    await ViewModel.createActiveWindowTabGroup(activeWindow.windowId, tabGroup);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -135,7 +135,7 @@ export async function onTabGroupUpdated(
 
             await Model.updateActiveWindowTabGroup(tabGroup.windowId, tabGroup.id, { color: tabGroupUpToDate.color });
           } else {
-            await ActiveWindowMethods.updateFocusModeColorForTabGroupWithColor(activeWindow.windowId, tabGroup.id, changeInfo.color!);
+            await ViewModel.updateFocusModeColorForTabGroupWithColor(activeWindow.windowId, tabGroup.id, changeInfo.color!);
           }
         },
         { color: changeInfo.color }
@@ -147,7 +147,7 @@ export async function onTabGroupUpdated(
         tabGroup.id,
         async () => {
           await Model.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: false });
-          await ActiveWindowMethods.activateLastActiveTabInGroup(activeWindow.windowId, tabGroup.id);
+          await ViewModel.activateLastActiveTabInGroup(activeWindow.windowId, tabGroup.id);
         },
         { collapsed: false }
       );
@@ -182,7 +182,7 @@ export async function onTabCreated(tabId: ChromeTabId) {
       if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
         // We create the active window tab group now because subsequent events that need it (e.g. onTabActivated)
         //   could be called before the onTabGroupCreated event
-        await ActiveWindowMethods.createActiveWindowTabGroupIfNotExists(activeWindow.windowId, tab.groupId);
+        await ViewModel.createActiveWindowTabGroupIfNotExists(activeWindow.windowId, tab.groupId);
         return;
       }
 
@@ -212,7 +212,7 @@ export async function onTabCreated(tabId: ChromeTabId) {
         }
 
         const createNewGroup = existingGroupId === undefined;
-        // TODO: Re-use logic in ActiveWindowMethods.autoGroupTabAndHighlightedTabs instead of or adjecent to this
+        // TODO: Re-use logic in ViewModel.autoGroupTabAndHighlightedTabs instead of or adjecent to this
         const groupId = await ChromeWindowMethods.groupTabsWithRetryHandler({
           createProperties: createNewGroup ? { windowId: tab.windowId } : undefined,
           groupId: createNewGroup ? undefined : existingGroupId,
@@ -225,7 +225,7 @@ export async function onTabCreated(tabId: ChromeTabId) {
           if (createNewGroup) {
             const newTabGroup = await ChromeWindowMethods.getIfTabGroupExists(groupId);
             if (newTabGroup) {
-              await ActiveWindowMethods.createActiveWindowTabGroup(activeWindow.windowId, newTabGroup);
+              await ViewModel.createActiveWindowTabGroup(activeWindow.windowId, newTabGroup);
             }
           }
         }
@@ -243,7 +243,7 @@ export async function onTabActivated(tabId: ChromeTabId) {
       tabId,
       async ({ tab }) => {
         myLogger.log(`title: '${tab.title}', groupId: ${tab.groupId}`);
-        await ActiveWindowMethods.focusActiveTab(tab.windowId, tab.id, tab.groupId);
+        await ViewModel.focusActiveTab(tab.windowId, tab.id, tab.groupId);
       },
       { active: true }
     );
@@ -272,7 +272,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
         tabId,
         async ({ tab }) => {
           didAutoGroup = true;
-          await ActiveWindowMethods.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
+          await ViewModel.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
         },
         { groupId: chrome.tabGroups.TAB_GROUP_ID_NONE, pinned: false }
       );
@@ -282,18 +282,18 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
       await ActiveWindowOperationRunner.runActiveWindowTabOperation(
         tabId,
         async ({ tab }) => {
-          await ActiveWindowMethods.focusActiveTab(tab.windowId, tab.id, tab.groupId);
+          await ViewModel.focusActiveTab(tab.windowId, tab.id, tab.groupId);
         },
         { groupId: changeInfo.groupId, active: true }
       );
     }
 
     if (changeInfo.groupId !== undefined) {
-      await ActiveWindowMethods.updateLastActiveTabIdForTabGroupWithTabId(tabId);
+      await ViewModel.updateLastActiveTabIdForTabGroupWithTabId(tabId);
     }
 
     if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {
-      await ActiveWindowOperationRunner.runActiveWindowTabOperation(tabId, () => ActiveWindowMethods.useTabTitleForEligebleTabGroups(), {
+      await ActiveWindowOperationRunner.runActiveWindowTabOperation(tabId, () => ViewModel.useTabTitleForEligebleTabGroups(), {
         groupId: changeInfo.groupId,
         title: changeInfo.title,
       });
@@ -312,7 +312,7 @@ export async function onTabAttached(tabId: ChromeTabId, attachInfo: chrome.tabs.
         tabId,
         async ({ tab }) => {
           if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false) {
-            await ActiveWindowMethods.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
+            await ViewModel.autoGroupTabAndHighlightedTabs(tab.windowId, tab.id);
           }
         },
         { windowId: attachInfo.newWindowId, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE, pinned: false }
@@ -323,7 +323,7 @@ export async function onTabAttached(tabId: ChromeTabId, attachInfo: chrome.tabs.
       tabId,
       async ({ tab }) => {
         if (tab.active) {
-          await ActiveWindowMethods.focusActiveTab(tab.windowId, tab.id, tab.groupId);
+          await ViewModel.focusActiveTab(tab.windowId, tab.id, tab.groupId);
         }
       },
       { windowId: attachInfo.newWindowId, active: true }
@@ -336,7 +336,7 @@ export async function onTabAttached(tabId: ChromeTabId, attachInfo: chrome.tabs.
 export async function onTabDetached(activeWindow: Types.ActiveWindow, tabId: ChromeTabId) {
   const myLogger = logger.createNestedLogger("onTabDetached");
   try {
-    await ActiveWindowMethods.blurTabGroupsIfNoActiveTab(activeWindow.windowId);
+    await ViewModel.blurTabGroupsIfNoActiveTab(activeWindow.windowId);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
@@ -345,7 +345,7 @@ export async function onTabDetached(activeWindow: Types.ActiveWindow, tabId: Chr
 export async function onTabRemoved(activeWindow: Types.ActiveWindow, tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) {
   const myLogger = logger.createNestedLogger("onTabRemoved");
   try {
-    await ActiveWindowMethods.blurTabGroupsIfNoActiveTab(activeWindow.windowId);
+    await ViewModel.blurTabGroupsIfNoActiveTab(activeWindow.windowId);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
@@ -357,12 +357,12 @@ export async function onMouseInPageStatusChanged(tabId: ChromeTabId, status: Typ
 
   switch (status) {
     case "entered":
-      await ActiveWindowMethods.useTabTitleForEligebleTabGroups();
+      await ViewModel.useTabTitleForEligebleTabGroups();
       break;
     case "focused":
       await ActiveWindowOperationRunner.runActiveWindowTabOperation(tabId, async ({ tab }) => {
         if (tab.active && !tab.pinned) {
-          await ActiveWindowMethods.repositionTab(tab.windowId, tab.id);
+          await ViewModel.repositionTab(tab.windowId, tab.id);
         }
       });
       break;
@@ -381,7 +381,7 @@ export async function onEnabledCollapseUnfocusedTabGroups() {
     activeWindows.map(async (activeWindow) => {
       const activeTab = activeTabsByWindowId[activeWindow.windowId];
       // This will effectively collapse all unfocused tab groups
-      await ActiveWindowMethods.focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
+      await ViewModel.focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
     })
   );
 }
@@ -390,7 +390,7 @@ export async function onEnabledAlwaysGroupTabs() {
   const activeWindows = await Model.getAll();
   await Promise.all(
     activeWindows.map(async (activeWindow) => {
-      await ActiveWindowMethods.groupUnpinnedAndUngroupedTabs(activeWindow.windowId);
+      await ViewModel.groupUnpinnedAndUngroupedTabs(activeWindow.windowId);
     })
   );
 }
@@ -414,9 +414,9 @@ export async function onChangeFocusMode(windowId: ChromeWindowId, enabled: boole
   try {
     await Model.getOrThrow(windowId);
     if (enabled) {
-      return await ActiveWindowMethods.enableFocusMode(windowId);
+      return await ViewModel.enableFocusMode(windowId);
     } else {
-      return await ActiveWindowMethods.disableFocusMode(windowId);
+      return await ViewModel.disableFocusMode(windowId);
     }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
@@ -431,12 +431,12 @@ export async function onChangeActivateCurrentWindow(windowId: ChromeWindowId, en
       if (activeWindow) {
         throw new Error(`Current window with id ${windowId} is already active`);
       }
-      return await ActiveWindowMethods.activateWindow(windowId);
+      return await ViewModel.activateWindow(windowId);
     } else {
       if (!activeWindow) {
         throw new Error(`Current window with id ${windowId} is not active`);
       }
-      return await ActiveWindowMethods.deactivateWindow(windowId);
+      return await ViewModel.deactivateWindow(windowId);
     }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
@@ -450,7 +450,7 @@ export async function onChangeHighlightPrevActiveTabGroup(enabled: boolean) {
     await Promise.all(
       activeWindows.map(async (activeWindow) => {
         const [activeTab] = (await chrome.tabs.query({ active: true, windowId: activeWindow.windowId })) as (ChromeTabWithId | undefined)[];
-        return await ActiveWindowMethods.focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
+        return await ViewModel.focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
       })
     );
   } catch (error) {
