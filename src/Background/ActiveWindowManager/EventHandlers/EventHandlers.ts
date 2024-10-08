@@ -1,157 +1,21 @@
-import ChromeWindowMethods from "../../Shared/ChromeWindowMethods";
-import Logger from "../../Shared/Logger";
-import Misc from "../../Shared/Misc";
-import * as ActiveWindowModel from "./ActiveWindowModel";
-import * as ActiveWindowMethods from "./ActiveWindowMethods";
-import Types from "../../Shared/Types";
+import ChromeWindowMethods from "../../../Shared/ChromeWindowMethods";
+import Logger from "../../../Shared/Logger";
+import Misc from "../../../Shared/Misc";
+import * as ActiveWindowModel from "../ActiveWindowModel";
+import * as ActiveWindowMethods from "../ActiveWindowMethods";
+import Types from "../../../Shared/Types";
 import {
-  ActiveWindowTabGroup,
   ChromeTabGroupChangeInfo,
   ChromeTabGroupId,
-  ChromeTabGroupWithId,
   ChromeTabId,
   ChromeTabWithId,
   ChromeWindowId,
   ChromeWindowWithId,
-} from "../../Shared/Types/Types";
-import Storage from "../../Shared/Storage";
+} from "../../../Shared/Types/Types";
+import Storage from "../../../Shared/Storage";
+import * as ActiveWindowOperationRunner from "./OperationRunner";
 
-const logger = Logger.createLogger("ActiveWindowEventHandlers", { color: "#4287f5" });
-
-async function runActiveWindowOperation(
-  windowId: ChromeWindowId,
-  operation: (activeWindow: Types.ActiveWindow, window: ChromeWindowWithId) => Promise<void>
-) {
-  const { isValid, activeWindow, windowUpToDate } = await validateWindowUpToDateAndActiveWindow(windowId);
-  if (!isValid) {
-    return;
-  }
-
-  await operation(activeWindow, windowUpToDate);
-}
-
-async function runActiveWindowTabGroupOperation<T extends Partial<ChromeTabGroupWithId>>(
-  tabGroupId: ChromeTabGroupId,
-  operation: (context: { activeWindow: Types.ActiveWindow; tabGroup: ChromeTabGroupWithId }) => Promise<void>,
-  requiredPropertiesToMatch?: Partial<Record<keyof ChromeTabGroupWithId, any>>
-) {
-  const { isValid, activeWindow, tabGroupUpToDate } = await validateTabGroupUpToDateAndActiveWindow(tabGroupId, requiredPropertiesToMatch);
-  if (!isValid) {
-    return;
-  }
-
-  await operation({ activeWindow, tabGroup: tabGroupUpToDate });
-}
-
-async function runActiveWindowTabOperation(
-  tabId: ChromeTabId,
-  operation: (context: { activeWindow: Types.ActiveWindow; tab: ChromeTabWithId }) => Promise<void>,
-  requiredPropertiesToMatch?: Partial<Record<keyof ChromeTabWithId, any>>
-) {
-  const { isValid, activeWindow, tabUpToDate } = await validateTabUpToDateAndActiveWindow(tabId, requiredPropertiesToMatch);
-  if (!isValid) {
-    return;
-  }
-
-  await operation({ activeWindow, tab: tabUpToDate });
-}
-
-async function validateTabUpToDateAndActiveWindow(
-  tabId: ChromeTabId,
-  requiredPropertiesToMatch?: Partial<Record<keyof ChromeTabWithId, any>>
-): Promise<
-  | {
-      isValid: true;
-      activeWindow: Types.ActiveWindow;
-      tabUpToDate: ChromeTabWithId;
-    }
-  | {
-      isValid: false;
-      activeWindow: undefined;
-      tabUpToDate: undefined;
-    }
-> {
-  const tabUpToDate = await ChromeWindowMethods.getIfTabExists(tabId);
-  if (!tabUpToDate) {
-    return { isValid: false, activeWindow: undefined, tabUpToDate: undefined };
-  }
-
-  if (requiredPropertiesToMatch) {
-    for (const [key, value] of Object.entries(requiredPropertiesToMatch)) {
-      if (tabUpToDate[key as keyof ChromeTabWithId] !== value) {
-        return { isValid: false, activeWindow: undefined, tabUpToDate: undefined };
-      }
-    }
-  }
-
-  const activeWindow = await ActiveWindowModel.get(tabUpToDate.windowId);
-  if (!activeWindow) {
-    return { isValid: false, activeWindow: undefined, tabUpToDate: undefined };
-  }
-
-  return { isValid: true, activeWindow, tabUpToDate };
-}
-
-async function validateTabGroupUpToDateAndActiveWindow(
-  groupId: ChromeTabGroupId,
-  requiredPropertiesToMatch?: Partial<Record<keyof ChromeTabGroupWithId, any>>
-): Promise<
-  | {
-      isValid: true;
-      activeWindow: Types.ActiveWindow;
-      tabGroupUpToDate: ChromeTabGroupWithId;
-    }
-  | {
-      isValid: false;
-      activeWindow: undefined;
-      tabGroupUpToDate: undefined;
-    }
-> {
-  const tabGroupUpToDate = await ChromeWindowMethods.getIfTabGroupExists(groupId);
-  if (!tabGroupUpToDate) {
-    return { isValid: false, activeWindow: undefined, tabGroupUpToDate: undefined };
-  }
-
-  if (requiredPropertiesToMatch) {
-    for (const [key, value] of Object.entries(requiredPropertiesToMatch)) {
-      if (tabGroupUpToDate[key as keyof ChromeTabGroupWithId] !== value) {
-        return { isValid: false, activeWindow: undefined, tabGroupUpToDate: undefined };
-      }
-    }
-  }
-
-  const activeWindow = await ActiveWindowModel.get(tabGroupUpToDate.windowId);
-  if (!activeWindow) {
-    return { isValid: false, activeWindow: undefined, tabGroupUpToDate: undefined };
-  }
-
-  return { isValid: true, activeWindow, tabGroupUpToDate };
-}
-
-async function validateWindowUpToDateAndActiveWindow(windowId: ChromeWindowId): Promise<
-  | {
-      isValid: boolean;
-      activeWindow: Types.ActiveWindow;
-      windowUpToDate: ChromeWindowWithId;
-    }
-  | {
-      isValid: false;
-      activeWindow: undefined;
-      windowUpToDate: undefined;
-    }
-> {
-  const windowUpToDate = await ChromeWindowMethods.getIfWindowExists(windowId);
-  if (!windowUpToDate) {
-    return { isValid: false, activeWindow: undefined, windowUpToDate: undefined };
-  }
-
-  const activeWindow = await ActiveWindowModel.get(windowId);
-  if (!activeWindow) {
-    return { isValid: false, activeWindow: undefined, windowUpToDate: undefined };
-  }
-
-  return { isValid: true, activeWindow, windowUpToDate };
-}
+const logger = Logger.createLogger("ActiveWindowManager::EventHandlers", { color: "#4287f5" });
 
 export async function onWindowCreated(window: ChromeWindowWithId) {
   const myLogger = logger.createNestedLogger("onWindowCreated");
@@ -188,7 +52,7 @@ export async function onWindowFocusChanged(windowId: ChromeWindowId) {
   try {
     // 1
     if (windowId !== chrome.windows.WINDOW_ID_NONE) {
-      await runActiveWindowOperation(windowId, async (activeWindow) => {
+      await ActiveWindowOperationRunner.runActiveWindowOperation(windowId, async (activeWindow) => {
         let keys: Partial<Types.LocalStorageShape> = {};
         if (activeWindow.focusMode) {
           keys = { ...keys, lastSeenFocusModeColors: activeWindow.focusMode.colors };
@@ -248,7 +112,7 @@ export async function onTabGroupUpdated(
     myLogger.log(`id: ${tabGroup.id}, title: ${tabGroup.title}`);
 
     if (wasColorUpdated) {
-      await runActiveWindowTabGroupOperation(
+      await ActiveWindowOperationRunner.runActiveWindowTabGroupOperation(
         tabGroup.id,
         async ({ tabGroup }) => {
           const prevActiveWindowTabGroupColor = activeWindowTabGroup.color;
@@ -279,7 +143,7 @@ export async function onTabGroupUpdated(
     }
 
     if (wasExpanded) {
-      await runActiveWindowTabGroupOperation(
+      await ActiveWindowOperationRunner.runActiveWindowTabGroupOperation(
         tabGroup.id,
         async () => {
           await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: false });
@@ -290,7 +154,7 @@ export async function onTabGroupUpdated(
     }
 
     if (wasCollapsed) {
-      await runActiveWindowTabGroupOperation(
+      await ActiveWindowOperationRunner.runActiveWindowTabGroupOperation(
         tabGroup.id,
         () => ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: true }),
         { collapsed: true }
@@ -299,7 +163,7 @@ export async function onTabGroupUpdated(
 
     // 6
     if (wasTitleUpdated) {
-      await runActiveWindowTabGroupOperation(
+      await ActiveWindowOperationRunner.runActiveWindowTabGroupOperation(
         tabGroup.id,
         ({ tabGroup }) =>
           ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { title: tabGroup.title, useTabTitle: false }),
@@ -314,7 +178,7 @@ export async function onTabGroupUpdated(
 export async function onTabCreated(tabId: ChromeTabId) {
   const myLogger = logger.createNestedLogger("onTabCreated");
   try {
-    await runActiveWindowTabOperation(tabId, async ({ activeWindow, tab }) => {
+    await ActiveWindowOperationRunner.runActiveWindowTabOperation(tabId, async ({ activeWindow, tab }) => {
       if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
         // We create the active window tab group now because subsequent events that need it (e.g. onTabActivated)
         //   could be called before the onTabGroupCreated event
@@ -375,7 +239,7 @@ export async function onTabCreated(tabId: ChromeTabId) {
 export async function onTabActivated(tabId: ChromeTabId) {
   const myLogger = logger.createNestedLogger("onTabActivated");
   try {
-    await runActiveWindowTabOperation(
+    await ActiveWindowOperationRunner.runActiveWindowTabOperation(
       tabId,
       async ({ tab }) => {
         myLogger.log(`title: '${tab.title}', groupId: ${tab.groupId}`);
@@ -384,7 +248,7 @@ export async function onTabActivated(tabId: ChromeTabId) {
       { active: true }
     );
 
-    await runActiveWindowTabOperation(
+    await ActiveWindowOperationRunner.runActiveWindowTabOperation(
       tabId,
       async ({ tab }) => {
         if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
@@ -404,7 +268,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     let didAutoGroup = false;
     const wasUngroupedOrUnpinned = changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE || changeInfo.pinned === false;
     if (wasUngroupedOrUnpinned && (await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
-      await runActiveWindowTabOperation(
+      await ActiveWindowOperationRunner.runActiveWindowTabOperation(
         tabId,
         async ({ tab }) => {
           didAutoGroup = true;
@@ -415,7 +279,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     }
 
     if (changeInfo.groupId !== undefined && !didAutoGroup /* If the tab was auto-grouped, then it was already focused */) {
-      await runActiveWindowTabOperation(
+      await ActiveWindowOperationRunner.runActiveWindowTabOperation(
         tabId,
         async ({ tab }) => {
           await ActiveWindowMethods.focusActiveTab(tab.windowId, tab.id, tab.groupId);
@@ -429,7 +293,7 @@ export async function onTabUpdated(tabId: ChromeTabId, changeInfo: chrome.tabs.T
     }
 
     if (changeInfo.groupId !== undefined || changeInfo.title !== undefined) {
-      await runActiveWindowTabOperation(tabId, () => ActiveWindowMethods.useTabTitleForEligebleTabGroups(), {
+      await ActiveWindowOperationRunner.runActiveWindowTabOperation(tabId, () => ActiveWindowMethods.useTabTitleForEligebleTabGroups(), {
         groupId: changeInfo.groupId,
         title: changeInfo.title,
       });
@@ -444,7 +308,7 @@ export async function onTabAttached(tabId: ChromeTabId, attachInfo: chrome.tabs.
 
   try {
     if ((await Storage.getItems("userPreferences")).userPreferences.alwaysGroupTabs) {
-      await runActiveWindowTabOperation(
+      await ActiveWindowOperationRunner.runActiveWindowTabOperation(
         tabId,
         async ({ tab }) => {
           if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && tab.pinned === false) {
@@ -455,7 +319,7 @@ export async function onTabAttached(tabId: ChromeTabId, attachInfo: chrome.tabs.
       );
     }
 
-    await runActiveWindowTabOperation(
+    await ActiveWindowOperationRunner.runActiveWindowTabOperation(
       tabId,
       async ({ tab }) => {
         if (tab.active) {
@@ -496,7 +360,7 @@ export async function onMouseInPageStatusChanged(tabId: ChromeTabId, status: Typ
       await ActiveWindowMethods.useTabTitleForEligebleTabGroups();
       break;
     case "focused":
-      await runActiveWindowTabOperation(tabId, async ({ tab }) => {
+      await ActiveWindowOperationRunner.runActiveWindowTabOperation(tabId, async ({ tab }) => {
         if (tab.active && !tab.pinned) {
           await ActiveWindowMethods.repositionTab(tab.windowId, tab.id);
         }
