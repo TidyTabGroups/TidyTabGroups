@@ -1,6 +1,6 @@
 import { IDBPTransaction, StoreNames } from "idb";
-import Database from "../../../Shared/Database";
-import Types from "../../../Shared/Types";
+import Database from "../../Shared/Database";
+import Types from "../../Shared/Types";
 
 export async function getKey(
   id: Types.ModelDataBaseActiveWindow["windowId"],

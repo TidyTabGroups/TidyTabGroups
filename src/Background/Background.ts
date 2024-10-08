@@ -1,4 +1,4 @@
-import View from "./ActiveWindowManager/View";
+import View from "./View";
 import Database from "../Shared/Database";
 import Logger from "../Shared/Logger";
 import Misc from "../Shared/Misc";

@@ -1,5 +1,5 @@
-import Logger from "../../Shared/Logger";
-import { ChromeTabWithId, MouseInPageStatus } from "../../Shared/Types/Types";
+import Logger from "../Shared/Logger";
+import { ChromeTabWithId, MouseInPageStatus } from "../Shared/Types/Types";
 const logger = Logger.createLogger("MouseInPageTracker");
 
 type OnChangeListener = (mouseInPageStatus: MouseInPageStatus, tab: ChromeTabWithId) => void;

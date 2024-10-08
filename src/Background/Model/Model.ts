@@ -1,7 +1,7 @@
-import Types from "../../../Shared/Types";
-import { ChromeWindowId, ChromeTabGroupId } from "../../../Shared/Types/Types";
-import Misc from "../../../Shared/Misc";
-import Logger from "../../../Shared/Logger";
+import Types from "../../Shared/Types";
+import { ChromeWindowId, ChromeTabGroupId } from "../../Shared/Types/Types";
+import Misc from "../../Shared/Misc";
+import Logger from "../../Shared/Logger";
 import * as Database from "./Database";
 
 const logger = Logger.createLogger("ActiveWindowManager::Model", { color: "#b603fc" });
