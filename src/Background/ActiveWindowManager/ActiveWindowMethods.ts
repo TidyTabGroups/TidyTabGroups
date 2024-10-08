@@ -1,7 +1,7 @@
 import ChromeWindowMethods from "../../Shared/ChromeWindowMethods";
 import Logger from "../../Shared/Logger";
 import Misc from "../../Shared/Misc";
-import * as ActiveWindowModel from "./ActiveWindowModel";
+import Model from "./Model";
 import * as MouseInPageTracker from "./MouseInPageTracker";
 import Types from "../../Shared/Types";
 import {
@@ -61,11 +61,11 @@ export async function reactivateAllWindows() {
 
     const [windows, previousActiveWindows] = await Promise.all([
       chrome.windows.getAll() as Promise<ChromeWindowWithId[]>,
-      ActiveWindowModel.getAll(),
+      Model.getAll(),
     ]);
     const windowIds = windows.map((window) => window.id);
 
-    await ActiveWindowModel.clear();
+    await Model.clear();
 
     await Promise.all(
       windowIds.map(async (windowId) => {
@@ -174,14 +174,14 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
       windowId,
       focusMode: newFocusMode,
       tabGroups: tabGroups.map((tabGroup) => {
-        return ActiveWindowModel.chromeTabGroupToActiveWindowTabGroup(tabGroup, {
+        return Model.chromeTabGroupToActiveWindowTabGroup(tabGroup, {
           useTabTitle: useTabTitleForGroupId === tabGroup.id,
           lastActiveTabId: lastActiveOrGreatestIndexTabByGroupId[tabGroup.id]?.id || null,
         });
       }),
     } as Types.ActiveWindow;
 
-    await ActiveWindowModel.add(newActiveWindow);
+    await Model.add(newActiveWindow);
     return newActiveWindow;
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
@@ -208,16 +208,16 @@ export async function deactivateWindow(windowId: ChromeWindowId) {
   if (isActivatingWindow(windowId)) {
     throw new Error(`deactivateWindow::windowId ${windowId} is being activated`);
   }
-  const activeWindow = await ActiveWindowModel.get(windowId);
+  const activeWindow = await Model.get(windowId);
   if (!activeWindow) {
     throw new Error(`deactivateWindow::windowId ${windowId} not found`);
   }
 
-  await ActiveWindowModel.remove(windowId);
+  await Model.remove(windowId);
 }
 
 export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId) {
-  const activeWindow = await ActiveWindowModel.getOrThrow(windowId);
+  const activeWindow = await Model.getOrThrow(windowId);
 
   const tabs = (await chrome.tabs.query({ windowId })) as ChromeTabWithId[];
   const tab = tabs.find((tab) => tab.id === tabId);
@@ -267,12 +267,12 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
   // 3. If the tab group title is empty, update the tab group title to the title of the first tab in the group
   // 4. Add the new active window tab group to the active window
   try {
-    const existingActiveWindowTabGroup = await ActiveWindowModel.getActiveWindowTabGroup(windowId, tabGroup.id);
+    const existingActiveWindowTabGroup = await Model.getActiveWindowTabGroup(windowId, tabGroup.id);
     if (existingActiveWindowTabGroup) {
       throw new Error(`tabGroup with id ${tabGroup.id} already exists in window with id ${windowId}`);
     }
 
-    const activeWindow = await ActiveWindowModel.getOrThrow(windowId);
+    const activeWindow = await Model.getOrThrow(windowId);
     const tabsInGroup = (await chrome.tabs.query({ windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
     const lastAccessedOrGreatestIndexTab = await ChromeWindowMethods.getLastAccessedOrGreatestIndexTab(tabsInGroup);
     let newActiveWindowTabGroup: ActiveWindowTabGroup = {
@@ -338,7 +338,7 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     }
 
     // 4
-    await ActiveWindowModel.addActiveWindowTabGroup(windowId, newActiveWindowTabGroup);
+    await Model.addActiveWindowTabGroup(windowId, newActiveWindowTabGroup);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -348,7 +348,7 @@ async function runFocusTabGroupLikeOperation(
   windowId: ChromeWindowId,
   operation: (focusTabGroupOptions: FocusTabGroupOptions) => Promise<ChromeTabGroupWithId[] | undefined>
 ) {
-  const activeWindow = await ActiveWindowModel.getOrThrow(windowId);
+  const activeWindow = await Model.getOrThrow(windowId);
 
   const collapseIgnoreSet = new Set(activeWindow.tabGroups.filter((tabGroup) => tabGroup.keepOpen).map((tabGroup) => tabGroup.id));
   const { userPreferences } = await Storage.getItems("userPreferences");
@@ -363,7 +363,7 @@ async function runFocusTabGroupLikeOperation(
 
   const tabGroups = await operation(focusTabGroupOptions);
   if (tabGroups) {
-    return await ActiveWindowModel.updateActiveWindowTabGroups(
+    return await Model.updateActiveWindowTabGroups(
       windowId,
       // TODO: we should only updated the properties that were actually updated from the ChromeWindowMethods.focusTabGroup
       //  call instead of naivly always updating the collapsed and color properties
@@ -414,7 +414,7 @@ export async function useTabTitleForEligebleTabGroups() {
     }
 
     const [activeWindows, windows] = await Promise.all([
-      ActiveWindowModel.getAll(),
+      Model.getAll(),
       chrome.windows.getAll({ windowTypes: ["normal"], populate: true }) as Promise<(ChromeWindowWithId & { tabs: ChromeTabWithId[] })[]>,
     ]);
     const activeWindowsSet = new Set(activeWindows.map((activeWindow) => activeWindow.windowId));
@@ -436,7 +436,7 @@ export async function useTabTitleForEligebleTabGroups() {
 
         await Promise.all(
           Object.entries(tabsByGroupId).map(async ([groupId, tabsInGroup]) => {
-            const activeWindowTabGroup = await ActiveWindowModel.getActiveWindowTabGroup(window.id, parseInt(groupId));
+            const activeWindowTabGroup = await Model.getActiveWindowTabGroup(window.id, parseInt(groupId));
             const tabTitle = ChromeWindowMethods.getTabTitleForUseTabTitle(tabsInGroup);
             if (!activeWindowTabGroup || !activeWindowTabGroup.useTabTitle || !tabTitle || activeWindowTabGroup.title === tabTitle) {
               return;
@@ -447,7 +447,7 @@ export async function useTabTitleForEligebleTabGroups() {
               return;
             }
 
-            await ActiveWindowModel.updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, { title: updatedTabGroup.title });
+            await Model.updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, { title: updatedTabGroup.title });
           })
         );
       })
@@ -475,7 +475,7 @@ export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId) {
 export async function enableFocusMode(windowId: ChromeWindowId) {
   const myLogger = logger.createNestedLogger("enableFocusMode");
   try {
-    if ((await ActiveWindowModel.getOrThrow(windowId)).focusMode) {
+    if ((await Model.getOrThrow(windowId)).focusMode) {
       throw new Error("Focus mode is already enabled");
     }
 
@@ -484,7 +484,7 @@ export async function enableFocusMode(windowId: ChromeWindowId) {
       Storage.getItems(["lastSeenFocusModeColors"]),
     ]);
 
-    await ActiveWindowModel.update(windowId, {
+    await Model.update(windowId, {
       focusMode: {
         colors: lastSeenFocusModeColors,
         savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
@@ -515,7 +515,7 @@ export async function enableFocusMode(windowId: ChromeWindowId) {
 export async function disableFocusMode(windowId: ChromeWindowId) {
   const myLogger = logger.createNestedLogger("disableFocusMode");
   try {
-    const activeWindow = await ActiveWindowModel.getOrThrow(windowId);
+    const activeWindow = await Model.getOrThrow(windowId);
     const { focusMode } = activeWindow;
     if (!focusMode) {
       throw new Error("Focus mode is already disabled");
@@ -540,11 +540,11 @@ export async function disableFocusMode(windowId: ChromeWindowId) {
         })
       )
     ).filter((tabGroup) => tabGroup !== undefined);
-    await ActiveWindowModel.updateActiveWindowTabGroups(
+    await Model.updateActiveWindowTabGroups(
       windowId,
       updatedTabGroups.map((tabGroup) => ({ id: tabGroup.id, color: tabGroup.color }))
     );
-    return await ActiveWindowModel.update(windowId, { focusMode: null });
+    return await Model.update(windowId, { focusMode: null });
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
@@ -554,7 +554,7 @@ export async function activateLastActiveTabInGroup(windowId: ChromeWindowId, gro
   const myLogger = logger.createNestedLogger("activateLastActiveTabInGroup");
   try {
     const [activeWindowTabGroup, tabsInGroup, { userPreferences }] = await Promise.all([
-      ActiveWindowModel.getActiveWindowTabGroupOrThrow(windowId, groupId),
+      Model.getActiveWindowTabGroupOrThrow(windowId, groupId),
       chrome.tabs.query({ windowId, groupId }) as Promise<ChromeTabWithId[]>,
       Storage.getItems("userPreferences"),
     ]);
@@ -602,7 +602,7 @@ export async function activateLastActiveTabInGroup(windowId: ChromeWindowId, gro
 export async function updateLastActiveTabIdForTabGroupWithTabId(tabId: ChromeTabId) {
   const myLogger = logger.createNestedLogger("updateLastActiveTabIdForTabGroupWithTabId");
   try {
-    const activeWindowTabGroups = await ActiveWindowModel.getAllActiveWindowTabGroups();
+    const activeWindowTabGroups = await Model.getAllActiveWindowTabGroups();
     const activeWindowTabGroup = activeWindowTabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.lastActiveTabId === tabId);
     if (activeWindowTabGroup) {
       const tabsInGroup = (await chrome.tabs.query({
@@ -610,7 +610,7 @@ export async function updateLastActiveTabIdForTabGroupWithTabId(tabId: ChromeTab
         groupId: activeWindowTabGroup.id,
       })) as ChromeTabWithId[];
       const lastAccessedOrGreatestIndexTab = await ChromeWindowMethods.getLastAccessedOrGreatestIndexTab(tabsInGroup);
-      await ActiveWindowModel.updateActiveWindowTabGroup(activeWindowTabGroup.windowId, activeWindowTabGroup.id, {
+      await Model.updateActiveWindowTabGroup(activeWindowTabGroup.windowId, activeWindowTabGroup.id, {
         lastActiveTabId: lastAccessedOrGreatestIndexTab?.id ?? null,
       });
     }
@@ -626,7 +626,7 @@ export async function updateFocusModeColorForTabGroupWithColor(
 ) {
   const myLogger = logger.createNestedLogger("updateFocusModeColorForTabGroupWithColor");
   try {
-    const activeWindow = await ActiveWindowModel.getOrThrow(windowId);
+    const activeWindow = await Model.getOrThrow(windowId);
     if (activeWindow.focusMode === null) {
       return;
     }
@@ -651,10 +651,10 @@ export async function updateFocusModeColorForTabGroupWithColor(
 
     if (isFocusedTabGroup) {
       newFocusModeColors = { ...activeWindow.focusMode.colors, focused: color };
-      await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
+      await Model.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
     } else {
       newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: color };
-      await ActiveWindowModel.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
+      await Model.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
       // this will effectively update the color of all other non-focused tab groups
       await focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
     }
@@ -673,7 +673,7 @@ export async function createActiveWindowTabGroupIfNotExists(windowId: ChromeWind
   try {
     const [tabGroup, activeWindowTabGroup] = await Promise.all([
       ChromeWindowMethods.getIfTabGroupExists(tabGroupId),
-      ActiveWindowModel.getActiveWindowTabGroup(windowId, tabGroupId),
+      Model.getActiveWindowTabGroup(windowId, tabGroupId),
     ]);
 
     if (!tabGroup) {

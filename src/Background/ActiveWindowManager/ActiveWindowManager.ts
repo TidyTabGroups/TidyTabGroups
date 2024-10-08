@@ -1,4 +1,4 @@
-import * as ActiveWindowModel from "./ActiveWindowModel";
+import Model from "./Model";
 import * as ActiveWindowMethods from "./ActiveWindowMethods";
 import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../../Shared/Types/Types";
 import ChromeWindowMethods from "../../Shared/ChromeWindowMethods";
@@ -174,7 +174,7 @@ export async function initialize(onError: (message: string) => void) {
           return;
         }
 
-        const activeWindowTabGroup = await ActiveWindowModel.getActiveWindowTabGroup(tabGroup.windowId, tabGroup.id);
+        const activeWindowTabGroup = await Model.getActiveWindowTabGroup(tabGroup.windowId, tabGroup.id);
         if (!activeWindowTabGroup) {
           myLogger.warn(
             `activeWindowTabGroup not found. tabGroup.id: ${tabGroup.id}, tabGroup.title: ${tabGroup.title}, windowId: ${tabGroup.windowId}`
@@ -343,14 +343,14 @@ export async function initialize(onError: (message: string) => void) {
           try {
             if (message.type === messageTypes[0]) {
               const { windowId } = message.data as { windowId: ChromeWindowId };
-              const activeWindow = await ActiveWindowModel.get(windowId);
+              const activeWindow = await Model.get(windowId);
               sendResponse({ data: { activeWindow } });
             } else if (message.type === messageTypes[1]) {
               const { windowId, updateProps } = message.data as {
                 windowId: Types.ActiveWindow["windowId"];
                 updateProps: Partial<Types.ActiveWindow>;
               };
-              const updatedActiveWindow = await ActiveWindowModel.update(windowId, updateProps);
+              const updatedActiveWindow = await Model.update(windowId, updateProps);
               sendResponse({ activeWindow: updatedActiveWindow });
             } else if (message.type === messageTypes[2]) {
               const { windowId, tabGroupId, enabled } = message.data as {
@@ -362,7 +362,7 @@ export async function initialize(onError: (message: string) => void) {
               sendResponse({ data: { activeWindowTabGroup } });
             } else if (message.type === messageTypes[3]) {
               const { windowId, tabGroupId } = message.data as { windowId: ChromeWindowId; tabGroupId: ChromeTabGroupId };
-              const activeWindowTabGroup = await ActiveWindowModel.getActiveWindowTabGroup(windowId, tabGroupId);
+              const activeWindowTabGroup = await Model.getActiveWindowTabGroup(windowId, tabGroupId);
               sendResponse({ data: { activeWindowTabGroup } });
             } else if (message.type === messageTypes[4]) {
               const { windowId, enabled } = message.data as { windowId: ChromeWindowId; enabled: boolean };
@@ -409,7 +409,7 @@ export async function initialize(onError: (message: string) => void) {
           let activeWindow: Types.ActiveWindow;
           try {
             const windowId = await windowIdOrPromisedWindowId;
-            const myActiveWindow = await ActiveWindowModel.get(windowId);
+            const myActiveWindow = await Model.get(windowId);
             if (!myActiveWindow) {
               myLogger.warn("activeWindow not found, ignoring operation: ", name);
               return;

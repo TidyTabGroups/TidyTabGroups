@@ -1,5 +1,5 @@
 import ChromeWindowMethods from "../../../Shared/ChromeWindowMethods";
-import * as ActiveWindowModel from "../ActiveWindowModel";
+import * as ActiveWindowModel from "../Model/Model";
 import Types from "../../../Shared/Types";
 import {
   ChromeTabGroupWithId,

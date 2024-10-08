@@ -1,10 +1,10 @@
-import Types from "../../Shared/Types";
-import { ChromeWindowId, ChromeTabGroupId } from "../../Shared/Types/Types";
-import Misc from "../../Shared/Misc";
-import Logger from "../../Shared/Logger";
-import * as ActiveWindowDatabase from "./ActiveWindowDatabase";
+import Types from "../../../Shared/Types";
+import { ChromeWindowId, ChromeTabGroupId } from "../../../Shared/Types/Types";
+import Misc from "../../../Shared/Misc";
+import Logger from "../../../Shared/Logger";
+import * as Database from "./Database";
 
-const logger = Logger.createLogger("ActiveWindow", { color: "#b603fc" });
+const logger = Logger.createLogger("ActiveWindowManager::Model", { color: "#b603fc" });
 
 let activeWindows: Types.ActiveWindow[] = [];
 
@@ -45,7 +45,7 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
       // match and sync the starting active window
       let startingWindowSyncedId: Types.ActiveWindow["windowId"] | null = null;
       if (startingWindowId !== undefined) {
-        const startingPreviousActiveWindow = await ActiveWindowDatabase.get(startingWindowId);
+        const startingPreviousActiveWindow = await Database.get(startingWindowId);
         if (startingPreviousActiveWindow) {
           activeWindows.push(startingPreviousActiveWindow);
           startingWindowSyncedId = startingPreviousActiveWindow.windowId;
@@ -57,7 +57,7 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
       startingWindowSyncing.resolve(startingWindowSyncedId);
 
       // match and sync the remaining active windows
-      const [windows, previousActiveWindows] = await Promise.all([chrome.windows.getAll({ windowTypes: ["normal"] }), ActiveWindowDatabase.getAll()]);
+      const [windows, previousActiveWindows] = await Promise.all([chrome.windows.getAll({ windowTypes: ["normal"] }), Database.getAll()]);
       const remainingPreviousActiveWindows =
         startingWindowId !== undefined
           ? previousActiveWindows.filter((activeWindow) => activeWindow.windowId !== startingWindowId)
@@ -118,7 +118,7 @@ function addInternal(activeWindow: Types.ActiveWindow) {
     throw new Error(`ActiveWindow::active window with id ${activeWindow.windowId} already exists`);
   }
   activeWindows.push(activeWindow);
-  ActiveWindowDatabase.add(activeWindow).catch((error) => {
+  Database.add(activeWindow).catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`addInternal::failed to add active window with id ${activeWindow.windowId} to database: ${error}`);
   });
@@ -132,7 +132,7 @@ function removeInternal(id: Types.ActiveWindow["windowId"]) {
   }
 
   activeWindows.splice(index, 1);
-  ActiveWindowDatabase.remove(id).catch((error) => {
+  Database.remove(id).catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`removeInternal::failed to remove active window with id ${id} from database: ${error}`);
   });
@@ -143,7 +143,7 @@ function updateInternal(id: Types.ActiveWindow["windowId"], updatedProperties: P
   const activeWindow = getOrThrowInternal(id);
   const updatedActiveWindow = Object.assign(activeWindow, updatedProperties);
   // FIXME: pass in Partial<Types.ModelDataBaseActiveWindow> instead of Partial<Types.ActiveWindow>
-  ActiveWindowDatabase.update(id, updatedProperties).catch((error) => {
+  Database.update(id, updatedProperties).catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`updateInternal::failed to update active window with id ${id} in database: ${error}`);
   });
@@ -153,7 +153,7 @@ function updateInternal(id: Types.ActiveWindow["windowId"], updatedProperties: P
 function clearInternal() {
   throwIfNotSynced("clearInternal");
   activeWindows = [];
-  ActiveWindowDatabase.clear().catch((error) => {
+  Database.clear().catch((error) => {
     // TODO: bubble error up to global level
     logger.error(`reactivateAllWindows::failed to clear database: ${error}`);
   });

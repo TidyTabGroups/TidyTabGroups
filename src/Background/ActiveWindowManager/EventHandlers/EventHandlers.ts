@@ -1,7 +1,7 @@
 import ChromeWindowMethods from "../../../Shared/ChromeWindowMethods";
 import Logger from "../../../Shared/Logger";
 import Misc from "../../../Shared/Misc";
-import * as ActiveWindowModel from "../ActiveWindowModel";
+import Model from "../Model";
 import * as ActiveWindowMethods from "../ActiveWindowMethods";
 import Types from "../../../Shared/Types";
 import {
@@ -90,7 +90,7 @@ export async function onTabGroupRemoved(activeWindow: Types.ActiveWindow, tabGro
   myLogger.log(`tabGroup:`, tabGroup.id, tabGroup.title, tabGroup.collapsed, tabGroup.color);
   try {
     // 1
-    await ActiveWindowModel.removeActiveWindowTabGroup(activeWindow.windowId, tabGroup.id);
+    await Model.removeActiveWindowTabGroup(activeWindow.windowId, tabGroup.id);
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(`error:${error}`));
   }
@@ -116,7 +116,7 @@ export async function onTabGroupUpdated(
         tabGroup.id,
         async ({ tabGroup }) => {
           const prevActiveWindowTabGroupColor = activeWindowTabGroup.color;
-          await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { color: changeInfo.color });
+          await Model.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { color: changeInfo.color });
 
           if (!activeWindow.focusMode) {
             return;
@@ -133,7 +133,7 @@ export async function onTabGroupUpdated(
               return;
             }
 
-            await ActiveWindowModel.updateActiveWindowTabGroup(tabGroup.windowId, tabGroup.id, { color: tabGroupUpToDate.color });
+            await Model.updateActiveWindowTabGroup(tabGroup.windowId, tabGroup.id, { color: tabGroupUpToDate.color });
           } else {
             await ActiveWindowMethods.updateFocusModeColorForTabGroupWithColor(activeWindow.windowId, tabGroup.id, changeInfo.color!);
           }
@@ -146,7 +146,7 @@ export async function onTabGroupUpdated(
       await ActiveWindowOperationRunner.runActiveWindowTabGroupOperation(
         tabGroup.id,
         async () => {
-          await ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: false });
+          await Model.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: false });
           await ActiveWindowMethods.activateLastActiveTabInGroup(activeWindow.windowId, tabGroup.id);
         },
         { collapsed: false }
@@ -156,7 +156,7 @@ export async function onTabGroupUpdated(
     if (wasCollapsed) {
       await ActiveWindowOperationRunner.runActiveWindowTabGroupOperation(
         tabGroup.id,
-        () => ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: true }),
+        () => Model.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { collapsed: true }),
         { collapsed: true }
       );
     }
@@ -166,7 +166,7 @@ export async function onTabGroupUpdated(
       await ActiveWindowOperationRunner.runActiveWindowTabGroupOperation(
         tabGroup.id,
         ({ tabGroup }) =>
-          ActiveWindowModel.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { title: tabGroup.title, useTabTitle: false }),
+          Model.updateActiveWindowTabGroup(activeWindow.windowId, tabGroup.id, { title: tabGroup.title, useTabTitle: false }),
         { title: changeInfo.title }
       );
     }
@@ -252,7 +252,7 @@ export async function onTabActivated(tabId: ChromeTabId) {
       tabId,
       async ({ tab }) => {
         if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-          await ActiveWindowModel.updateActiveWindowTabGroup(tab.windowId, tab.groupId, { lastActiveTabId: tab.id });
+          await Model.updateActiveWindowTabGroup(tab.windowId, tab.groupId, { lastActiveTabId: tab.id });
         }
       },
       { active: true }
@@ -370,7 +370,7 @@ export async function onMouseInPageStatusChanged(tabId: ChromeTabId, status: Typ
 }
 
 export async function onEnabledCollapseUnfocusedTabGroups() {
-  const activeWindows = await ActiveWindowModel.getAll();
+  const activeWindows = await Model.getAll();
   const activeTabs = (await chrome.tabs.query({ active: true })) as ChromeTabWithId[];
   const activeTabsByWindowId = activeTabs.reduce((acc, activeTab) => {
     acc[activeTab.windowId] = activeTab;
@@ -387,7 +387,7 @@ export async function onEnabledCollapseUnfocusedTabGroups() {
 }
 
 export async function onEnabledAlwaysGroupTabs() {
-  const activeWindows = await ActiveWindowModel.getAll();
+  const activeWindows = await Model.getAll();
   await Promise.all(
     activeWindows.map(async (activeWindow) => {
       await ActiveWindowMethods.groupUnpinnedAndUngroupedTabs(activeWindow.windowId);
@@ -406,13 +406,13 @@ export async function onChangeKeepTabGroupOpen(windowId: ChromeWindowId, tabGrou
       }
     }
   }
-  return await ActiveWindowModel.updateActiveWindowTabGroup(windowId, tabGroupId, updatedProps);
+  return await Model.updateActiveWindowTabGroup(windowId, tabGroupId, updatedProps);
 }
 
 export async function onChangeFocusMode(windowId: ChromeWindowId, enabled: boolean) {
   const myLogger = logger.createNestedLogger("onChangeFocusMode");
   try {
-    await ActiveWindowModel.getOrThrow(windowId);
+    await Model.getOrThrow(windowId);
     if (enabled) {
       return await ActiveWindowMethods.enableFocusMode(windowId);
     } else {
@@ -426,7 +426,7 @@ export async function onChangeFocusMode(windowId: ChromeWindowId, enabled: boole
 export async function onChangeActivateCurrentWindow(windowId: ChromeWindowId, enabled: boolean) {
   const myLogger = logger.createNestedLogger("onChangeActivateCurrentWindow");
   try {
-    const activeWindow = await ActiveWindowModel.get(windowId);
+    const activeWindow = await Model.get(windowId);
     if (enabled) {
       if (activeWindow) {
         throw new Error(`Current window with id ${windowId} is already active`);
@@ -446,7 +446,7 @@ export async function onChangeActivateCurrentWindow(windowId: ChromeWindowId, en
 export async function onChangeHighlightPrevActiveTabGroup(enabled: boolean) {
   const myLogger = logger.createNestedLogger("onChangeHighlightPrevActiveTabGroup");
   try {
-    const activeWindows = await ActiveWindowModel.getAll();
+    const activeWindows = await Model.getAll();
     await Promise.all(
       activeWindows.map(async (activeWindow) => {
         const [activeTab] = (await chrome.tabs.query({ active: true, windowId: activeWindow.windowId })) as (ChromeTabWithId | undefined)[];

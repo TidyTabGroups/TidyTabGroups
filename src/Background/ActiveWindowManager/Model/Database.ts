@@ -1,6 +1,6 @@
 import { IDBPTransaction, StoreNames } from "idb";
-import Database from "../../Shared/Database";
-import Types from "../../Shared/Types";
+import Database from "../../../Shared/Database";
+import Types from "../../../Shared/Types";
 
 export async function getKey(
   id: Types.ModelDataBaseActiveWindow["windowId"],
@@ -25,7 +25,7 @@ export async function getOrThrow(
   const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
   const activeWindow = await get(id, transaction);
   if (!activeWindow) {
-    throw new Error(`ActiveWindowDatabase::getOrThrow with id ${id} not found`);
+    throw new Error(`Database::getOrThrow with id ${id} not found`);
   }
   return activeWindow;
 }
@@ -59,7 +59,7 @@ export async function remove(
 
   const key = await transaction.objectStore("activeWindows").getKey(id);
   if (!key) {
-    throw new Error(`ActiveWindowDatabase::removeFromDatabase with id ${id} not found`);
+    throw new Error(`Database::removeFromDatabase with id ${id} not found`);
   }
 
   await transaction.objectStore("activeWindows").delete(id);
