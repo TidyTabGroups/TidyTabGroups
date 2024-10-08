@@ -1,4 +1,4 @@
-import ActiveWindowManager from "./ActiveWindowManager";
+import View from "./ActiveWindowManager/View";
 import Database from "../Shared/Database";
 import Logger from "../Shared/Logger";
 import Misc from "../Shared/Misc";
@@ -12,7 +12,7 @@ Database.initializeDatabaseConnection("model").catch((error) => {
   onError(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
 });
 
-ActiveWindowManager.initialize((error) => {
+View.initialize((error) => {
   const myLogger = logger.createNestedLogger("ActiveWindowManager.initialize");
   onError(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
 });

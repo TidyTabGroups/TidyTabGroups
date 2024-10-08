@@ -1,13 +1,13 @@
-import Model from "./Model";
-import ViewModel from "./ViewModel";
-import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../../Shared/Types/Types";
-import ChromeWindowMethods from "../../Shared/ChromeWindowMethods";
-import Logger from "../../Shared/Logger";
-import Types from "../../Shared/Types";
-import Storage from "../../Shared/Storage";
+import Model from "../Model";
+import ViewModel from "../ViewModel";
+import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../../../Shared/Types/Types";
+import ChromeWindowMethods from "../../../Shared/ChromeWindowMethods";
+import Logger from "../../../Shared/Logger";
+import Types from "../../../Shared/Types";
+import Storage from "../../../Shared/Storage";
 import EventHandlers from "./EventHandlers";
-import * as MouseInPageTracker from "./MouseInPageTracker";
-import Misc from "../../Shared/Misc";
+import * as MouseInPageTracker from "../MouseInPageTracker";
+import Misc from "../../../Shared/Misc";
 
 const logger = Logger.createLogger("ActiveWindowManager", { color: "#fcba03" });
 

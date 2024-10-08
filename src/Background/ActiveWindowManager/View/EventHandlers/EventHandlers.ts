@@ -1,9 +1,9 @@
-import ChromeWindowMethods from "../../../Shared/ChromeWindowMethods";
-import Logger from "../../../Shared/Logger";
-import Misc from "../../../Shared/Misc";
-import Model from "../Model";
-import ViewModel from "../ViewModel";
-import Types from "../../../Shared/Types";
+import ChromeWindowMethods from "../../../../Shared/ChromeWindowMethods";
+import Logger from "../../../../Shared/Logger";
+import Misc from "../../../../Shared/Misc";
+import Model from "../../Model";
+import ViewModel from "../../ViewModel";
+import Types from "../../../../Shared/Types";
 import {
   ChromeTabGroupChangeInfo,
   ChromeTabGroupId,
@@ -11,8 +11,8 @@ import {
   ChromeTabWithId,
   ChromeWindowId,
   ChromeWindowWithId,
-} from "../../../Shared/Types/Types";
-import Storage from "../../../Shared/Storage";
+} from "../../../../Shared/Types/Types";
+import Storage from "../../../../Shared/Storage";
 import * as ActiveWindowOperationRunner from "./OperationRunner";
 
 const logger = Logger.createLogger("ActiveWindowManager::EventHandlers", { color: "#4287f5" });

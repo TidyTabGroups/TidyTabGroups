@@ -1,6 +1,6 @@
-import ChromeWindowMethods from "../../../Shared/ChromeWindowMethods";
-import * as ActiveWindowModel from "../Model/Model";
-import Types from "../../../Shared/Types";
+import ChromeWindowMethods from "../../../../Shared/ChromeWindowMethods";
+import * as ActiveWindowModel from "../../Model/Model";
+import Types from "../../../../Shared/Types";
 import {
   ChromeTabGroupWithId,
   ChromeTabGroupId,
@@ -8,7 +8,7 @@ import {
   ChromeTabWithId,
   ChromeWindowId,
   ChromeWindowWithId,
-} from "../../../Shared/Types/Types";
+} from "../../../../Shared/Types/Types";
 
 export async function runActiveWindowOperation(
     windowId: ChromeWindowId,
