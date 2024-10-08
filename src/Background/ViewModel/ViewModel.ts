@@ -1,7 +1,7 @@
 import ChromeWindowMethods from "../../Shared/ChromeWindowMethods";
 import Logger from "../../Shared/Logger";
 import Misc from "../../Shared/Misc";
-import Model from "../Model";
+import * as Model from "../Model/Model";
 import * as MouseInPageTracker from "../MouseInPageTracker";
 import Types from "../../Shared/Types";
 import {

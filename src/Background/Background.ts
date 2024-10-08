@@ -1,4 +1,4 @@
-import View from "./View";
+import * as View from "./View/View";
 import Database from "../Shared/Database";
 import Logger from "../Shared/Logger";
 import Misc from "../Shared/Misc";

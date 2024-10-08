@@ -1,11 +1,11 @@
-import Model from "../Model";
-import ViewModel from "../ViewModel";
+import * as Model from "../Model/Model";
+import * as ViewModel from "../ViewModel/ViewModel";
 import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../../Shared/Types/Types";
 import ChromeWindowMethods from "../../Shared/ChromeWindowMethods";
 import Logger from "../../Shared/Logger";
 import Types from "../../Shared/Types";
 import Storage from "../../Shared/Storage";
-import EventHandlers from "./EventHandlers";
+import * as EventHandlers from "./EventHandlers/EventHandlers";
 import * as MouseInPageTracker from "../MouseInPageTracker";
 import Misc from "../../Shared/Misc";
 

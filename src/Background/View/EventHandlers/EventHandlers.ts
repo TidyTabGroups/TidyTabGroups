@@ -1,8 +1,8 @@
 import ChromeWindowMethods from "../../../Shared/ChromeWindowMethods";
 import Logger from "../../../Shared/Logger";
 import Misc from "../../../Shared/Misc";
-import Model from "../../Model";
-import ViewModel from "../../ViewModel";
+import * as Model from "../../Model/Model";
+import * as ViewModel from "../../ViewModel/ViewModel";
 import Types from "../../../Shared/Types";
 import {
   ChromeTabGroupChangeInfo,
