@@ -60,7 +60,7 @@ export async function reactivateAllWindows() {
     reactivatingAllWindows = true;
 
     const [windows, previousActiveWindows] = await Promise.all([
-      chrome.windows.getAll() as Promise<ChromeWindowWithId[]>,
+      chrome.windows.getAll({ windowTypes: ["normal"] }) as Promise<ChromeWindowWithId[]>,
       Model.getAll(),
     ]);
     const windowIds = windows.map((window) => window.id);
@@ -88,7 +88,7 @@ export async function activateAllWindows() {
   activatingAllWindows = true;
 
   try {
-    const windows = (await chrome.windows.getAll()) as ChromeWindowWithId[];
+    const windows = (await chrome.windows.getAll({ windowTypes: ["normal"] })) as ChromeWindowWithId[];
     await Promise.all(windows.map((window) => activateWindowInternal(window.id)));
   } catch (error) {
     throw new Error(`activateAllWindows::${error}`);
