@@ -1,6 +1,12 @@
 import * as Model from "../Model/Model";
 import * as ViewModel from "../ViewModel/ViewModel";
-import { ChromeTabGroupChangeInfo, ChromeTabGroupId, ChromeTabId, ChromeTabWithId, ChromeWindowId } from "../../Shared/Types/Types";
+import {
+  ChromeTabGroupChangeInfo,
+  ChromeTabGroupId,
+  ChromeTabId,
+  ChromeTabWithId,
+  ChromeWindowId,
+} from "../../Shared/Types/Types";
 import ChromeWindowMethods from "../../Shared/ChromeWindowMethods";
 import Logger from "../../Shared/Logger";
 import Types from "../../Shared/Types";
@@ -44,7 +50,10 @@ export async function initialize(onError: (message: string) => void) {
       return;
     }
 
-    if (!userPreferences.oldValue.collapseUnfocusedTabGroups && userPreferences.newValue.collapseUnfocusedTabGroups) {
+    if (
+      !userPreferences.oldValue.collapseUnfocusedTabGroups &&
+      userPreferences.newValue.collapseUnfocusedTabGroups
+    ) {
       queueOperation(
         {
           name: "onEnabledCollapseUnfocusedTabGroups",
@@ -64,11 +73,17 @@ export async function initialize(onError: (message: string) => void) {
       );
     }
 
-    if (userPreferences.oldValue.highlightPrevActiveTabGroup !== userPreferences.newValue.highlightPrevActiveTabGroup) {
+    if (
+      userPreferences.oldValue.highlightPrevActiveTabGroup !==
+      userPreferences.newValue.highlightPrevActiveTabGroup
+    ) {
       queueOperation(
         {
           name: "onChangeHighlightPrevActiveTabGroup",
-          operation: () => EventHandlers.onChangeHighlightPrevActiveTabGroup(userPreferences.newValue.highlightPrevActiveTabGroup),
+          operation: () =>
+            EventHandlers.onChangeHighlightPrevActiveTabGroup(
+              userPreferences.newValue.highlightPrevActiveTabGroup
+            ),
         },
         false
       );
@@ -86,7 +101,9 @@ export async function initialize(onError: (message: string) => void) {
     const myLogger = logger.createNestedLogger("windows.onCreated");
     const windowId = window.id;
     if (windowId === undefined || window.type !== "normal") {
-      myLogger.log(`windowId is not valid or window type is not 'normal', ignoring operation: windowId: ${windowId}, window.type: ${window.type}`);
+      myLogger.log(
+        `windowId is not valid or window type is not 'normal', ignoring operation: windowId: ${windowId}, window.type: ${window.type}`
+      );
       return;
     }
 
@@ -111,7 +128,12 @@ export async function initialize(onError: (message: string) => void) {
     const myLogger = logger.createNestedLogger("windows.onRemoved");
     myLogger.log(`windowId: ${windowId}`);
 
-    queueOperationIfWindowIsActive(EventHandlers.onWindowRemoved, windowId, true, "onWindowRemoved");
+    queueOperationIfWindowIsActive(
+      EventHandlers.onWindowRemoved,
+      windowId,
+      true,
+      "onWindowRemoved"
+    );
   });
 
   chrome.windows.onFocusChanged.addListener((windowId: ChromeWindowId) => {
@@ -174,7 +196,10 @@ export async function initialize(onError: (message: string) => void) {
           return;
         }
 
-        const activeWindowTabGroup = await Model.getActiveWindowTabGroup(tabGroup.windowId, tabGroup.id);
+        const activeWindowTabGroup = await Model.getActiveWindowTabGroup(
+          tabGroup.windowId,
+          tabGroup.id
+        );
         if (!activeWindowTabGroup) {
           myLogger.warn(
             `activeWindowTabGroup not found. tabGroup.id: ${tabGroup.id}, tabGroup.title: ${tabGroup.title}, windowId: ${tabGroup.windowId}`
@@ -183,12 +208,18 @@ export async function initialize(onError: (message: string) => void) {
         }
 
         const changeInfo: ChromeTabGroupChangeInfo = {
-          collapsed: tabGroup.collapsed !== activeWindowTabGroup.collapsed ? tabGroup.collapsed : undefined,
+          collapsed:
+            tabGroup.collapsed !== activeWindowTabGroup.collapsed ? tabGroup.collapsed : undefined,
           title: tabGroup.title !== activeWindowTabGroup.title ? tabGroup.title : undefined,
           color: tabGroup.color !== activeWindowTabGroup.color ? tabGroup.color : undefined,
         };
 
-        await EventHandlers.onTabGroupUpdated(activeWindow, activeWindowTabGroup, tabGroup, changeInfo);
+        await EventHandlers.onTabGroupUpdated(
+          activeWindow,
+          activeWindowTabGroup,
+          tabGroup,
+          changeInfo
+        );
       },
       tabGroup.windowId,
       false,
@@ -238,29 +269,35 @@ export async function initialize(onError: (message: string) => void) {
     );
   });
 
-  chrome.tabs.onUpdated.addListener((tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-    // only handle these changeInfo properties
-    const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = ["groupId", "title", "pinned"];
-    if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
-      return;
-    }
+  chrome.tabs.onUpdated.addListener(
+    (tabId: ChromeTabId, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+      // only handle these changeInfo properties
+      const validChangeInfo: Array<keyof chrome.tabs.TabChangeInfo> = [
+        "groupId",
+        "title",
+        "pinned",
+      ];
+      if (!validChangeInfo.find((key) => changeInfo[key] !== undefined)) {
+        return;
+      }
 
-    const myLogger = logger.createNestedLogger("tabs.onUpdated");
-    myLogger.log(`tabId: ${tabId}, title: ${tab.title}, changeInfo: `, changeInfo);
+      const myLogger = logger.createNestedLogger("tabs.onUpdated");
+      myLogger.log(`tabId: ${tabId}, title: ${tab.title}, changeInfo: `, changeInfo);
 
-    queueOperation(
-      {
-        name: myLogger.getPrefixedMessage("onTabUpdated"),
-        operation: async () => {
-          const myMyLogger = myLogger.createNestedLogger("onTabUpdated");
-          myMyLogger.log(`id: ${tab.id}, title: ${tab.title}, changeInfo: ${changeInfo}`);
+      queueOperation(
+        {
+          name: myLogger.getPrefixedMessage("onTabUpdated"),
+          operation: async () => {
+            const myMyLogger = myLogger.createNestedLogger("onTabUpdated");
+            myMyLogger.log(`id: ${tab.id}, title: ${tab.title}, changeInfo: ${changeInfo}`);
 
-          await EventHandlers.onTabUpdated(tabId, changeInfo);
+            await EventHandlers.onTabUpdated(tabId, changeInfo);
+          },
         },
-      },
-      false
-    );
-  });
+        false
+      );
+    }
+  );
 
   chrome.tabs.onRemoved.addListener((tabId: ChromeTabId, removeInfo: chrome.tabs.TabRemoveInfo) => {
     const myLogger = logger.createNestedLogger("tabs.onRemoved");
@@ -279,115 +316,144 @@ export async function initialize(onError: (message: string) => void) {
     );
   });
 
-  chrome.tabs.onAttached.addListener((tabId: ChromeTabId, attachInfo: chrome.tabs.TabAttachInfo) => {
-    const myLogger = logger.createNestedLogger("tabs.onAttached");
-    myLogger.log(`tab.id: '${tabId}', attachInfo.newWindowId: ${attachInfo.newWindowId}`);
+  chrome.tabs.onAttached.addListener(
+    (tabId: ChromeTabId, attachInfo: chrome.tabs.TabAttachInfo) => {
+      const myLogger = logger.createNestedLogger("tabs.onAttached");
+      myLogger.log(`tab.id: '${tabId}', attachInfo.newWindowId: ${attachInfo.newWindowId}`);
 
-    queueOperation(
-      {
-        name: myLogger.getPrefixedMessage("onTabAttached"),
-        operation: async () => {
-          const myMyLogger = myLogger.createNestedLogger("onTabAttached");
-          myMyLogger.log(`tab.id: '${tabId}', attachInfo.newWindowId: ${attachInfo.newWindowId}`);
-          await EventHandlers.onTabAttached(tabId, attachInfo);
+      queueOperation(
+        {
+          name: myLogger.getPrefixedMessage("onTabAttached"),
+          operation: async () => {
+            const myMyLogger = myLogger.createNestedLogger("onTabAttached");
+            myMyLogger.log(`tab.id: '${tabId}', attachInfo.newWindowId: ${attachInfo.newWindowId}`);
+            await EventHandlers.onTabAttached(tabId, attachInfo);
+          },
         },
-      },
-      false
-    );
-  });
-
-  chrome.tabs.onDetached.addListener((tabId: ChromeTabId, detachInfo: chrome.tabs.TabDetachInfo) => {
-    const myLogger = logger.createNestedLogger("tabs.onDetached");
-    myLogger.log(`tabId: ${tabId}, detachInfo.oldWindowId: ${detachInfo.oldWindowId}`);
-
-    queueOperationIfWindowIsActive(
-      async (activeWindow) => {
-        const myMyLogger = myLogger.createNestedLogger("onTabDetached");
-        myMyLogger.log(`tabId: ${tabId}, detachInfo.oldWindowId: ${detachInfo.oldWindowId}`);
-
-        await EventHandlers.onTabDetached(activeWindow, tabId);
-      },
-      detachInfo.oldWindowId,
-      false,
-      myLogger.getPrefixedMessage("onTabDetached")
-    );
-  });
-
-  chrome.runtime.onMessage.addListener((message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-    const myLogger = logger.createNestedLogger("onMessage");
-    myLogger.log(`message:`, message);
-
-    if (!message || !message.type) {
-      myLogger.warn(`message is not valid - message: ${message}, sender: ${sender}`);
-      return;
+        false
+      );
     }
+  );
 
-    myLogger.log(`message:`, message);
+  chrome.tabs.onDetached.addListener(
+    (tabId: ChromeTabId, detachInfo: chrome.tabs.TabDetachInfo) => {
+      const myLogger = logger.createNestedLogger("tabs.onDetached");
+      myLogger.log(`tabId: ${tabId}, detachInfo.oldWindowId: ${detachInfo.oldWindowId}`);
 
-    const messageTypes = [
-      "getActiveWindow",
-      "updateActiveWindow",
-      "onChangeKeepTabGroupOpen",
-      "getActiveWindowTabGroup",
-      "onChangeFocusMode",
-      "onChangeActivateCurrentWindow",
-    ];
-    if (!messageTypes.includes(message.type)) {
-      return;
+      queueOperationIfWindowIsActive(
+        async (activeWindow) => {
+          const myMyLogger = myLogger.createNestedLogger("onTabDetached");
+          myMyLogger.log(`tabId: ${tabId}, detachInfo.oldWindowId: ${detachInfo.oldWindowId}`);
+
+          await EventHandlers.onTabDetached(activeWindow, tabId);
+        },
+        detachInfo.oldWindowId,
+        false,
+        myLogger.getPrefixedMessage("onTabDetached")
+      );
     }
+  );
 
-    queueOperation(
-      {
-        name: myLogger.getPrefixedMessage("onMessage"),
-        operation: async () => {
-          try {
-            if (message.type === messageTypes[0]) {
-              const { windowId } = message.data as { windowId: ChromeWindowId };
-              const activeWindow = await Model.get(windowId);
-              sendResponse({ data: { activeWindow } });
-            } else if (message.type === messageTypes[1]) {
-              const { windowId, updateProps } = message.data as {
-                windowId: Types.ActiveWindow["windowId"];
-                updateProps: Partial<Types.ActiveWindow>;
-              };
-              const updatedActiveWindow = await Model.update(windowId, updateProps);
-              sendResponse({ activeWindow: updatedActiveWindow });
-            } else if (message.type === messageTypes[2]) {
-              const { windowId, tabGroupId, enabled } = message.data as {
-                windowId: ChromeWindowId;
-                tabGroupId: ChromeTabGroupId;
-                enabled: boolean;
-              };
-              const activeWindowTabGroup = await EventHandlers.onChangeKeepTabGroupOpen(windowId, tabGroupId, enabled);
-              sendResponse({ data: { activeWindowTabGroup } });
-            } else if (message.type === messageTypes[3]) {
-              const { windowId, tabGroupId } = message.data as { windowId: ChromeWindowId; tabGroupId: ChromeTabGroupId };
-              const activeWindowTabGroup = await Model.getActiveWindowTabGroup(windowId, tabGroupId);
-              sendResponse({ data: { activeWindowTabGroup } });
-            } else if (message.type === messageTypes[4]) {
-              const { windowId, enabled } = message.data as { windowId: ChromeWindowId; enabled: boolean };
-              const activeWindow = await EventHandlers.onChangeFocusMode(windowId, enabled);
-              sendResponse({ data: { activeWindow } });
-            } else if (message.type === messageTypes[5]) {
-              const { windowId, enabled } = message.data as { windowId: ChromeWindowId; enabled: boolean };
-              const activeWindow = await EventHandlers.onChangeActivateCurrentWindow(windowId, enabled);
-              sendResponse({ data: { activeWindow } });
-            } else {
-              throw new Error("message type is invalid");
+  chrome.runtime.onMessage.addListener(
+    (
+      message: any,
+      sender: chrome.runtime.MessageSender,
+      sendResponse: (response?: any) => void
+    ) => {
+      const myLogger = logger.createNestedLogger("onMessage");
+      myLogger.log(`message:`, message);
+
+      if (!message || !message.type) {
+        myLogger.warn(`message is not valid - message: ${message}, sender: ${sender}`);
+        return;
+      }
+
+      myLogger.log(`message:`, message);
+
+      const messageTypes = [
+        "getActiveWindow",
+        "updateActiveWindow",
+        "onChangeKeepTabGroupOpen",
+        "getActiveWindowTabGroup",
+        "onChangeFocusMode",
+        "onChangeActivateCurrentWindow",
+      ];
+      if (!messageTypes.includes(message.type)) {
+        return;
+      }
+
+      queueOperation(
+        {
+          name: myLogger.getPrefixedMessage("onMessage"),
+          operation: async () => {
+            try {
+              if (message.type === messageTypes[0]) {
+                const { windowId } = message.data as { windowId: ChromeWindowId };
+                const activeWindow = await Model.get(windowId);
+                sendResponse({ data: { activeWindow } });
+              } else if (message.type === messageTypes[1]) {
+                const { windowId, updateProps } = message.data as {
+                  windowId: Types.ActiveWindow["windowId"];
+                  updateProps: Partial<Types.ActiveWindow>;
+                };
+                const updatedActiveWindow = await Model.update(windowId, updateProps);
+                sendResponse({ activeWindow: updatedActiveWindow });
+              } else if (message.type === messageTypes[2]) {
+                const { windowId, tabGroupId, enabled } = message.data as {
+                  windowId: ChromeWindowId;
+                  tabGroupId: ChromeTabGroupId;
+                  enabled: boolean;
+                };
+                const activeWindowTabGroup = await EventHandlers.onChangeKeepTabGroupOpen(
+                  windowId,
+                  tabGroupId,
+                  enabled
+                );
+                sendResponse({ data: { activeWindowTabGroup } });
+              } else if (message.type === messageTypes[3]) {
+                const { windowId, tabGroupId } = message.data as {
+                  windowId: ChromeWindowId;
+                  tabGroupId: ChromeTabGroupId;
+                };
+                const activeWindowTabGroup = await Model.getActiveWindowTabGroup(
+                  windowId,
+                  tabGroupId
+                );
+                sendResponse({ data: { activeWindowTabGroup } });
+              } else if (message.type === messageTypes[4]) {
+                const { windowId, enabled } = message.data as {
+                  windowId: ChromeWindowId;
+                  enabled: boolean;
+                };
+                const activeWindow = await EventHandlers.onChangeFocusMode(windowId, enabled);
+                sendResponse({ data: { activeWindow } });
+              } else if (message.type === messageTypes[5]) {
+                const { windowId, enabled } = message.data as {
+                  windowId: ChromeWindowId;
+                  enabled: boolean;
+                };
+                const activeWindow = await EventHandlers.onChangeActivateCurrentWindow(
+                  windowId,
+                  enabled
+                );
+                sendResponse({ data: { activeWindow } });
+              } else {
+                throw new Error("message type is invalid");
+              }
+            } catch (error) {
+              const errorMessage = myLogger.getPrefixedMessage(`error processing message:${error}`);
+              sendResponse({ error: errorMessage });
+              throw new Error(errorMessage);
             }
-          } catch (error) {
-            const errorMessage = myLogger.getPrefixedMessage(`error processing message:${error}`);
-            sendResponse({ error: errorMessage });
-            throw new Error(errorMessage);
-          }
+          },
         },
-      },
-      true
-    );
+        true
+      );
 
-    // return true for the asynchronous response
-    return true;
-  });
+      // return true for the asynchronous response
+      return true;
+    }
+  );
 
   type ActiveWindowQueuedEventOperation = (activeWindow: Types.ActiveWindow) => Promise<void>;
   type QueuedEventOperation = { name: string; operation: () => Promise<void> };
@@ -416,7 +482,11 @@ export async function initialize(onError: (message: string) => void) {
             }
             activeWindow = myActiveWindow;
           } catch (error) {
-            throw new Error(myLogger.getPrefixedMessage(`error trying to get active window for operation: ${name}: ${error}`));
+            throw new Error(
+              myLogger.getPrefixedMessage(
+                `error trying to get active window for operation: ${name}: ${error}`
+              )
+            );
           }
           await operation(activeWindow);
         },
@@ -454,7 +524,9 @@ export async function initialize(onError: (message: string) => void) {
     try {
       await asyncInitializationSteps;
     } catch (error) {
-      const errorMessage = myLogger.getPrefixedMessage(`Error during asyncInitializationSteps: ${Misc.getErrorMessage(error)}`);
+      const errorMessage = myLogger.getPrefixedMessage(
+        `Error during asyncInitializationSteps: ${Misc.getErrorMessage(error)}`
+      );
       onBackgroundEventError(errorMessage);
       return;
     }
@@ -470,7 +542,9 @@ export async function initialize(onError: (message: string) => void) {
           await currentOperation.operation();
         } catch (error) {
           const errorMessage = myLogger.getPrefixedMessage(
-            `processQueue::Error processing operation: ${currentOperation.name}: ${Misc.getErrorMessage(error)}`
+            `processQueue::Error processing operation: ${
+              currentOperation.name
+            }: ${Misc.getErrorMessage(error)}`
           );
           onBackgroundEventError(errorMessage);
         } finally {
@@ -492,7 +566,14 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
 
   if (details.reason === "update" && details.previousVersion === "0.0.4") {
     await Storage.updateItems("userPreferences", (prev) => {
-      return { userPreferences: { ...prev.userPreferences, repositionTabs: false, repositionTabGroups: false, alwaysGroupTabs: false } };
+      return {
+        userPreferences: {
+          ...prev.userPreferences,
+          repositionTabs: false,
+          repositionTabGroups: false,
+          alwaysGroupTabs: false,
+        },
+      };
     });
   }
 
@@ -505,6 +586,9 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   // inject the content script into all tabs
   const tabs = (await chrome.tabs.query({})) as ChromeTabWithId[];
   for (const tab of tabs) {
-    chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["js/vendor.js", "js/content_script.js"] });
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true },
+      files: ["js/vendor.js", "js/content_script.js"],
+    });
   }
 }

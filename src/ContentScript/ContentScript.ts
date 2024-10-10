@@ -15,7 +15,8 @@ import Logger from "../Shared/Logger";
 
 // FIXME: There might be cases where the main frame is not accessible, but the subframes are. In this case, the mouse tracker logic will not work.
 
-const logger = process.env.NODE_ENV === "production" ? undefined : Logger.createLogger("content_script");
+const logger =
+  process.env.NODE_ENV === "production" ? undefined : Logger.createLogger("content_script");
 const isMainFrame = window === window.top;
 
 // Ping-pong message to check if the content script is running
@@ -204,7 +205,10 @@ DetachableDOM.addEventListener(
 function startPageFocusTimeout() {
   const myLogger = logger?.createNestedLogger("startPageFocusTimeout");
   if (!listenToPageFocusEvents) {
-    myLogger?.warn("should not be called when listenToPageFocusEvents is false - isMainFrame: ", isMainFrame);
+    myLogger?.warn(
+      "should not be called when listenToPageFocusEvents is false - isMainFrame: ",
+      isMainFrame
+    );
     return;
   }
 
@@ -234,7 +238,10 @@ function startPageFocusTimeout() {
 function clearPageFocusTimeout() {
   const myLogger = logger?.createNestedLogger("clearPageFocusTimeout");
   if (listenToPageFocusEvents) {
-    myLogger?.warn("should not be called when listenToPageFocusEvents is true - isMainFrame: ", isMainFrame);
+    myLogger?.warn(
+      "should not be called when listenToPageFocusEvents is true - isMainFrame: ",
+      isMainFrame
+    );
     return;
   }
 

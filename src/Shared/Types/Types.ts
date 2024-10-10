@@ -102,6 +102,10 @@ export type MouseInPageStatus = "entered" | "focused" | "left";
 
 export type FocusTabGroupOptions = {
   collapseUnfocusedTabGroups: boolean;
-  highlightColors?: { focused: chrome.tabGroups.ColorEnum; nonFocused: chrome.tabGroups.ColorEnum; highlightPrevActiveTabGroup?: boolean };
+  highlightColors?: {
+    focused: chrome.tabGroups.ColorEnum;
+    nonFocused: chrome.tabGroups.ColorEnum;
+    highlightPrevActiveTabGroup?: boolean;
+  };
   collapseIgnoreSet?: Set<ChromeTabGroupId>;
 };

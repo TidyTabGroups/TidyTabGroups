@@ -16,7 +16,17 @@ interface Connection<T extends DBSchema> {
   onStoreCreatedListeners: ((storeName: StoreNames<T>) => void)[];
 }
 
-import { DBSchema, IDBPDatabase, IDBPTransaction, IndexNames, StoreNames, openDB, unwrap, wrap, deleteDB } from "idb";
+import {
+  DBSchema,
+  IDBPDatabase,
+  IDBPTransaction,
+  IndexNames,
+  StoreNames,
+  openDB,
+  unwrap,
+  wrap,
+  deleteDB,
+} from "idb";
 import { ModelDataBase } from "../Types/Types";
 import Logger from "../Logger";
 
@@ -42,9 +52,10 @@ function getSchema<DBTypes extends DBSchema>(name: keyof typeof schemas) {
   return {
     version: schema.version,
     stores: schema.stores.map((storeDescription) => {
-      const newIndexes: IndexDescription<DBTypes, StoreNames<DBTypes>>[] = storeDescription.indexes.map((indexDescription) => {
-        return { ...indexDescription, name: indexDescription.name };
-      });
+      const newIndexes: IndexDescription<DBTypes, StoreNames<DBTypes>>[] =
+        storeDescription.indexes.map((indexDescription) => {
+          return { ...indexDescription, name: indexDescription.name };
+        });
       return { ...storeDescription, indexes: newIndexes };
     }),
   };
@@ -84,10 +95,15 @@ export function initializeDatabaseConnection<T extends DBSchema>(name: keyof typ
     try {
       const db = (await openDB<T>(name, schema.version, {
         upgrade(db, oldVersion, newVersion, transaction) {
-          console.log(`initializeDatabaseConnection::upgrade needed for ${name} database. Old version: ${oldVersion}, new version: ${newVersion}`);
+          console.log(
+            `initializeDatabaseConnection::upgrade needed for ${name} database. Old version: ${oldVersion}, new version: ${newVersion}`
+          );
           schema.stores.forEach((storeDescription) => {
             // FIXME: get rid of the `as StoreNames<T>` type assertion when we figure out how to type the `storeDescription.name` better
-            const store = db.createObjectStore(storeDescription.name as StoreNames<T>, storeDescription.options);
+            const store = db.createObjectStore(
+              storeDescription.name as StoreNames<T>,
+              storeDescription.options
+            );
             storeDescription.indexes?.forEach(({ name, keyPath, options }) => {
               return store.createIndex(name, keyPath, options);
             });
@@ -134,7 +150,11 @@ export function getDBConnection<T extends DBSchema>(name: keyof typeof schemas) 
   });
 }
 
-export async function createTransaction<DBTypes extends DBSchema, TxStores extends ArrayLike<StoreNames<DBTypes>>, Mode extends IDBTransactionMode>(
+export async function createTransaction<
+  DBTypes extends DBSchema,
+  TxStores extends ArrayLike<StoreNames<DBTypes>>,
+  Mode extends IDBTransactionMode
+>(
   connectionName: keyof typeof schemas,
   storeNames: TxStores,
   mode: Mode,
@@ -158,7 +178,11 @@ export async function useOrCreateTransaction<
     return [transaction, true];
   }
 
-  const newTransaction = await createTransaction<DBTypes, TxStores, Mode>(connectionName, storeNames, mode);
+  const newTransaction = await createTransaction<DBTypes, TxStores, Mode>(
+    connectionName,
+    storeNames,
+    mode
+  );
   return [newTransaction, false];
 }
 

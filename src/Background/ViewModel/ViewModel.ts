@@ -53,7 +53,9 @@ export function getWindowsBeingActivated() {
 
 export async function reactivateAllWindows() {
   if (isReactivatingAllWindows() || isActivatingAnyWindow()) {
-    throw new Error("reactivateAllWindows::already re-activating all windows, or another window is being activated");
+    throw new Error(
+      "reactivateAllWindows::already re-activating all windows, or another window is being activated"
+    );
   }
 
   try {
@@ -69,7 +71,9 @@ export async function reactivateAllWindows() {
 
     await Promise.all(
       windowIds.map(async (windowId) => {
-        const previousActiveWindow = previousActiveWindows.find((previousActiveWindow) => previousActiveWindow.windowId === windowId);
+        const previousActiveWindow = previousActiveWindows.find(
+          (previousActiveWindow) => previousActiveWindow.windowId === windowId
+        );
         await activateWindowInternal(windowId, previousActiveWindow?.focusMode?.colors);
       })
     );
@@ -88,7 +92,9 @@ export async function activateAllWindows() {
   activatingAllWindows = true;
 
   try {
-    const windows = (await chrome.windows.getAll({ windowTypes: ["normal"] })) as ChromeWindowWithId[];
+    const windows = (await chrome.windows.getAll({
+      windowTypes: ["normal"],
+    })) as ChromeWindowWithId[];
     await Promise.all(windows.map((window) => activateWindowInternal(window.id)));
   } catch (error) {
     throw new Error(`activateAllWindows::${error}`);
@@ -97,7 +103,10 @@ export async function activateAllWindows() {
   }
 }
 
-async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?: ActiveWindowFocusModeColors) {
+async function activateWindowInternal(
+  windowId: ChromeWindowId,
+  focusModeColors?: ActiveWindowFocusModeColors
+) {
   const myLogger = logger.createNestedLogger("activateWindowInternal");
   try {
     const window = (await chrome.windows.get(windowId)) as ChromeWindowWithId;
@@ -113,12 +122,20 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
     if (focusModeColors) {
       newFocusModeColors = focusModeColors;
     } else {
-      const { userPreferences, lastSeenFocusModeColors } = await Storage.getItems(["userPreferences", "lastSeenFocusModeColors"]);
-      newFocusModeColors = userPreferences.enableFocusModeForNewWindows ? lastSeenFocusModeColors : null;
+      const { userPreferences, lastSeenFocusModeColors } = await Storage.getItems([
+        "userPreferences",
+        "lastSeenFocusModeColors",
+      ]);
+      newFocusModeColors = userPreferences.enableFocusModeForNewWindows
+        ? lastSeenFocusModeColors
+        : null;
     }
 
     if (window.focused && newFocusModeColors) {
-      await Storage.setItems({ lastSeenFocusModeColors: newFocusModeColors, lastFocusedWindowHadFocusMode: true });
+      await Storage.setItems({
+        lastSeenFocusModeColors: newFocusModeColors,
+        lastFocusedWindowHadFocusMode: true,
+      });
     }
 
     const getUserPreferences = Misc.lazyCall(async () => {
@@ -127,17 +144,27 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
 
     let useTabTitleForGroupId: ChromeTabGroupId | null = null;
     if ((await getUserPreferences()).alwaysGroupTabs) {
-      const newTabGroupId = await ChromeWindowMethods.groupUnpinnedAndUngroupedTabsWithRetryHandler(windowId);
+      const newTabGroupId = await ChromeWindowMethods.groupUnpinnedAndUngroupedTabsWithRetryHandler(
+        windowId
+      );
       if (newTabGroupId) {
         const [newTabGroup, tabsInGroup] = await Promise.all([
           chrome.tabGroups.get(newTabGroupId),
           chrome.tabs.query({ groupId: newTabGroupId }) as Promise<ChromeTabWithId[]>,
         ]);
 
-        if (Misc.isTabGroupTitleEmpty(newTabGroup.title) && (await getUserPreferences()).setTabGroupTitle) {
-          const tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(newTabGroupId, {
-            title: ChromeWindowMethods.getTabTitleForUseTabTitle(tabsInGroup) ?? Misc.DEFAULT_TAB_GROUP_TITLE,
-          });
+        if (
+          Misc.isTabGroupTitleEmpty(newTabGroup.title) &&
+          (await getUserPreferences()).setTabGroupTitle
+        ) {
+          const tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(
+            newTabGroupId,
+            {
+              title:
+                ChromeWindowMethods.getTabTitleForUseTabTitle(tabsInGroup) ??
+                Misc.DEFAULT_TAB_GROUP_TITLE,
+            }
+          );
 
           if (tabGroupUpToDate) {
             useTabTitleForGroupId = newTabGroupId;
@@ -155,20 +182,27 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
       {
         collapseUnfocusedTabGroups: userPreferences.collapseUnfocusedTabGroups,
         highlightColors: newFocusModeColors
-          ? { ...newFocusModeColors, highlightPrevActiveTabGroup: userPreferences.highlightPrevActiveTabGroup }
+          ? {
+              ...newFocusModeColors,
+              highlightPrevActiveTabGroup: userPreferences.highlightPrevActiveTabGroup,
+            }
           : undefined,
       },
       true
     );
 
     const tabGroups = (await chrome.tabGroups.query({ windowId })) as ChromeTabGroupWithId[];
-    const lastActiveOrGreatestIndexTabByGroupId = await ChromeWindowMethods.getLastAccessedOrGreatestIndexTabByGroupId(tabs);
+    const lastActiveOrGreatestIndexTabByGroupId =
+      await ChromeWindowMethods.getLastAccessedOrGreatestIndexTabByGroupId(tabs);
 
     let newFocusMode = newFocusModeColors
       ? {
-        colors: newFocusModeColors,
-        savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
-      }
+          colors: newFocusModeColors,
+          savedTabGroupColors: tabGroups.map((tabGroup) => ({
+            tabGroupId: tabGroup.id,
+            color: tabGroup.color,
+          })),
+        }
       : null;
     const newActiveWindow = {
       windowId,
@@ -241,7 +275,10 @@ export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId
   if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
     const tabsInGroup = tabs.filter((otherTab) => otherTab.groupId === tab.groupId);
     const lastTabInGroup = tabsInGroup[tabsInGroup.length - 1];
-    if (lastTabInGroup.index < tabs[tabs.length - 1].index && (await getUserPreferences()).repositionTabGroups) {
+    if (
+      lastTabInGroup.index < tabs[tabs.length - 1].index &&
+      (await getUserPreferences()).repositionTabGroups
+    ) {
       await ChromeWindowMethods.moveTabGroupWithRetryHandler(tab.groupId, { index: -1 });
     } else {
       lastRelativeTabIndex = lastTabInGroup.index;
@@ -254,13 +291,18 @@ export async function repositionTab(windowId: ChromeWindowId, tabId: ChromeTabId
   }
 
   // If the tab opened any un-accessed tabs that are positioned after it, then dont move it
-  const isOpenerOfUnaccessedTabs = tabs.some((t) => t.openerTabId === tab.id && t.lastAccessed === undefined && t.index > tab.index);
+  const isOpenerOfUnaccessedTabs = tabs.some(
+    (t) => t.openerTabId === tab.id && t.lastAccessed === undefined && t.index > tab.index
+  );
   if (!isOpenerOfUnaccessedTabs) {
     await ChromeWindowMethods.moveTabWithRetryHandler(tabId, { index: lastRelativeTabIndex });
   }
 }
 
-export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGroup: ChromeTabGroupWithId) {
+export async function createActiveWindowTabGroup(
+  windowId: ChromeWindowId,
+  tabGroup: ChromeTabGroupWithId
+) {
   const myLogger = logger.createNestedLogger("createActiveWindowTabGroup");
   // 1. If focus mode is enabled, update the tab group color to the focused or non-focused color
   // 2. If the tab group is expanded but not focused, collapse the tab group
@@ -269,12 +311,18 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
   try {
     const existingActiveWindowTabGroup = await Model.getActiveWindowTabGroup(windowId, tabGroup.id);
     if (existingActiveWindowTabGroup) {
-      throw new Error(`tabGroup with id ${tabGroup.id} already exists in window with id ${windowId}`);
+      throw new Error(
+        `tabGroup with id ${tabGroup.id} already exists in window with id ${windowId}`
+      );
     }
 
     const activeWindow = await Model.getOrThrow(windowId);
-    const tabsInGroup = (await chrome.tabs.query({ windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
-    const lastAccessedOrGreatestIndexTab = await ChromeWindowMethods.getLastAccessedOrGreatestIndexTab(tabsInGroup);
+    const tabsInGroup = (await chrome.tabs.query({
+      windowId,
+      groupId: tabGroup.id,
+    })) as ChromeTabWithId[];
+    const lastAccessedOrGreatestIndexTab =
+      await ChromeWindowMethods.getLastAccessedOrGreatestIndexTab(tabsInGroup);
     let newActiveWindowTabGroup: ActiveWindowTabGroup = {
       ...tabGroup,
       useTabTitle: false,
@@ -292,9 +340,13 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     const { focusMode } = activeWindow;
     if (focusMode) {
       if (isFocusedTabGroup && focusMode.colors.focused !== tabGroupUpToDate.color) {
-        tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { color: focusMode.colors.focused });
+        tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, {
+          color: focusMode.colors.focused,
+        });
       } else if (!isFocusedTabGroup && focusMode.colors.nonFocused !== tabGroupUpToDate.color) {
-        tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { color: focusMode.colors.nonFocused });
+        tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, {
+          color: focusMode.colors.nonFocused,
+        });
       }
 
       if (!tabGroupUpToDate) {
@@ -305,8 +357,14 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     }
 
     // 2
-    if (!tabGroupUpToDate.collapsed && !isFocusedTabGroup && (await getUserPreferences()).collapseUnfocusedTabGroups) {
-      tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { collapsed: true });
+    if (
+      !tabGroupUpToDate.collapsed &&
+      !isFocusedTabGroup &&
+      (await getUserPreferences()).collapseUnfocusedTabGroups
+    ) {
+      tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, {
+        collapsed: true,
+      });
       if (!tabGroupUpToDate) {
         return;
       }
@@ -314,13 +372,19 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
     }
 
     // 3
-    const useTabTitle = Misc.isTabGroupTitleEmpty(tabGroupUpToDate.title) && (await getUserPreferences()).setTabGroupTitle;
+    const useTabTitle =
+      Misc.isTabGroupTitleEmpty(tabGroupUpToDate.title) &&
+      (await getUserPreferences()).setTabGroupTitle;
     if (useTabTitle) {
       // FIXME: remove the timeout workaround once the chromium bug is resolved: https://issues.chromium.org/issues/334965868#comment4
       await Misc.waitMs(30);
 
-      const tabsInGroup = (await chrome.tabs.query({ windowId: tabGroup.windowId, groupId: tabGroup.id })) as ChromeTabWithId[];
-      const newTitle = ChromeWindowMethods.getTabTitleForUseTabTitle(tabsInGroup) ?? Misc.DEFAULT_TAB_GROUP_TITLE;
+      const tabsInGroup = (await chrome.tabs.query({
+        windowId: tabGroup.windowId,
+        groupId: tabGroup.id,
+      })) as ChromeTabWithId[];
+      const newTitle =
+        ChromeWindowMethods.getTabTitleForUseTabTitle(tabsInGroup) ?? Misc.DEFAULT_TAB_GROUP_TITLE;
 
       tabGroupUpToDate = await ChromeWindowMethods.getIfTabGroupExists(tabGroup.id);
       if (!tabGroupUpToDate) {
@@ -328,12 +392,18 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
       }
 
       if (Misc.isTabGroupTitleEmpty(tabGroupUpToDate.title)) {
-        tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { title: newTitle });
+        tabGroupUpToDate = await ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, {
+          title: newTitle,
+        });
         if (!tabGroupUpToDate) {
           return;
         }
 
-        newActiveWindowTabGroup = { ...newActiveWindowTabGroup, title: tabGroupUpToDate.title, useTabTitle: true };
+        newActiveWindowTabGroup = {
+          ...newActiveWindowTabGroup,
+          title: tabGroupUpToDate.title,
+          useTabTitle: true,
+        };
       }
     }
 
@@ -346,17 +416,24 @@ export async function createActiveWindowTabGroup(windowId: ChromeWindowId, tabGr
 
 async function runFocusTabGroupLikeOperation(
   windowId: ChromeWindowId,
-  operation: (focusTabGroupOptions: FocusTabGroupOptions) => Promise<ChromeTabGroupWithId[] | undefined>
+  operation: (
+    focusTabGroupOptions: FocusTabGroupOptions
+  ) => Promise<ChromeTabGroupWithId[] | undefined>
 ) {
   const activeWindow = await Model.getOrThrow(windowId);
 
-  const collapseIgnoreSet = new Set(activeWindow.tabGroups.filter((tabGroup) => tabGroup.keepOpen).map((tabGroup) => tabGroup.id));
+  const collapseIgnoreSet = new Set(
+    activeWindow.tabGroups.filter((tabGroup) => tabGroup.keepOpen).map((tabGroup) => tabGroup.id)
+  );
   const { userPreferences } = await Storage.getItems("userPreferences");
 
   const focusTabGroupOptions = {
     collapseUnfocusedTabGroups: userPreferences.collapseUnfocusedTabGroups,
     highlightColors: activeWindow.focusMode?.colors
-      ? { ...activeWindow.focusMode.colors, highlightPrevActiveTabGroup: userPreferences.highlightPrevActiveTabGroup }
+      ? {
+          ...activeWindow.focusMode.colors,
+          highlightPrevActiveTabGroup: userPreferences.highlightPrevActiveTabGroup,
+        }
       : undefined,
     collapseIgnoreSet,
   };
@@ -367,17 +444,30 @@ async function runFocusTabGroupLikeOperation(
       windowId,
       // TODO: we should only updated the properties that were actually updated from the ChromeWindowMethods.focusTabGroup
       //  call instead of naivly always updating the collapsed and color properties
-      tabGroups.map((tabGroup) => ({ id: tabGroup.id, collapsed: tabGroup.collapsed, color: tabGroup.color }))
+      tabGroups.map((tabGroup) => ({
+        id: tabGroup.id,
+        collapsed: tabGroup.collapsed,
+        color: tabGroup.color,
+      }))
     );
   }
   return activeWindow;
 }
 
-export async function focusActiveTab(windowId: ChromeWindowId, tabId: ChromeTabId, tabGroupId: ChromeTabGroupId) {
+export async function focusActiveTab(
+  windowId: ChromeWindowId,
+  tabId: ChromeTabId,
+  tabGroupId: ChromeTabGroupId
+) {
   const myLogger = logger.createNestedLogger("focusActiveTab");
   try {
     return await runFocusTabGroupLikeOperation(windowId, (focusTabGroupOptions) =>
-      ChromeWindowMethods.focusActiveTabWithRetryHandler(tabId, tabGroupId, windowId, focusTabGroupOptions)
+      ChromeWindowMethods.focusActiveTabWithRetryHandler(
+        tabId,
+        tabGroupId,
+        windowId,
+        focusTabGroupOptions
+      )
     );
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
@@ -415,7 +505,9 @@ export async function useTabTitleForEligebleTabGroups() {
 
     const [activeWindows, windows] = await Promise.all([
       Model.getAll(),
-      chrome.windows.getAll({ windowTypes: ["normal"], populate: true }) as Promise<(ChromeWindowWithId & { tabs: ChromeTabWithId[] })[]>,
+      chrome.windows.getAll({ windowTypes: ["normal"], populate: true }) as Promise<
+        (ChromeWindowWithId & { tabs: ChromeTabWithId[] })[]
+      >,
     ]);
     const activeWindowsSet = new Set(activeWindows.map((activeWindow) => activeWindow.windowId));
     const mouseInPage = await MouseInPageTracker.isInPage();
@@ -436,18 +528,31 @@ export async function useTabTitleForEligebleTabGroups() {
 
         await Promise.all(
           Object.entries(tabsByGroupId).map(async ([groupId, tabsInGroup]) => {
-            const activeWindowTabGroup = await Model.getActiveWindowTabGroup(window.id, parseInt(groupId));
+            const activeWindowTabGroup = await Model.getActiveWindowTabGroup(
+              window.id,
+              parseInt(groupId)
+            );
             const tabTitle = ChromeWindowMethods.getTabTitleForUseTabTitle(tabsInGroup);
-            if (!activeWindowTabGroup || !activeWindowTabGroup.useTabTitle || !tabTitle || activeWindowTabGroup.title === tabTitle) {
+            if (
+              !activeWindowTabGroup ||
+              !activeWindowTabGroup.useTabTitle ||
+              !tabTitle ||
+              activeWindowTabGroup.title === tabTitle
+            ) {
               return;
             }
 
-            const updatedTabGroup = await ChromeWindowMethods.updateTabGroupWithRetryHandler(activeWindowTabGroup.id, { title: tabTitle });
+            const updatedTabGroup = await ChromeWindowMethods.updateTabGroupWithRetryHandler(
+              activeWindowTabGroup.id,
+              { title: tabTitle }
+            );
             if (!updatedTabGroup) {
               return;
             }
 
-            await Model.updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, { title: updatedTabGroup.title });
+            await Model.updateActiveWindowTabGroup(updatedTabGroup.windowId, updatedTabGroup.id, {
+              title: updatedTabGroup.title,
+            });
           })
         );
       })
@@ -458,14 +563,19 @@ export async function useTabTitleForEligebleTabGroups() {
 }
 
 export async function blurTabGroupsIfNoActiveTab(windowId: ChromeWindowId) {
-  const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (ChromeTabWithId | undefined)[];
+  const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (
+    | ChromeTabWithId
+    | undefined
+  )[];
   if (!activeTab) {
     await focusTabGroup(windowId, chrome.tabGroups.TAB_GROUP_ID_NONE);
   }
 }
 
 export async function groupUnpinnedAndUngroupedTabs(windowId: ChromeWindowId) {
-  const newTabGroupId = await ChromeWindowMethods.groupUnpinnedAndUngroupedTabsWithRetryHandler(windowId);
+  const newTabGroupId = await ChromeWindowMethods.groupUnpinnedAndUngroupedTabsWithRetryHandler(
+    windowId
+  );
   if (newTabGroupId) {
     const tabGroup = await chrome.tabGroups.get(newTabGroupId);
     await createActiveWindowTabGroup(windowId, tabGroup);
@@ -487,13 +597,22 @@ export async function enableFocusMode(windowId: ChromeWindowId) {
     await Model.update(windowId, {
       focusMode: {
         colors: lastSeenFocusModeColors,
-        savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
+        savedTabGroupColors: tabGroups.map((tabGroup) => ({
+          tabGroupId: tabGroup.id,
+          color: tabGroup.color,
+        })),
       },
     });
 
     const focusTabGroupOperation = async () => {
-      const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (ChromeTabWithId | undefined)[];
-      return await focusTabGroup(windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
+      const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (
+        | ChromeTabWithId
+        | undefined
+      )[];
+      return await focusTabGroup(
+        windowId,
+        activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE
+      );
     };
 
     const setLastFocusedWindowHadFocusModeOperation = async () => {
@@ -505,7 +624,10 @@ export async function enableFocusMode(windowId: ChromeWindowId) {
       }
     };
 
-    const [activeWindow] = await Promise.all([focusTabGroupOperation(), setLastFocusedWindowHadFocusModeOperation()]);
+    const [activeWindow] = await Promise.all([
+      focusTabGroupOperation(),
+      setLastFocusedWindowHadFocusModeOperation(),
+    ]);
     return activeWindow;
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
@@ -529,14 +651,18 @@ export async function disableFocusMode(windowId: ChromeWindowId) {
       await Promise.all(
         tabGroups.map((tabGroup) => {
           let newColor: chrome.tabGroups.ColorEnum;
-          const savedColor = focusMode.savedTabGroupColors.find((savedColor) => savedColor.tabGroupId === tabGroup.id)?.color;
+          const savedColor = focusMode.savedTabGroupColors.find(
+            (savedColor) => savedColor.tabGroupId === tabGroup.id
+          )?.color;
           if (savedColor) {
             newColor = savedColor;
           } else {
             newColor = colors[colorIndex++ % colors.length];
           }
 
-          return ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, { color: newColor });
+          return ChromeWindowMethods.updateTabGroupWithRetryHandler(tabGroup.id, {
+            color: newColor,
+          });
         })
       )
     ).filter((tabGroup) => tabGroup !== undefined);
@@ -550,7 +676,10 @@ export async function disableFocusMode(windowId: ChromeWindowId) {
   }
 }
 
-export async function activateLastActiveTabInGroup(windowId: ChromeWindowId, groupId: ChromeTabGroupId) {
+export async function activateLastActiveTabInGroup(
+  windowId: ChromeWindowId,
+  groupId: ChromeTabGroupId
+) {
   const myLogger = logger.createNestedLogger("activateLastActiveTabInGroup");
   try {
     const [activeWindowTabGroup, tabsInGroup, { userPreferences }] = await Promise.all([
@@ -567,9 +696,13 @@ export async function activateLastActiveTabInGroup(windowId: ChromeWindowId, gro
     let tabToActivate: ChromeTabWithId | undefined;
     // TODO: Remove this when https://issues.chromium.org/issues/326678907 gets fixed
     if (activeWindowTabGroup.lastActiveTabId !== null) {
-      tabToActivate = await ChromeWindowMethods.getIfTabExists(activeWindowTabGroup.lastActiveTabId);
+      tabToActivate = await ChromeWindowMethods.getIfTabExists(
+        activeWindowTabGroup.lastActiveTabId
+      );
       if (!tabToActivate) {
-        myLogger.warn(`wasExpanded: lastActiveTabId with id ${activeWindowTabGroup.lastActiveTabId} does not exist`);
+        myLogger.warn(
+          `wasExpanded: lastActiveTabId with id ${activeWindowTabGroup.lastActiveTabId} does not exist`
+        );
       }
     }
 
@@ -582,7 +715,9 @@ export async function activateLastActiveTabInGroup(windowId: ChromeWindowId, gro
 
     // start loading the tab now (before waiting for the animations to finish)
     if (tabToActivate.status === "unloaded") {
-      chrome.tabs.update(tabToActivate.id, { url: tabToActivate.url }).catch((error) => myLogger.error(`error discarding tab:${error}`));
+      chrome.tabs
+        .update(tabToActivate.id, { url: tabToActivate.url })
+        .catch((error) => myLogger.error(`error discarding tab:${error}`));
     }
     // wait for the tab group uncollapse animations to finish before activatiing the last tab in the group
     const timeToWaitBeforeActivation = Misc.serviceWorkerJustWokeUp() ? 100 : 250;
@@ -603,16 +738,23 @@ export async function updateLastActiveTabIdForTabGroupWithTabId(tabId: ChromeTab
   const myLogger = logger.createNestedLogger("updateLastActiveTabIdForTabGroupWithTabId");
   try {
     const activeWindowTabGroups = await Model.getAllActiveWindowTabGroups();
-    const activeWindowTabGroup = activeWindowTabGroups.find((activeWindowTabGroup) => activeWindowTabGroup.lastActiveTabId === tabId);
+    const activeWindowTabGroup = activeWindowTabGroups.find(
+      (activeWindowTabGroup) => activeWindowTabGroup.lastActiveTabId === tabId
+    );
     if (activeWindowTabGroup) {
       const tabsInGroup = (await chrome.tabs.query({
         windowId: activeWindowTabGroup.windowId,
         groupId: activeWindowTabGroup.id,
       })) as ChromeTabWithId[];
-      const lastAccessedOrGreatestIndexTab = await ChromeWindowMethods.getLastAccessedOrGreatestIndexTab(tabsInGroup);
-      await Model.updateActiveWindowTabGroup(activeWindowTabGroup.windowId, activeWindowTabGroup.id, {
-        lastActiveTabId: lastAccessedOrGreatestIndexTab?.id ?? null,
-      });
+      const lastAccessedOrGreatestIndexTab =
+        await ChromeWindowMethods.getLastAccessedOrGreatestIndexTab(tabsInGroup);
+      await Model.updateActiveWindowTabGroup(
+        activeWindowTabGroup.windowId,
+        activeWindowTabGroup.id,
+        {
+          lastActiveTabId: lastAccessedOrGreatestIndexTab?.id ?? null,
+        }
+      );
     }
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
@@ -651,12 +793,19 @@ export async function updateFocusModeColorForTabGroupWithColor(
 
     if (isFocusedTabGroup) {
       newFocusModeColors = { ...activeWindow.focusMode.colors, focused: color };
-      await Model.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
+      await Model.update(activeWindow.windowId, {
+        focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors },
+      });
     } else {
       newFocusModeColors = { ...activeWindow.focusMode.colors, nonFocused: color };
-      await Model.update(activeWindow.windowId, { focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors } });
+      await Model.update(activeWindow.windowId, {
+        focusMode: { ...activeWindow.focusMode, colors: newFocusModeColors },
+      });
       // this will effectively update the color of all other non-focused tab groups
-      await focusTabGroup(activeWindow.windowId, activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE);
+      await focusTabGroup(
+        activeWindow.windowId,
+        activeTab?.groupId ?? chrome.tabGroups.TAB_GROUP_ID_NONE
+      );
     }
 
     const window = await ChromeWindowMethods.getIfWindowExists(windowId);
@@ -668,7 +817,10 @@ export async function updateFocusModeColorForTabGroupWithColor(
   }
 }
 
-export async function createActiveWindowTabGroupIfNotExists(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+export async function createActiveWindowTabGroupIfNotExists(
+  windowId: ChromeWindowId,
+  tabGroupId: ChromeTabGroupId
+) {
   const myLogger = logger.createNestedLogger("createActiveWindowTabGroupIfNotExists");
   try {
     const [tabGroup, activeWindowTabGroup] = await Promise.all([

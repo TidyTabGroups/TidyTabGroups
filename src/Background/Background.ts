@@ -83,7 +83,10 @@ async function initializeStorage() {
           type: "pinnedTab",
         },
       },
-      lastSeenFocusModeColors: { focused: process.env.NODE_ENV === "development" ? "yellow" : "cyan", nonFocused: "grey" },
+      lastSeenFocusModeColors: {
+        focused: process.env.NODE_ENV === "development" ? "yellow" : "cyan",
+        nonFocused: "grey",
+      },
       lastFocusedWindowHadFocusMode: false,
       lastError: null,
     };
@@ -94,7 +97,9 @@ async function initializeStorage() {
     await chrome.storage.local.set(newItems);
     Storage.start();
   } catch (error) {
-    throw new Error(`initializeStorage::An error occurred while initializing the storage: ${error}`);
+    throw new Error(
+      `initializeStorage::An error occurred while initializing the storage: ${error}`
+    );
   }
 }
 
@@ -104,11 +109,17 @@ async function initializeFixedPages() {
       const newPreferences = changes.userPreferences.newValue;
       const oldPreferences = changes.userPreferences.oldValue;
 
-      if (newPreferences.createDummyFixedPageOnStartup.enabled && !oldPreferences.createDummyFixedPageOnStartup.enabled) {
+      if (
+        newPreferences.createDummyFixedPageOnStartup.enabled &&
+        !oldPreferences.createDummyFixedPageOnStartup.enabled
+      ) {
         await Misc.createDummyFixedPage(newPreferences.createDummyFixedPageOnStartup.type);
       }
 
-      if (newPreferences.createOptionsFixedPageOnStartup.enabled && !oldPreferences.createOptionsFixedPageOnStartup.enabled) {
+      if (
+        newPreferences.createOptionsFixedPageOnStartup.enabled &&
+        !oldPreferences.createOptionsFixedPageOnStartup.enabled
+      ) {
         await Misc.createOptionsFixedPage(newPreferences.createOptionsFixedPageOnStartup.type);
       }
     }
@@ -116,31 +127,37 @@ async function initializeFixedPages() {
 
   chrome.windows.onCreated.addListener(async (window) => {
     if (window.type === "normal") {
-      const { createDummyFixedPageOnStartup, createOptionsFixedPageOnStartup } = (await Storage.getItems("userPreferences")).userPreferences;
+      const { createDummyFixedPageOnStartup, createOptionsFixedPageOnStartup } = (
+        await Storage.getItems("userPreferences")
+      ).userPreferences;
       if (
         createDummyFixedPageOnStartup.enabled &&
-        (createDummyFixedPageOnStartup.type === "pinnedTab" || createDummyFixedPageOnStartup.type === "tab")
+        (createDummyFixedPageOnStartup.type === "pinnedTab" ||
+          createDummyFixedPageOnStartup.type === "tab")
       ) {
         await Misc.createDummyFixedPage(createDummyFixedPageOnStartup.type, window.id);
       }
 
       if (
         createOptionsFixedPageOnStartup.enabled &&
-        (createOptionsFixedPageOnStartup.type === "pinnedTab" || createOptionsFixedPageOnStartup.type === "tab")
+        (createOptionsFixedPageOnStartup.type === "pinnedTab" ||
+          createOptionsFixedPageOnStartup.type === "tab")
       ) {
         await Misc.createOptionsFixedPage(createOptionsFixedPageOnStartup.type, window.id);
       }
     }
   });
 
-  chrome.runtime.onInstalled.addListener(async (installationDetails: chrome.runtime.InstalledDetails) => {
-    const { userPreferences } = await Storage.getItems("userPreferences");
-    if (userPreferences.createDummyFixedPageOnStartup.enabled) {
-      await Misc.createDummyFixedPage(userPreferences.createDummyFixedPageOnStartup.type);
-    }
+  chrome.runtime.onInstalled.addListener(
+    async (installationDetails: chrome.runtime.InstalledDetails) => {
+      const { userPreferences } = await Storage.getItems("userPreferences");
+      if (userPreferences.createDummyFixedPageOnStartup.enabled) {
+        await Misc.createDummyFixedPage(userPreferences.createDummyFixedPageOnStartup.type);
+      }
 
-    if (userPreferences.createOptionsFixedPageOnStartup.enabled) {
-      await Misc.createOptionsFixedPage(userPreferences.createOptionsFixedPageOnStartup.type);
+      if (userPreferences.createOptionsFixedPageOnStartup.enabled) {
+        await Misc.createOptionsFixedPage(userPreferences.createOptionsFixedPageOnStartup.type);
+      }
     }
-  });
+  );
 }

@@ -17,7 +17,10 @@ export async function initialize() {
 
   m_initializationPromise = new Promise<void>(async (resolve, reject) => {
     try {
-      const [activeTab] = (await chrome.tabs.query({ active: true, currentWindow: true })) as ChromeTabWithId[];
+      const [activeTab] = (await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      })) as ChromeTabWithId[];
       if (activeTab) {
         m_mouseInPageStatus = await new Promise((resolve) => {
           chrome.tabs.sendMessage(activeTab.id, { type: "getMouseInPageStatus" }, (response) => {
@@ -34,7 +37,9 @@ export async function initialize() {
         }
 
         m_mouseInPageStatus = msg.data;
-        m_onChangeListeners.forEach((listener) => listener(m_mouseInPageStatus, tab as ChromeTabWithId));
+        m_onChangeListeners.forEach((listener) =>
+          listener(m_mouseInPageStatus, tab as ChromeTabWithId)
+        );
       });
       resolve();
     } catch (error) {

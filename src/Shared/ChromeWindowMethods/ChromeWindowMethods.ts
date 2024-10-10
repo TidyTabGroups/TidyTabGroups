@@ -20,10 +20,15 @@ export async function activateTabWithRetryHandler(tabId: ChromeTabId) {
     const activeTabUpToDate = await getIfTabExists(tabId);
     return !!activeTabUpToDate;
   });
-  return await operationHandler.try(() => chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>);
+  return await operationHandler.try(
+    () => chrome.tabs.update(tabId, { active: true }) as Promise<ChromeTabWithId>
+  );
 }
 
-export async function updateTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId, updatedProperties: chrome.tabGroups.UpdateProperties) {
+export async function updateTabGroupWithRetryHandler(
+  tabGroupId: ChromeTabGroupId,
+  updatedProperties: chrome.tabGroups.UpdateProperties
+) {
   try {
     const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId, true>();
     operationHandler.setShouldRetryOperationCallback(async () => {
@@ -34,7 +39,10 @@ export async function updateTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupI
   } catch (error) {
     // FIXME: remove this once saved tab groups are editable
     if (Misc.getErrorMessage(error).includes("saved groups are not editable")) {
-      console.warn(`updateTabGroup::saved tab group with id ${tabGroupId} is not editable: `, error);
+      console.warn(
+        `updateTabGroup::saved tab group with id ${tabGroupId} is not editable: `,
+        error
+      );
       return (await chrome.tabGroups.get(tabGroupId)) as ChromeTabGroupWithId;
     } else {
       throw error;
@@ -42,27 +50,44 @@ export async function updateTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupI
   }
 }
 
-export async function moveTabWithRetryHandler(tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) {
+export async function moveTabWithRetryHandler(
+  tabId: ChromeTabId,
+  moveProperties: chrome.tabs.MoveProperties
+) {
   const windowIdToMoveTo = moveProperties.windowId || (await chrome.tabs.get(tabId)).windowId;
 
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabWithId, true>();
   operationHandler.setShouldRetryOperationCallback(async () => {
-    const [tabUpToDate, windowUpToDate] = await Promise.all([getIfTabExists(tabId), getIfWindowExists(windowIdToMoveTo)]);
+    const [tabUpToDate, windowUpToDate] = await Promise.all([
+      getIfTabExists(tabId),
+      getIfWindowExists(windowIdToMoveTo),
+    ]);
     return !!tabUpToDate && !!windowUpToDate && tabUpToDate.windowId === windowIdToMoveTo;
   });
 
-  return await operationHandler.try(() => chrome.tabs.move(tabId, moveProperties) as Promise<ChromeTabWithId>);
+  return await operationHandler.try(
+    () => chrome.tabs.move(tabId, moveProperties) as Promise<ChromeTabWithId>
+  );
 }
 
-export async function moveTabGroupWithRetryHandler(tabGroupId: ChromeTabGroupId, moveProperties: chrome.tabGroups.MoveProperties) {
-  const windowIdToMoveTo = moveProperties.windowId || (await chrome.tabGroups.get(tabGroupId)).windowId;
+export async function moveTabGroupWithRetryHandler(
+  tabGroupId: ChromeTabGroupId,
+  moveProperties: chrome.tabGroups.MoveProperties
+) {
+  const windowIdToMoveTo =
+    moveProperties.windowId || (await chrome.tabGroups.get(tabGroupId)).windowId;
 
   const operationHandler = new ChromeTabOperationRetryHandler<ChromeTabGroupWithId, true>();
   operationHandler.setShouldRetryOperationCallback(async () => {
-    const [tabGroupUpToDate, windowUpToDate] = await Promise.all([getIfTabGroupExists(tabGroupId), getIfWindowExists(windowIdToMoveTo)]);
+    const [tabGroupUpToDate, windowUpToDate] = await Promise.all([
+      getIfTabGroupExists(tabGroupId),
+      getIfWindowExists(windowIdToMoveTo),
+    ]);
     return !!tabGroupUpToDate && !!windowUpToDate && tabGroupUpToDate.windowId === windowIdToMoveTo;
   });
-  return await operationHandler.try(() => chrome.tabGroups.move(tabGroupId, moveProperties) as Promise<ChromeTabGroupWithId>);
+  return await operationHandler.try(
+    () => chrome.tabGroups.move(tabGroupId, moveProperties) as Promise<ChromeTabGroupWithId>
+  );
 }
 
 export async function groupTabsWithRetryHandler(options: chrome.tabs.GroupOptions) {
@@ -86,11 +111,17 @@ export async function groupTabsWithRetryHandler(options: chrome.tabs.GroupOption
     ]);
 
     const exisitingTabsUpToDate = tabsUpToDate.filter((tab) => !!tab) as ChromeTabWithId[];
-    if ((hasWindowIdToGroupIn && !windowToGroupInExists) || (hasGroupIdToGroupIn && !tabGroupToGroupInExists) || exisitingTabsUpToDate.length === 0) {
+    if (
+      (hasWindowIdToGroupIn && !windowToGroupInExists) ||
+      (hasGroupIdToGroupIn && !tabGroupToGroupInExists) ||
+      exisitingTabsUpToDate.length === 0
+    ) {
       return false;
     }
 
-    operationHandler.replaceOperation(() => chrome.tabs.group({ ...options, tabIds: exisitingTabsUpToDate.map((tab) => tab.id) }));
+    operationHandler.replaceOperation(() =>
+      chrome.tabs.group({ ...options, tabIds: exisitingTabsUpToDate.map((tab) => tab.id) })
+    );
     return true;
   });
 
@@ -100,7 +131,7 @@ export async function groupTabsWithRetryHandler(options: chrome.tabs.GroupOption
 export async function getIfTabExists(tabId: ChromeTabId) {
   try {
     return (await chrome.tabs.get(tabId)) as ChromeTabWithId;
-  } catch (error) { }
+  } catch (error) {}
 }
 
 export async function doesTabExist(tabId: ChromeTabId) {
@@ -111,7 +142,7 @@ export async function doesTabExist(tabId: ChromeTabId) {
 export async function getIfTabGroupExists(tabGroupId: ChromeTabGroupId) {
   try {
     return await chrome.tabGroups.get(tabGroupId);
-  } catch (error) { }
+  } catch (error) {}
 }
 
 export async function doesTabGroupExist(tabGroupId: ChromeTabGroupId) {
@@ -119,27 +150,39 @@ export async function doesTabGroupExist(tabGroupId: ChromeTabGroupId) {
   return !!tabGroup;
 }
 
-export async function getIfWindowExists(windowId: ChromeWindowId, queryOptions: chrome.windows.QueryOptions = {}) {
+export async function getIfWindowExists(
+  windowId: ChromeWindowId,
+  queryOptions: chrome.windows.QueryOptions = {}
+) {
   try {
     return (await chrome.windows.get(windowId, queryOptions)) as ChromeWindowWithId;
-  } catch (error) { }
+  } catch (error) {}
 }
 export async function getIfCurrentWindowExists() {
   try {
     return (await chrome.windows.getCurrent()) as ChromeWindowWithId;
-  } catch (error) { }
+  } catch (error) {}
 }
 
-export async function queryTabsIfWindowExists(windowId: ChromeWindowId, otherQueryInfo?: chrome.tabs.QueryInfo) {
+export async function queryTabsIfWindowExists(
+  windowId: ChromeWindowId,
+  otherQueryInfo?: chrome.tabs.QueryInfo
+) {
   try {
     return (await chrome.tabs.query({ ...otherQueryInfo, windowId })) as ChromeTabWithId[];
-  } catch (error) { }
+  } catch (error) {}
 }
 
-export async function queryTabGroupsIfWindowExists(windowId: ChromeWindowId, otherQueryInfo?: chrome.tabGroups.QueryInfo) {
+export async function queryTabGroupsIfWindowExists(
+  windowId: ChromeWindowId,
+  otherQueryInfo?: chrome.tabGroups.QueryInfo
+) {
   try {
-    return (await chrome.tabGroups.query({ ...otherQueryInfo, windowId })) as ChromeTabGroupWithId[];
-  } catch (error) { }
+    return (await chrome.tabGroups.query({
+      ...otherQueryInfo,
+      windowId,
+    })) as ChromeTabGroupWithId[];
+  } catch (error) {}
 }
 
 export async function doesWindowExist(windowId: ChromeWindowId) {
@@ -150,7 +193,11 @@ export async function doesWindowExist(windowId: ChromeWindowId) {
 export function getLastAccessedTab(tabs: ChromeTabWithId[]) {
   let lastAccessedTab: ChromeTabWithId | undefined;
   tabs.forEach((tab) => {
-    if (tab.lastAccessed !== undefined && (lastAccessedTab?.lastAccessed === undefined || tab.lastAccessed > lastAccessedTab.lastAccessed)) {
+    if (
+      tab.lastAccessed !== undefined &&
+      (lastAccessedTab?.lastAccessed === undefined ||
+        tab.lastAccessed > lastAccessedTab.lastAccessed)
+    ) {
       lastAccessedTab = tab;
     }
   });
@@ -181,7 +228,9 @@ function getLastAccessedOrGreatestIndexTabHelper(tabs: ChromeTabWithId[]) {
   return curr;
 }
 
-export async function getLastAccessedOrGreatestIndexTabByGroupId(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+export async function getLastAccessedOrGreatestIndexTabByGroupId(
+  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]
+) {
   const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
   if (!windowIdAndTabs) {
     return {};
@@ -203,7 +252,9 @@ export async function getLastAccessedOrGreatestIndexTabByGroupId(windowIdOrTabs:
   return lastActiveTabByTagGroupId;
 }
 
-export async function getLastAccessedOrGreatestIndexTab(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+export async function getLastAccessedOrGreatestIndexTab(
+  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]
+) {
   const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
   if (!windowIdAndTabs) {
     return;
@@ -213,12 +264,16 @@ export async function getLastAccessedOrGreatestIndexTab(windowIdOrTabs: ChromeWi
   return getLastAccessedOrGreatestIndexTabHelper(tabs);
 }
 
-export async function getTabsOrderedByLastAccessed(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+export async function getTabsOrderedByLastAccessed(
+  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]
+) {
   const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
   if (!windowIdAndTabs) {
     return [];
   }
-  return windowIdAndTabs.tabs.sort((tab1, tab2) => (tab2.lastAccessed || 0) - (tab1.lastAccessed || 0));
+  return windowIdAndTabs.tabs.sort(
+    (tab1, tab2) => (tab2.lastAccessed || 0) - (tab1.lastAccessed || 0)
+  );
 }
 
 export async function focusTabGroup(
@@ -233,8 +288,13 @@ export async function focusTabGroup(
   const { windowId, tabGroups } = windowIdAndTabGroups;
   const { collapseUnfocusedTabGroups, highlightColors, collapseIgnoreSet } = options;
 
-  let prevActiveTabGroupToHighlightInfo: { id: ChromeTabGroupId; color: chrome.tabGroups.ColorEnum } | undefined;
-  if (highlightColors?.highlightPrevActiveTabGroup && tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+  let prevActiveTabGroupToHighlightInfo:
+    | { id: ChromeTabGroupId; color: chrome.tabGroups.ColorEnum }
+    | undefined;
+  if (
+    highlightColors?.highlightPrevActiveTabGroup &&
+    tabGroupId === chrome.tabGroups.TAB_GROUP_ID_NONE
+  ) {
     const prevActiveTabGroupId = await getLastAccessedTabGroupId(windowId);
     if (prevActiveTabGroupId !== undefined) {
       prevActiveTabGroupToHighlightInfo = {
@@ -265,12 +325,17 @@ export async function focusTabGroup(
         }
       } else {
         const isInCollapseIgnoreSet = collapseIgnoreSet?.has(tabGroup.id);
-        const isPrevActiveTabGroupToHighlight = tabGroup.id === prevActiveTabGroupToHighlightInfo?.id;
+        const isPrevActiveTabGroupToHighlight =
+          tabGroup.id === prevActiveTabGroupToHighlightInfo?.id;
 
         if (collapseUnfocusedTabGroups && !tabGroup.collapsed && !isInCollapseIgnoreSet) {
           updateProps.collapsed = true;
         }
-        if (highlightColors?.nonFocused && highlightColors.nonFocused !== tabGroup.color && !isPrevActiveTabGroupToHighlight) {
+        if (
+          highlightColors?.nonFocused &&
+          highlightColors.nonFocused !== tabGroup.color &&
+          !isPrevActiveTabGroupToHighlight
+        ) {
           updateProps.color = highlightColors.nonFocused;
         }
       }
@@ -284,17 +349,33 @@ export async function focusTabGroup(
   return updatedTabGroups.filter((tabGroup) => !!tabGroup) as ChromeTabGroupWithId[];
 }
 
-export const TAB_GROUP_COLORS: Array<chrome.tabGroups.ColorEnum> = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
+export const TAB_GROUP_COLORS: Array<chrome.tabGroups.ColorEnum> = [
+  "grey",
+  "blue",
+  "red",
+  "yellow",
+  "green",
+  "pink",
+  "purple",
+  "cyan",
+  "orange",
+];
 
-export async function getUnpinnedAndUngroupedTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+export async function getUnpinnedAndUngroupedTabs(
+  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]
+) {
   const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
   if (!windowIdAndTabs) {
     return [];
   }
-  return windowIdAndTabs.tabs.filter((tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned);
+  return windowIdAndTabs.tabs.filter(
+    (tab) => tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE && !tab.pinned
+  );
 }
 
-export async function groupUnpinnedAndUngroupedTabsWithRetryHandler(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+export async function groupUnpinnedAndUngroupedTabsWithRetryHandler(
+  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]
+) {
   const myLogger = logger.createNestedLogger("groupUnpinnedAndUngroupedTabsWithRetryHandler");
   try {
     const windowIdAndTabs = await getWindowIdAndTabs(windowIdOrTabs);
@@ -312,7 +393,10 @@ export async function groupUnpinnedAndUngroupedTabsWithRetryHandler(windowIdOrTa
     operationHandler.setShouldRetryOperationCallback(async () => {
       const [windowUpToDate, tabsWithNoGroupUpToDate] = await Promise.all([
         getIfWindowExists(windowId),
-        queryTabsIfWindowExists(windowId, { pinned: false, groupId: chrome.tabGroups.TAB_GROUP_ID_NONE }),
+        queryTabsIfWindowExists(windowId, {
+          pinned: false,
+          groupId: chrome.tabGroups.TAB_GROUP_ID_NONE,
+        }),
       ]);
 
       if (!windowUpToDate || !tabsWithNoGroupUpToDate || tabsWithNoGroupUpToDate.length === 0) {
@@ -321,12 +405,16 @@ export async function groupUnpinnedAndUngroupedTabsWithRetryHandler(windowIdOrTa
 
       // Reset the operation for the tabs up-to-date
       const tabIdsWithNoGroupUpToDate = tabsWithNoGroupUpToDate.map((tab) => tab.id);
-      operationHandler.replaceOperation(() => chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroupUpToDate }));
+      operationHandler.replaceOperation(() =>
+        chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroupUpToDate })
+      );
 
       return true;
     });
 
-    return await operationHandler.try(() => chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroup }));
+    return await operationHandler.try(() =>
+      chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsWithNoGroup })
+    );
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
   }
@@ -344,7 +432,8 @@ export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
           //  See https://issues.chromium.org/issues/326678907.
           (tab.active ||
             // then prioritize by lastAccessed
-            (tab.lastAccessed && (!candidateTab.lastAccessed || tab.lastAccessed > candidateTab.lastAccessed)) ||
+            (tab.lastAccessed &&
+              (!candidateTab.lastAccessed || tab.lastAccessed > candidateTab.lastAccessed)) ||
             // then prioritize by index if there is no lastAccessed on either tab
             (!candidateTab.lastAccessed && tab.index > candidateTab.index)))) &&
       tab.title &&
@@ -357,17 +446,25 @@ export function getTabTitleForUseTabTitle(tabsInGroup: ChromeTabWithId[]) {
   // Remove leading digit in parentheses and any space characters after it from the tab title (e.g. "(7) Notion" -> "Notion")
   // TODO: add a user setting to toggle this behavior
   const LEADING_DIGIT_IN_PARENTHESES_REGEX = /^\(\d+\)\s*/;
-  const cleanedTitle = candidateTab?.title ? candidateTab.title.replace(LEADING_DIGIT_IN_PARENTHESES_REGEX, "") : undefined;
+  const cleanedTitle = candidateTab?.title
+    ? candidateTab.title.replace(LEADING_DIGIT_IN_PARENTHESES_REGEX, "")
+    : undefined;
   return cleanedTitle;
 }
 
 export async function withUserInteractionErrorHandler<T>(
   operation: () => Promise<T>
-): Promise<{ result: T; encounteredUserInteractionError: false } | { result: undefined; encounteredUserInteractionError: true }> {
+): Promise<
+  | { result: T; encounteredUserInteractionError: false }
+  | { result: undefined; encounteredUserInteractionError: true }
+> {
   try {
     return { result: await operation(), encounteredUserInteractionError: false };
   } catch (error) {
-    if (Misc.getErrorMessage(error) !== "Tabs cannot be edited right now (user may be dragging a tab).") {
+    if (
+      Misc.getErrorMessage(error) !==
+      "Tabs cannot be edited right now (user may be dragging a tab)."
+    ) {
       throw error;
     }
 
@@ -393,7 +490,9 @@ async function getWindowIdAndTabs(windowIdOrTabs: ChromeWindowId | ChromeTabWith
   return { windowId, tabs };
 }
 
-async function getWindowIdAndTabGroups(windowIdOrTabGroups: ChromeWindowId | ChromeTabGroupWithId[]) {
+async function getWindowIdAndTabGroups(
+  windowIdOrTabGroups: ChromeWindowId | ChromeTabGroupWithId[]
+) {
   let windowId: ChromeWindowId;
   let tabGroups: ChromeTabGroupWithId[];
   if (Array.isArray(windowIdOrTabGroups)) {
@@ -439,7 +538,9 @@ export async function focusActiveTabWithRetryHandler(
     );
   });
 
-  return await operationHandler.try(() => focusTabGroup(tabGroupId, tabGroups, focusTabGroupOptions));
+  return await operationHandler.try(() =>
+    focusTabGroup(tabGroupId, tabGroups, focusTabGroupOptions)
+  );
 }
 
 export async function focusTabGroupWithRetryHandler(
@@ -471,7 +572,9 @@ export async function focusTabGroupWithRetryHandler(
       }
     }
 
-    operationHandler.replaceOperation(() => focusTabGroup(tabGroupIdToFocus, tabGroupsUpToDate, options));
+    operationHandler.replaceOperation(() =>
+      focusTabGroup(tabGroupIdToFocus, tabGroupsUpToDate, options)
+    );
     return true;
   });
 
@@ -483,7 +586,9 @@ export async function groupTabAndHighlightedTabsWithRetryHandler(tabId: ChromeTa
 
   const tab = (await chrome.tabs.get(tabId)) as ChromeTabWithId;
   if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE || tab.pinned) {
-    throw new Error(myLogger.getPrefixedMessage(`tab is already grouped or pinned - tabId: ${tabId}`));
+    throw new Error(
+      myLogger.getPrefixedMessage(`tab is already grouped or pinned - tabId: ${tabId}`)
+    );
   }
 
   const { windowId } = tab;
@@ -521,7 +626,9 @@ export async function groupTabAndHighlightedTabsWithRetryHandler(tabId: ChromeTa
     );
   });
 
-  return await operationHandler.try(() => chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsToAutoGroup }));
+  return await operationHandler.try(() =>
+    chrome.tabs.group({ createProperties: { windowId }, tabIds: tabIdsToAutoGroup })
+  );
 }
 
 export async function createFixedPage<T extends FixedPageType>(
@@ -533,7 +640,9 @@ export async function createFixedPage<T extends FixedPageType>(
   try {
     if (type === "popupWindow") {
       const windows = await chrome.windows.getAll({ populate: true, windowTypes: ["popup"] });
-      const existingPopupWindow = windows.find((window) => window.tabs && window.tabs[0] && window.tabs[0].url === url);
+      const existingPopupWindow = windows.find(
+        (window) => window.tabs && window.tabs[0] && window.tabs[0].url === url
+      );
       if (existingPopupWindow) {
         return;
       }
@@ -546,7 +655,10 @@ export async function createFixedPage<T extends FixedPageType>(
     } else {
       let windows: ChromeWindowWithId[];
       if (windowId !== undefined) {
-        const window = await getIfWindowExists(windowId, { populate: true, windowTypes: ["normal"] });
+        const window = await getIfWindowExists(windowId, {
+          populate: true,
+          windowTypes: ["normal"],
+        });
         if (!window) {
           throw new Error(`Normal window with id ${windowId} not found`);
         }
@@ -576,7 +688,10 @@ export async function createFixedPage<T extends FixedPageType>(
   }
 }
 
-export async function getLastAccessedTabGroupId(windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]) {
+export async function getLastAccessedTabGroupId(
+  windowIdOrTabs: ChromeWindowId | ChromeTabWithId[]
+) {
   const tabsOrderedByLastAccessed = await getTabsOrderedByLastAccessed(windowIdOrTabs);
-  return tabsOrderedByLastAccessed.find((tab) => tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)?.groupId;
+  return tabsOrderedByLastAccessed.find((tab) => tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
+    ?.groupId;
 }

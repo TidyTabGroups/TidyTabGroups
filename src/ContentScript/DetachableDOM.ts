@@ -1,4 +1,9 @@
-type DetachJobType = "removeEventListener" | "removeNode" | "clearInterval" | "clearTimeout" | "disconnectMutationObserver";
+type DetachJobType =
+  | "removeEventListener"
+  | "removeNode"
+  | "clearInterval"
+  | "clearTimeout"
+  | "disconnectMutationObserver";
 
 interface DetachJob {
   jobType: DetachJobType;
@@ -163,7 +168,10 @@ export const disconnectMutationObserver = (mutationObserver: MutationObserver) =
   let returnValue = undefined;
   // remove the job from jobs array and disconnect the mutationObserver
   detachJobs = detachJobs.filter((job) => {
-    if (job.jobType === "disconnectMutationObserver" && job.data.mutationObserver === mutationObserver) {
+    if (
+      job.jobType === "disconnectMutationObserver" &&
+      job.data.mutationObserver === mutationObserver
+    ) {
       returnValue = mutationObserver.disconnect();
       return false;
     }

@@ -57,12 +57,20 @@ async function waitForSync(startingWindowId?: ChromeWindowId) {
       startingWindowSyncing.resolve(startingWindowSyncedId);
 
       // match and sync the remaining active windows
-      const [windows, previousActiveWindows] = await Promise.all([chrome.windows.getAll({ windowTypes: ["normal"] }), Database.getAll()]);
+      const [windows, previousActiveWindows] = await Promise.all([
+        chrome.windows.getAll({ windowTypes: ["normal"] }),
+        Database.getAll(),
+      ]);
       const remainingPreviousActiveWindows =
         startingWindowId !== undefined
-          ? previousActiveWindows.filter((activeWindow) => activeWindow.windowId !== startingWindowId)
+          ? previousActiveWindows.filter(
+              (activeWindow) => activeWindow.windowId !== startingWindowId
+            )
           : previousActiveWindows;
-      const remainingWindows = startingWindowId !== undefined ? windows.filter((window) => window.id !== startingWindowId) : windows;
+      const remainingWindows =
+        startingWindowId !== undefined
+          ? windows.filter((window) => window.id !== startingWindowId)
+          : windows;
       const remainingWindowsIds = remainingWindows.map((window) => window.id);
 
       const nonMatchingActiveWindowIds: Types.ModelDataBaseActiveWindow["windowId"][] = [];
@@ -113,14 +121,18 @@ function getInternal(id: Types.ActiveWindow["windowId"]) {
 
 function addInternal(activeWindow: Types.ActiveWindow) {
   throwIfNotSynced("addInternal");
-  const index = activeWindows.findIndex((exisitingActiveWindow) => exisitingActiveWindow.windowId === activeWindow.windowId);
+  const index = activeWindows.findIndex(
+    (exisitingActiveWindow) => exisitingActiveWindow.windowId === activeWindow.windowId
+  );
   if (index !== -1) {
     throw new Error(`ActiveWindow::active window with id ${activeWindow.windowId} already exists`);
   }
   activeWindows.push(activeWindow);
   Database.add(activeWindow).catch((error) => {
     // TODO: bubble error up to global level
-    logger.error(`addInternal::failed to add active window with id ${activeWindow.windowId} to database: ${error}`);
+    logger.error(
+      `addInternal::failed to add active window with id ${activeWindow.windowId} to database: ${error}`
+    );
   });
 }
 
@@ -134,18 +146,25 @@ function removeInternal(id: Types.ActiveWindow["windowId"]) {
   activeWindows.splice(index, 1);
   Database.remove(id).catch((error) => {
     // TODO: bubble error up to global level
-    logger.error(`removeInternal::failed to remove active window with id ${id} from database: ${error}`);
+    logger.error(
+      `removeInternal::failed to remove active window with id ${id} from database: ${error}`
+    );
   });
 }
 
-function updateInternal(id: Types.ActiveWindow["windowId"], updatedProperties: Partial<Types.ActiveWindow>) {
+function updateInternal(
+  id: Types.ActiveWindow["windowId"],
+  updatedProperties: Partial<Types.ActiveWindow>
+) {
   throwIfNotSynced("updateInternal", id);
   const activeWindow = getOrThrowInternal(id);
   const updatedActiveWindow = Object.assign(activeWindow, updatedProperties);
   // FIXME: pass in Partial<Types.ModelDataBaseActiveWindow> instead of Partial<Types.ActiveWindow>
   Database.update(id, updatedProperties).catch((error) => {
     // TODO: bubble error up to global level
-    logger.error(`updateInternal::failed to update active window with id ${id} in database: ${error}`);
+    logger.error(
+      `updateInternal::failed to update active window with id ${id} in database: ${error}`
+    );
   });
   return updatedActiveWindow as Types.ActiveWindow;
 }
@@ -184,7 +203,10 @@ export async function remove(id: Types.ActiveWindow["windowId"]) {
   return removeInternal(id);
 }
 
-export async function update(id: Types.ActiveWindow["windowId"], updatedProperties: Partial<Types.ActiveWindow>) {
+export async function update(
+  id: Types.ActiveWindow["windowId"],
+  updatedProperties: Partial<Types.ActiveWindow>
+) {
   await waitForSync(id);
   return updateInternal(id, updatedProperties);
 }
@@ -196,7 +218,10 @@ export async function clear() {
 
 export function chromeTabGroupToActiveWindowTabGroup(
   tabGroup: chrome.tabGroups.TabGroup,
-  otherProperties?: { useTabTitle: Types.ActiveWindowTabGroup["useTabTitle"]; lastActiveTabId: Types.ActiveWindowTabGroup["lastActiveTabId"] }
+  otherProperties?: {
+    useTabTitle: Types.ActiveWindowTabGroup["useTabTitle"];
+    lastActiveTabId: Types.ActiveWindowTabGroup["lastActiveTabId"];
+  }
 ) {
   const activeWindowTabGroup = {
     id: tabGroup.id,
@@ -214,14 +239,22 @@ export function chromeTabGroupToActiveWindowTabGroup(
   return activeWindowTabGroup;
 }
 
-export async function getActiveWindowTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+export async function getActiveWindowTabGroup(
+  windowId: ChromeWindowId,
+  tabGroupId: ChromeTabGroupId
+) {
   return (await getOrThrow(windowId)).tabGroups.find((tabGroup) => tabGroup.id === tabGroupId);
 }
 
-export async function getActiveWindowTabGroupOrThrow(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
+export async function getActiveWindowTabGroupOrThrow(
+  windowId: ChromeWindowId,
+  tabGroupId: ChromeTabGroupId
+) {
   const activeWindowTabGroup = await getActiveWindowTabGroup(windowId, tabGroupId);
   if (!activeWindowTabGroup) {
-    throw new Error(`getActiveWindowTabGroupOrThrow::tabGroupId ${tabGroupId} not found in windowId ${windowId}`);
+    throw new Error(
+      `getActiveWindowTabGroupOrThrow::tabGroupId ${tabGroupId} not found in windowId ${windowId}`
+    );
   }
 
   return activeWindowTabGroup;
@@ -231,13 +264,20 @@ export async function getAllActiveWindowTabGroups() {
   return (await getAll()).flatMap((activeWindow) => activeWindow.tabGroups);
 }
 
-export async function addActiveWindowTabGroup(windowId: ChromeWindowId, tabGroup: Types.ActiveWindowTabGroup) {
+export async function addActiveWindowTabGroup(
+  windowId: ChromeWindowId,
+  tabGroup: Types.ActiveWindowTabGroup
+) {
   const existingTabGroup = await getActiveWindowTabGroup(windowId, tabGroup.id);
   if (existingTabGroup) {
-    throw new Error(`addActiveWindowTabGroup::tabGroupId ${tabGroup.id} already exists in windowId ${windowId}`);
+    throw new Error(
+      `addActiveWindowTabGroup::tabGroupId ${tabGroup.id} already exists in windowId ${windowId}`
+    );
   }
 
-  return await update(windowId, { tabGroups: [...(await getOrThrow(windowId)).tabGroups, tabGroup] });
+  return await update(windowId, {
+    tabGroups: [...(await getOrThrow(windowId)).tabGroups, tabGroup],
+  });
 }
 
 // TODO: Use updateActiveWindowTabGroups with a single tabGroup for this implementation
@@ -263,20 +303,25 @@ export async function updateActiveWindowTabGroup(
   });
 
   if (updatedTabGroup === null) {
-    throw new Error(`updateActiveWindowTabGroup::tabGroupId ${tabGroupId} not found in windowId ${windowId}`);
+    throw new Error(
+      `updateActiveWindowTabGroup::tabGroupId ${tabGroupId} not found in windowId ${windowId}`
+    );
   }
 
   return updatedTabGroup;
 }
 
-type TabGroupUpdatePropertiesWithId = { id: chrome.tabGroups.TabGroup["id"] } & Partial<chrome.tabGroups.UpdateProperties>;
-export async function updateActiveWindowTabGroups(windowId: ChromeWindowId, tabGroups: TabGroupUpdatePropertiesWithId[]) {
+type TabGroupUpdatePropertiesWithId = {
+  id: chrome.tabGroups.TabGroup["id"];
+} & Partial<chrome.tabGroups.UpdateProperties>;
+export async function updateActiveWindowTabGroups(
+  windowId: ChromeWindowId,
+  tabGroups: TabGroupUpdatePropertiesWithId[]
+) {
   const activeWindow = await getOrThrow(windowId);
 
-  const tabGroupsById: { [tabGroupId: ChromeTabGroupId]: TabGroupUpdatePropertiesWithId } = tabGroups.reduce(
-    (acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }),
-    {}
-  );
+  const tabGroupsById: { [tabGroupId: ChromeTabGroupId]: TabGroupUpdatePropertiesWithId } =
+    tabGroups.reduce((acc, tabGroup) => ({ ...acc, [tabGroup.id]: tabGroup }), {});
 
   const newActiveWindowTabGroups = activeWindow.tabGroups.map((activeWindowTabGroup) => {
     if (tabGroupsById[activeWindowTabGroup.id]) {
@@ -290,6 +335,13 @@ export async function updateActiveWindowTabGroups(windowId: ChromeWindowId, tabG
   return await update(activeWindow.windowId, { tabGroups: newActiveWindowTabGroups });
 }
 
-export async function removeActiveWindowTabGroup(windowId: ChromeWindowId, tabGroupId: ChromeTabGroupId) {
-  return await update(windowId, { tabGroups: (await getOrThrow(windowId)).tabGroups.filter((tabGroup) => tabGroup.id !== tabGroupId) });
+export async function removeActiveWindowTabGroup(
+  windowId: ChromeWindowId,
+  tabGroupId: ChromeTabGroupId
+) {
+  return await update(windowId, {
+    tabGroups: (
+      await getOrThrow(windowId)
+    ).tabGroups.filter((tabGroup) => tabGroup.id !== tabGroupId),
+  });
 }

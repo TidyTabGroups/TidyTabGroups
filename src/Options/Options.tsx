@@ -3,7 +3,12 @@ import { createRoot } from "react-dom/client";
 import Storage from "../Shared/Storage";
 import { UserPreferences } from "../Shared/Types/Types";
 import { Switch, Container, Typography, AppBar, Toolbar } from "@mui/material";
-import { App, FixedPageTypeSelect, UserPreferenceCard, UserPreferenceProps } from "../Shared/UIComponents";
+import {
+  App,
+  FixedPageTypeSelect,
+  UserPreferenceCard,
+  UserPreferenceProps,
+} from "../Shared/UIComponents";
 
 Storage.start();
 
@@ -22,7 +27,9 @@ const UserPreferences = () => {
 
     Storage.addChangeListener(onChangeUserPreferences);
 
-    function onChangeUserPreferences(changes: { userPreferences?: { newValue?: UserPreferences; oldValue?: UserPreferences } }) {
+    function onChangeUserPreferences(changes: {
+      userPreferences?: { newValue?: UserPreferences; oldValue?: UserPreferences };
+    }) {
       if (changes.userPreferences?.newValue) {
         setUserPreferences(changes.userPreferences.newValue);
       }
@@ -47,7 +54,12 @@ const UserPreferences = () => {
   const otherUserPreferences: UserPreferenceProps[] = [
     {
       name: "Reload on error",
-      control: <Switch checked={userPreferences.reloadOnError} onChange={(e) => updatePreferences({ reloadOnError: e.target.checked })} />,
+      control: (
+        <Switch
+          checked={userPreferences.reloadOnError}
+          onChange={(e) => updatePreferences({ reloadOnError: e.target.checked })}
+        />
+      ),
       enabled: userPreferences.reloadOnError,
     },
   ];
@@ -61,12 +73,18 @@ const UserPreferences = () => {
             value={userPreferences.createDummyFixedPageOnStartup.type}
             onChangeType={(value) =>
               updatePreferences({
-                createDummyFixedPageOnStartup: { ...userPreferences.createDummyFixedPageOnStartup, type: value },
+                createDummyFixedPageOnStartup: {
+                  ...userPreferences.createDummyFixedPageOnStartup,
+                  type: value,
+                },
               })
             }
             onChangeEnabled={(value) =>
               updatePreferences({
-                createDummyFixedPageOnStartup: { ...userPreferences.createDummyFixedPageOnStartup, enabled: value },
+                createDummyFixedPageOnStartup: {
+                  ...userPreferences.createDummyFixedPageOnStartup,
+                  enabled: value,
+                },
               })
             }
             enabled={userPreferences.createDummyFixedPageOnStartup.enabled}
@@ -81,12 +99,18 @@ const UserPreferences = () => {
             value={userPreferences.createOptionsFixedPageOnStartup.type}
             onChangeType={(value) =>
               updatePreferences({
-                createOptionsFixedPageOnStartup: { ...userPreferences.createOptionsFixedPageOnStartup, type: value },
+                createOptionsFixedPageOnStartup: {
+                  ...userPreferences.createOptionsFixedPageOnStartup,
+                  type: value,
+                },
               })
             }
             onChangeEnabled={(value) =>
               updatePreferences({
-                createOptionsFixedPageOnStartup: { ...userPreferences.createOptionsFixedPageOnStartup, enabled: value },
+                createOptionsFixedPageOnStartup: {
+                  ...userPreferences.createOptionsFixedPageOnStartup,
+                  enabled: value,
+                },
               })
             }
             enabled={userPreferences.createOptionsFixedPageOnStartup.enabled}
@@ -98,24 +122,46 @@ const UserPreferences = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ height: "100vh", padding: "24px", gap: "20px", display: "flex", flexDirection: "column" }}>
+    <Container
+      maxWidth="md"
+      sx={{
+        height: "100vh",
+        padding: "24px",
+        gap: "20px",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <UserPreferenceCard
         userPreferences={[
           {
             name: "Reposition focused Tabs to the end",
-            control: <Switch checked={userPreferences.repositionTabs} onChange={(e) => updatePreferences({ repositionTabs: e.target.checked })} />,
+            control: (
+              <Switch
+                checked={userPreferences.repositionTabs}
+                onChange={(e) => updatePreferences({ repositionTabs: e.target.checked })}
+              />
+            ),
             enabled: userPreferences.repositionTabs,
           },
           {
             name: "Reposition focused Tab Groups to the end",
             control: (
-              <Switch checked={userPreferences.repositionTabGroups} onChange={(e) => updatePreferences({ repositionTabGroups: e.target.checked })} />
+              <Switch
+                checked={userPreferences.repositionTabGroups}
+                onChange={(e) => updatePreferences({ repositionTabGroups: e.target.checked })}
+              />
             ),
             enabled: userPreferences.repositionTabGroups,
           },
           {
             name: "Always group Tabs",
-            control: <Switch checked={userPreferences.alwaysGroupTabs} onChange={(e) => updatePreferences({ alwaysGroupTabs: e.target.checked })} />,
+            control: (
+              <Switch
+                checked={userPreferences.alwaysGroupTabs}
+                onChange={(e) => updatePreferences({ alwaysGroupTabs: e.target.checked })}
+              />
+            ),
             enabled: userPreferences.alwaysGroupTabs,
           },
           {
@@ -123,7 +169,9 @@ const UserPreferences = () => {
             control: (
               <Switch
                 checked={userPreferences.collapseUnfocusedTabGroups}
-                onChange={(e) => updatePreferences({ collapseUnfocusedTabGroups: e.target.checked })}
+                onChange={(e) =>
+                  updatePreferences({ collapseUnfocusedTabGroups: e.target.checked })
+                }
               />
             ),
             enabled: userPreferences.collapseUnfocusedTabGroups,
@@ -133,7 +181,9 @@ const UserPreferences = () => {
             control: (
               <Switch
                 checked={userPreferences.activateTabInFocusedTabGroup}
-                onChange={(e) => updatePreferences({ activateTabInFocusedTabGroup: e.target.checked })}
+                onChange={(e) =>
+                  updatePreferences({ activateTabInFocusedTabGroup: e.target.checked })
+                }
               />
             ),
             enabled: userPreferences.activateTabInFocusedTabGroup,
@@ -141,7 +191,10 @@ const UserPreferences = () => {
           {
             name: "Set titles for new tab groups",
             control: (
-              <Switch checked={userPreferences.setTabGroupTitle} onChange={(e) => updatePreferences({ setTabGroupTitle: e.target.checked })} />
+              <Switch
+                checked={userPreferences.setTabGroupTitle}
+                onChange={(e) => updatePreferences({ setTabGroupTitle: e.target.checked })}
+              />
             ),
             enabled: userPreferences.setTabGroupTitle,
           },
@@ -155,7 +208,9 @@ const UserPreferences = () => {
             control: (
               <Switch
                 checked={userPreferences.enableFocusModeForNewWindows}
-                onChange={(e) => updatePreferences({ enableFocusModeForNewWindows: e.target.checked })}
+                onChange={(e) =>
+                  updatePreferences({ enableFocusModeForNewWindows: e.target.checked })
+                }
               />
             ),
             enabled: userPreferences.enableFocusModeForNewWindows,
@@ -165,7 +220,9 @@ const UserPreferences = () => {
             control: (
               <Switch
                 checked={userPreferences.highlightPrevActiveTabGroup}
-                onChange={(e) => updatePreferences({ highlightPrevActiveTabGroup: e.target.checked })}
+                onChange={(e) =>
+                  updatePreferences({ highlightPrevActiveTabGroup: e.target.checked })
+                }
               />
             ),
             enabled: userPreferences.highlightPrevActiveTabGroup,

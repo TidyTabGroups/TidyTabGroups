@@ -1,9 +1,21 @@
 import ChromeWindowMethods from "../ChromeWindowMethods";
-import { ChromeTabGroupWithId, ChromeTabId, ChromeTabWithId, ChromeWindowId, FixedPageType } from "../Types/Types";
+import {
+  ChromeTabGroupWithId,
+  ChromeTabId,
+  ChromeTabWithId,
+  ChromeWindowId,
+  FixedPageType,
+} from "../Types/Types";
 
-export function tabGroupEquals(tabGroup: ChromeTabGroupWithId, tabGroupToCompare: ChromeTabGroupWithId) {
+export function tabGroupEquals(
+  tabGroup: ChromeTabGroupWithId,
+  tabGroupToCompare: ChromeTabGroupWithId
+) {
   const keys = Object.keys(tabGroupToCompare) as (keyof chrome.tabGroups.TabGroup)[];
-  if (keys.length !== Object.keys(tabGroup).length || keys.find((key) => tabGroupToCompare[key] !== tabGroup[key])) {
+  if (
+    keys.length !== Object.keys(tabGroup).length ||
+    keys.find((key) => tabGroupToCompare[key] !== tabGroup[key])
+  ) {
     return false;
   }
 
@@ -15,7 +27,10 @@ export function isTabGroupTitleEmpty(title: chrome.tabGroups.TabGroup["title"]) 
 }
 
 export async function getTabFromTabOrTabId(tabOrTabId: ChromeTabId | ChromeTabWithId) {
-  const tab = typeof tabOrTabId === "number" ? await ChromeWindowMethods.getIfTabExists(tabOrTabId) : tabOrTabId;
+  const tab =
+    typeof tabOrTabId === "number"
+      ? await ChromeWindowMethods.getIfTabExists(tabOrTabId)
+      : tabOrTabId;
   return tab;
 }
 
@@ -82,18 +97,37 @@ export function getErrorMessage(error: unknown): string {
   if (typeof error === "string") {
     return error;
   }
-  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
     return error.message;
   }
   return "An unknown error occurred";
 }
 
-export function createDummyFixedPage<T extends FixedPageType>(type: T, windowId?: T extends "pinnedTab" | "tab" ? ChromeWindowId : undefined) {
-  return ChromeWindowMethods.createFixedPage<T>(type, chrome.runtime.getURL("dummy-page.html"), windowId);
+export function createDummyFixedPage<T extends FixedPageType>(
+  type: T,
+  windowId?: T extends "pinnedTab" | "tab" ? ChromeWindowId : undefined
+) {
+  return ChromeWindowMethods.createFixedPage<T>(
+    type,
+    chrome.runtime.getURL("dummy-page.html"),
+    windowId
+  );
 }
 
-export function createOptionsFixedPage<T extends FixedPageType>(type: T, windowId?: T extends "pinnedTab" | "tab" ? ChromeWindowId : undefined) {
-  return ChromeWindowMethods.createFixedPage<T>(type, chrome.runtime.getURL("options.html"), windowId);
+export function createOptionsFixedPage<T extends FixedPageType>(
+  type: T,
+  windowId?: T extends "pinnedTab" | "tab" ? ChromeWindowId : undefined
+) {
+  return ChromeWindowMethods.createFixedPage<T>(
+    type,
+    chrome.runtime.getURL("options.html"),
+    windowId
+  );
 }
 
 export function forEachNestedFrame(callback: (frame: Window) => void) {

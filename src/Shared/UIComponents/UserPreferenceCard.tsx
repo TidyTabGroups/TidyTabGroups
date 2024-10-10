@@ -16,7 +16,14 @@ export const UserPreferenceCard = (props: UserPreferenceCardProps) => {
         {title}
       </Typography>
       <Card sx={{ borderRadius: "10px" }}>
-        <CardContent sx={{ display: "flex", flexDirection: "column", gap: "10px", ":last-child": { padding: "16px" } }}>
+        <CardContent
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            ":last-child": { padding: "16px" },
+          }}
+        >
           {userPreferences.map((userPreference, index) => [
             <UserPreference {...userPreference} />,
             index === userPreferences.length - 1 ? null : <Divider />,

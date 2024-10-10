@@ -2,7 +2,16 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import Storage from "../Shared/Storage";
 import { App, UserPreferenceCard, UserPreferenceProps } from "../Shared/UIComponents";
-import { Switch, Container, Typography, CircularProgress, Box, AppBar, Toolbar, IconButton } from "@mui/material";
+import {
+  Switch,
+  Container,
+  Typography,
+  CircularProgress,
+  Box,
+  AppBar,
+  Toolbar,
+  IconButton,
+} from "@mui/material";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import Types from "../Shared/Types";
@@ -25,7 +34,8 @@ const Popup = () => {
   const [activeWindow, setActiveWindow] = useState<Types.ActiveWindow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentActiveWindowTabGroupInfo, setCurrentActiveWindowTabGroupInfo] = useState<CurrentActiveWindowTabGroupInfo | null>(null);
+  const [currentActiveWindowTabGroupInfo, setCurrentActiveWindowTabGroupInfo] =
+    useState<CurrentActiveWindowTabGroupInfo | null>(null);
   const [userPreferences, setUserPreferences] = useState<Types.UserPreferences | null>(null);
 
   useEffect(() => {
@@ -33,7 +43,10 @@ const Popup = () => {
       const myLogger = logger.createNestedLogger("componentDidMount");
       try {
         const currentWindow = (await chrome.windows.getCurrent()) as Types.ChromeWindowWithId;
-        const [activeWindow, userPreferences] = await Promise.all([fetchActiveWindow(currentWindow.id), fetchUserPreferences()]);
+        const [activeWindow, userPreferences] = await Promise.all([
+          fetchActiveWindow(currentWindow.id),
+          fetchUserPreferences(),
+        ]);
 
         let currentActiveWindowTabGroupInfo: CurrentActiveWindowTabGroupInfo | null = null;
         if (activeWindow) {
@@ -84,7 +97,9 @@ const Popup = () => {
     const myLogger = logger.createNestedLogger("onActiveWindowChanged");
     try {
       if (activeWindow !== null) {
-        const currentActiveWindowTabGroupInfo = await fetchCurrentTabGroupInfo(activeWindow.windowId);
+        const currentActiveWindowTabGroupInfo = await fetchCurrentTabGroupInfo(
+          activeWindow.windowId
+        );
         setCurrentActiveWindowTabGroupInfo(currentActiveWindowTabGroupInfo);
       } else {
         setCurrentActiveWindowTabGroupInfo(null);
@@ -131,7 +146,9 @@ const Popup = () => {
         throw new Error("onChangeActivateCurrentWindow called with no currentWindowId");
       }
 
-      const { activeWindow } = await messageActiveWindowManager<{ activeWindow: Types.ActiveWindow | undefined }>({
+      const { activeWindow } = await messageActiveWindowManager<{
+        activeWindow: Types.ActiveWindow | undefined;
+      }>({
         type: "onChangeActivateCurrentWindow",
         data: { windowId: currentWindowId, enabled: e.target.checked },
       });
@@ -171,9 +188,15 @@ const Popup = () => {
       }
 
       const { windowId } = activeWindow;
-      const { activeWindowTabGroup } = await messageActiveWindowManager<{ activeWindowTabGroup: Types.ActiveWindowTabGroup }>({
+      const { activeWindowTabGroup } = await messageActiveWindowManager<{
+        activeWindowTabGroup: Types.ActiveWindowTabGroup;
+      }>({
         type: "onChangeKeepTabGroupOpen",
-        data: { windowId, tabGroupId: currentActiveWindowTabGroupInfo.id, enabled: e.target.checked },
+        data: {
+          windowId,
+          tabGroupId: currentActiveWindowTabGroupInfo.id,
+          enabled: e.target.checked,
+        },
       });
 
       setCurrentActiveWindowTabGroupInfo(getCurrentActiveWindowTabGroupInfo(activeWindowTabGroup));
@@ -206,7 +229,9 @@ const Popup = () => {
     const currentWindowPreferences: UserPreferenceProps[] = [
       {
         name: "Enable Tidy Tab Groups",
-        control: <Switch checked={activeWindow !== null} onChange={onChangeActivateCurrentWindow} />,
+        control: (
+          <Switch checked={activeWindow !== null} onChange={onChangeActivateCurrentWindow} />
+        ),
         enabled: activeWindow !== null,
       },
     ];
@@ -224,7 +249,12 @@ const Popup = () => {
     if (currentActiveWindowTabGroupInfo && userPreferences!.collapseUnfocusedTabGroups) {
       currentTabGroupPreferences.push({
         name: "Keep open",
-        control: <Switch checked={currentActiveWindowTabGroupInfo.keepOpen} onChange={onChangeKeepTabGroupOpen} />,
+        control: (
+          <Switch
+            checked={currentActiveWindowTabGroupInfo.keepOpen}
+            onChange={onChangeKeepTabGroupOpen}
+          />
+        ),
         enabled: currentActiveWindowTabGroupInfo.keepOpen,
       });
     }
@@ -232,17 +262,28 @@ const Popup = () => {
     content = (
       <Box display="flex" flexDirection="column" gap={2}>
         <UserPreferenceCard title="Current Window" userPreferences={currentWindowPreferences} />
-        {currentTabGroupPreferences.length > 0 && <UserPreferenceCard title="Current Tab Group" userPreferences={currentTabGroupPreferences} />}
+        {currentTabGroupPreferences.length > 0 && (
+          <UserPreferenceCard
+            title="Current Tab Group"
+            userPreferences={currentTabGroupPreferences}
+          />
+        )}
       </Box>
     );
   }
 
   return (
-    <Container sx={{ height: "100vh", display: "flex", flexDirection: "column", gap: 2, padding: 0 }}>
+    <Container
+      sx={{ height: "100vh", display: "flex", flexDirection: "column", gap: 2, padding: 0 }}
+    >
       <AppBar position="static">
         <Toolbar sx={{ justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
-            <img src="/assets/logo_96x96.png" alt="Logo" style={{ marginRight: "10px", width: "24px", height: "24px" }} />
+            <img
+              src="/assets/logo_96x96.png"
+              alt="Logo"
+              style={{ marginRight: "10px", width: "24px", height: "24px" }}
+            />
           </Box>
           <Box>
             <IconButton onClick={openOptionsPage} sx={{ color: "gray" }}>
@@ -266,15 +307,23 @@ root.render(
   </App>
 );
 
-async function fetchCurrentTabGroupInfo(windowId: Types.ChromeWindowId): Promise<CurrentActiveWindowTabGroupInfo | null> {
+async function fetchCurrentTabGroupInfo(
+  windowId: Types.ChromeWindowId
+): Promise<CurrentActiveWindowTabGroupInfo | null> {
   const myLogger = logger.createNestedLogger("fetchCurrentTabGroupInfo");
   try {
-    const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (Types.ChromeTabWithId | undefined)[];
+    const [activeTab] = (await chrome.tabs.query({ active: true, windowId })) as (
+      | Types.ChromeTabWithId
+      | undefined
+    )[];
     if (!activeTab || activeTab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
       return null;
     }
 
-    const activeWindowTabGroup = await fetchActiveWindowTabGroup(activeTab.windowId, activeTab.groupId);
+    const activeWindowTabGroup = await fetchActiveWindowTabGroup(
+      activeTab.windowId,
+      activeTab.groupId
+    );
     return activeWindowTabGroup ? getCurrentActiveWindowTabGroupInfo(activeWindowTabGroup) : null;
   } catch (error) {
     throw new Error(myLogger.getPrefixedMessage(Misc.getErrorMessage(error)));
@@ -284,7 +333,9 @@ async function fetchCurrentTabGroupInfo(windowId: Types.ChromeWindowId): Promise
 async function fetchActiveWindow(windowId: Types.ChromeWindowId) {
   const myLogger = logger.createNestedLogger("fetchActiveWindow");
   try {
-    const { activeWindow } = await messageActiveWindowManager<{ activeWindow: Types.ActiveWindow | undefined }>({
+    const { activeWindow } = await messageActiveWindowManager<{
+      activeWindow: Types.ActiveWindow | undefined;
+    }>({
       type: "getActiveWindow",
       data: { windowId },
     });
@@ -294,10 +345,15 @@ async function fetchActiveWindow(windowId: Types.ChromeWindowId) {
   }
 }
 
-async function fetchActiveWindowTabGroup(windowId: Types.ChromeWindowId, tabGroupId: Types.ChromeTabGroupWithId["id"]) {
+async function fetchActiveWindowTabGroup(
+  windowId: Types.ChromeWindowId,
+  tabGroupId: Types.ChromeTabGroupWithId["id"]
+) {
   const myLogger = logger.createNestedLogger("fetchActiveWindowTabGroup");
   try {
-    const { activeWindowTabGroup } = await messageActiveWindowManager<{ activeWindowTabGroup: Types.ActiveWindowTabGroup | undefined }>({
+    const { activeWindowTabGroup } = await messageActiveWindowManager<{
+      activeWindowTabGroup: Types.ActiveWindowTabGroup | undefined;
+    }>({
       type: "getActiveWindowTabGroup",
       data: { windowId, tabGroupId },
     });
@@ -326,7 +382,10 @@ async function messageActiveWindowManager<R>(message: any): Promise<R> {
   try {
     const response = (await chrome.runtime.sendMessage(message)) as { error: unknown; data: R };
     if (response.error) {
-      throw new Error("Active window manager message responded with an error: " + Misc.getErrorMessage(response.error));
+      throw new Error(
+        "Active window manager message responded with an error: " +
+          Misc.getErrorMessage(response.error)
+      );
     } else {
       return response.data;
     }

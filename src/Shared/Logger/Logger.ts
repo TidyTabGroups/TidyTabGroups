@@ -13,7 +13,12 @@ export interface Logger {
 
 export function createLogger(
   prefix?: string,
-  options?: { enableLogging?: boolean; color?: string; divider?: string; filter?: (message: string) => boolean },
+  options?: {
+    enableLogging?: boolean;
+    color?: string;
+    divider?: string;
+    filter?: (message: string) => boolean;
+  },
   extraArgs?: any[]
 ) {
   let enableLogging: boolean = options?.enableLogging === undefined ? true : options.enableLogging;
@@ -32,7 +37,19 @@ export function createLogger(
     resultingPrefixString += prefixDivider;
   }
 
-  const nestedColors = ["#E57373", "#81C784", "#64B5F6", "#FFB74D", "#9575CD", "#A1887F", "#4DD0E1", "#BA68C8", "#F48FB1", "#26A69A", "#FFF176"];
+  const nestedColors = [
+    "#E57373",
+    "#81C784",
+    "#64B5F6",
+    "#FFB74D",
+    "#9575CD",
+    "#A1887F",
+    "#4DD0E1",
+    "#BA68C8",
+    "#F48FB1",
+    "#26A69A",
+    "#FFF176",
+  ];
   let currentColorIndex = 0;
   function createNestedLogger(nestedPrefix?: string, filter?: (message: string) => boolean) {
     const nestedColor = nestedColors[currentColorIndex];
@@ -43,7 +60,11 @@ export function createLogger(
       ? [getCSSColorText(options.color), getCSSColorText("initial"), ...formattedPrefixData[1]]
       : formattedPrefixData[1];
 
-    return createLogger(resultingPrefixString + formattedPrefixData[0], { filter, enableLogging }, cssColors);
+    return createLogger(
+      resultingPrefixString + formattedPrefixData[0],
+      { filter, enableLogging },
+      cssColors
+    );
   }
 
   function getPrefixedMessage(message: string) {
@@ -110,5 +131,8 @@ function getCSSColorText(color: string) {
 }
 
 function getFormattedTextAndCSSColor(text: string, color: string) {
-  return [wrapTextWithColor(text), [getCSSColorText(color), getCSSColorText("initial")] as [string, string]] as const;
+  return [
+    wrapTextWithColor(text),
+    [getCSSColorText(color), getCSSColorText("initial")] as [string, string],
+  ] as const;
 }

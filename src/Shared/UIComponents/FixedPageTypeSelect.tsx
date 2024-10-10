@@ -9,10 +9,19 @@ interface FixedPageTypeSelectProps {
   enabled: boolean;
 }
 
-export default function FixedPageTypeSelect({ value, onChangeType, onChangeEnabled, enabled }: FixedPageTypeSelectProps) {
+export default function FixedPageTypeSelect({
+  value,
+  onChangeType,
+  onChangeEnabled,
+  enabled,
+}: FixedPageTypeSelectProps) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "end" }}>
-      <Select value={value} onChange={(e) => onChangeType(e.target.value as FixedPageType)} disabled={!enabled}>
+      <Select
+        value={value}
+        onChange={(e) => onChangeType(e.target.value as FixedPageType)}
+        disabled={!enabled}
+      >
         <MenuItem value="tab">Tab</MenuItem>
         <MenuItem value="pinnedTab">Pinned Tab</MenuItem>
         <MenuItem value="popupWindow">Popup Window</MenuItem>

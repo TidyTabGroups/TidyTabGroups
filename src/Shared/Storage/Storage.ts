@@ -32,10 +32,10 @@ export async function removeItems(keys: (keyof LocalStorageShape)[]) {
   return chrome.storage.local.remove(keys);
 }
 
-export async function updateItems<T extends keyof LocalStorageShape, P extends { [key in T]: LocalStorageShape[T] }>(
-  keys: T | T[],
-  updater: (items: P) => Promise<P> | P
-) {
+export async function updateItems<
+  T extends keyof LocalStorageShape,
+  P extends { [key in T]: LocalStorageShape[T] }
+>(keys: T | T[], updater: (items: P) => Promise<P> | P) {
   await waitForReady();
   const items = await getItems(keys);
   // @ts-ignore
@@ -46,15 +46,27 @@ export async function updateItems<T extends keyof LocalStorageShape, P extends {
 }
 
 export async function addChangeListener<T extends keyof LocalStorageShape>(
-  listener: (changes: { [key in T]?: { newValue: LocalStorageShape[key]; oldValue: LocalStorageShape[key] } }) => void
+  listener: (changes: {
+    [key in T]?: { newValue: LocalStorageShape[key]; oldValue: LocalStorageShape[key] };
+  }) => void
 ) {
   await waitForReady();
-  chrome.storage.onChanged.addListener(listener as (changes: { [key in keyof LocalStorageShape]?: chrome.storage.StorageChange }) => void);
+  chrome.storage.onChanged.addListener(
+    listener as (changes: {
+      [key in keyof LocalStorageShape]?: chrome.storage.StorageChange;
+    }) => void
+  );
 }
 
 export async function removeChangeListener<T extends keyof LocalStorageShape>(
-  listener: (changes: { [key in T]?: { newValue: LocalStorageShape[key]; oldValue: LocalStorageShape[key] } }) => void
+  listener: (changes: {
+    [key in T]?: { newValue: LocalStorageShape[key]; oldValue: LocalStorageShape[key] };
+  }) => void
 ) {
   await waitForReady();
-  chrome.storage.onChanged.removeListener(listener as (changes: { [key in keyof LocalStorageShape]?: chrome.storage.StorageChange }) => void);
+  chrome.storage.onChanged.removeListener(
+    listener as (changes: {
+      [key in keyof LocalStorageShape]?: chrome.storage.StorageChange;
+    }) => void
+  );
 }

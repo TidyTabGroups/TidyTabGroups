@@ -10,8 +10,12 @@ import Misc from "../Misc";
 
 const logger = Logger.createLogger("ChromeTabOperationRetryHandler");
 
-type ShouldRetryOperationCallback<ShouldRetryOperation extends boolean> = ShouldRetryOperation extends true ? () => Promise<boolean> : undefined;
-export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation extends boolean = false> {
+type ShouldRetryOperationCallback<ShouldRetryOperation extends boolean> =
+  ShouldRetryOperation extends true ? () => Promise<boolean> : undefined;
+export default class ChromeTabOperationRetryHandler<
+  T,
+  ShouldRetryOperation extends boolean = false
+> {
   private operation: (() => Promise<T>) | null = null;
   private shouldRetryOperationCallback?: ShouldRetryOperationCallback<ShouldRetryOperation>;
 
@@ -23,7 +27,9 @@ export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation exte
     this.operation = operation;
   }
 
-  setShouldRetryOperationCallback(shouldRetryOperationCallback: ShouldRetryOperationCallback<ShouldRetryOperation>) {
+  setShouldRetryOperationCallback(
+    shouldRetryOperationCallback: ShouldRetryOperationCallback<ShouldRetryOperation>
+  ) {
     this.shouldRetryOperationCallback = shouldRetryOperationCallback;
   }
 
@@ -37,7 +43,8 @@ export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation exte
       throw new Error(logger.getPrefixedMessage("operation is null"));
     }
 
-    const { result, encounteredUserInteractionError } = await ChromeWindowMethods.withUserInteractionErrorHandler(this.operation);
+    const { result, encounteredUserInteractionError } =
+      await ChromeWindowMethods.withUserInteractionErrorHandler(this.operation);
     if (!encounteredUserInteractionError) {
       return result;
     }
@@ -45,7 +52,9 @@ export default class ChromeTabOperationRetryHandler<T, ShouldRetryOperation exte
     logger.log(`Handled user interaction error for operation: `, this.operation.toString());
     await Misc.waitMs(100);
 
-    let shouldRetry = this.shouldRetryOperationCallback ? await this.shouldRetryOperationCallback() : true;
+    let shouldRetry = this.shouldRetryOperationCallback
+      ? await this.shouldRetryOperationCallback()
+      : true;
     if (shouldRetry) {
       return await this.tryOperation();
     } else {

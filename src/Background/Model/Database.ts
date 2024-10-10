@@ -4,25 +4,52 @@ import Types from "../../Shared/Types";
 
 export async function getKey(
   id: Types.ModelDataBaseActiveWindow["windowId"],
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly" | "readwrite">
+  _transaction?: IDBPTransaction<
+    Types.ModelDataBase,
+    ["activeWindows", ...StoreNames<Types.ModelDataBase>[]],
+    "readonly" | "readwrite"
+  >
 ) {
-  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
+  const [transaction] = await Database.useOrCreateTransaction(
+    "model",
+    _transaction,
+    ["activeWindows"],
+    "readonly"
+  );
   return await transaction.objectStore("activeWindows").getKey(id);
 }
 
 export async function get(
   id: Types.ModelDataBaseActiveWindow["windowId"],
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly" | "readwrite">
+  _transaction?: IDBPTransaction<
+    Types.ModelDataBase,
+    ["activeWindows", ...StoreNames<Types.ModelDataBase>[]],
+    "readonly" | "readwrite"
+  >
 ) {
-  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
+  const [transaction] = await Database.useOrCreateTransaction(
+    "model",
+    _transaction,
+    ["activeWindows"],
+    "readonly"
+  );
   return await transaction.objectStore("activeWindows").get(id);
 }
 
 export async function getOrThrow(
   id: Types.ModelDataBaseActiveWindow["windowId"],
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly" | "readwrite">
+  _transaction?: IDBPTransaction<
+    Types.ModelDataBase,
+    ["activeWindows", ...StoreNames<Types.ModelDataBase>[]],
+    "readonly" | "readwrite"
+  >
 ) {
-  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
+  const [transaction] = await Database.useOrCreateTransaction(
+    "model",
+    _transaction,
+    ["activeWindows"],
+    "readonly"
+  );
   const activeWindow = await get(id, transaction);
   if (!activeWindow) {
     throw new Error(`Database::getOrThrow with id ${id} not found`);
@@ -31,17 +58,35 @@ export async function getOrThrow(
 }
 
 export async function getAll(
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readonly">
+  _transaction?: IDBPTransaction<
+    Types.ModelDataBase,
+    ["activeWindows", ...StoreNames<Types.ModelDataBase>[]],
+    "readonly"
+  >
 ) {
-  const [transaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readonly");
+  const [transaction] = await Database.useOrCreateTransaction(
+    "model",
+    _transaction,
+    ["activeWindows"],
+    "readonly"
+  );
   return await transaction.objectStore("activeWindows").getAll();
 }
 
 export async function add(
   activeWindow: Types.ModelDataBaseActiveWindow,
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readwrite">
+  _transaction?: IDBPTransaction<
+    Types.ModelDataBase,
+    ["activeWindows", ...StoreNames<Types.ModelDataBase>[]],
+    "readwrite"
+  >
 ) {
-  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readwrite");
+  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction(
+    "model",
+    _transaction,
+    ["activeWindows"],
+    "readwrite"
+  );
   await transaction.objectStore("activeWindows").add(activeWindow);
 
   if (!didProvideTransaction) {
@@ -53,9 +98,18 @@ export async function add(
 
 export async function remove(
   id: Types.ModelDataBaseActiveWindow["windowId"],
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readwrite">
+  _transaction?: IDBPTransaction<
+    Types.ModelDataBase,
+    ["activeWindows", ...StoreNames<Types.ModelDataBase>[]],
+    "readwrite"
+  >
 ) {
-  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readwrite");
+  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction(
+    "model",
+    _transaction,
+    ["activeWindows"],
+    "readwrite"
+  );
 
   const key = await transaction.objectStore("activeWindows").getKey(id);
   if (!key) {
@@ -73,9 +127,18 @@ export async function update(
   id: Types.ActiveWindow["windowId"],
   // FIXME: use Partial<Types.ModelDataBaseActiveWindow> instead of Partial<Types.ActiveWindow>
   updatedProperties: Partial<Types.ActiveWindow>,
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readwrite">
+  _transaction?: IDBPTransaction<
+    Types.ModelDataBase,
+    ["activeWindows", ...StoreNames<Types.ModelDataBase>[]],
+    "readwrite"
+  >
 ) {
-  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readwrite");
+  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction(
+    "model",
+    _transaction,
+    ["activeWindows"],
+    "readwrite"
+  );
 
   const activeWindow = await getOrThrow(id, transaction);
 
@@ -87,9 +150,18 @@ export async function update(
 }
 
 export async function clear(
-  _transaction?: IDBPTransaction<Types.ModelDataBase, ["activeWindows", ...StoreNames<Types.ModelDataBase>[]], "readwrite">
+  _transaction?: IDBPTransaction<
+    Types.ModelDataBase,
+    ["activeWindows", ...StoreNames<Types.ModelDataBase>[]],
+    "readwrite"
+  >
 ) {
-  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction("model", _transaction, ["activeWindows"], "readwrite");
+  const [transaction, didProvideTransaction] = await Database.useOrCreateTransaction(
+    "model",
+    _transaction,
+    ["activeWindows"],
+    "readwrite"
+  );
   await transaction.objectStore("activeWindows").clear();
 
   if (!didProvideTransaction) {
