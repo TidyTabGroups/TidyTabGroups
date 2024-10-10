@@ -64,6 +64,7 @@ export interface LocalStorageShape {
   lastSeenFocusModeColors: ActiveWindowFocusModeColors;
   lastFocusedWindowHadFocusMode: boolean; // FIXME: This used to be used for enabling focus mode for newly created windows, but currently has no use.
   lastError: string | null;
+  state: "ready" | "loading" | "error";
 }
 
 export type FixedPageType = "tab" | "pinnedTab" | "popupWindow";
@@ -109,3 +110,5 @@ export type FocusTabGroupOptions = {
   };
   collapseIgnoreSet?: Set<ChromeTabGroupId>;
 };
+
+export type ExcludeUndefined<T> = Exclude<T, undefined>;

@@ -2,3 +2,7 @@ npm-debug.log
 node_modules/
 dist/
 tmp/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

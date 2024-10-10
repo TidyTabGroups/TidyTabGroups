@@ -89,6 +89,7 @@ async function initializeStorage() {
       },
       lastFocusedWindowHadFocusMode: false,
       lastError: null,
+      state: "loading",
     };
     const keys = Object.keys(defaultValues) as (keyof LocalStorageShape)[];
     const items = await chrome.storage.local.get(keys);

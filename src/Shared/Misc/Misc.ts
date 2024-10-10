@@ -5,7 +5,9 @@ import {
   ChromeTabWithId,
   ChromeWindowId,
   FixedPageType,
+  ExcludeUndefined,
 } from "../Types/Types";
+import Storage from "../Storage";
 
 export function tabGroupEquals(
   tabGroup: ChromeTabGroupWithId,
