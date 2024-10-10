@@ -100,7 +100,7 @@ export async function groupTabsWithRetryHandler(options: chrome.tabs.GroupOption
 export async function getIfTabExists(tabId: ChromeTabId) {
   try {
     return (await chrome.tabs.get(tabId)) as ChromeTabWithId;
-  } catch (error) {}
+  } catch (error) { }
 }
 
 export async function doesTabExist(tabId: ChromeTabId) {
@@ -111,7 +111,7 @@ export async function doesTabExist(tabId: ChromeTabId) {
 export async function getIfTabGroupExists(tabGroupId: ChromeTabGroupId) {
   try {
     return await chrome.tabGroups.get(tabGroupId);
-  } catch (error) {}
+  } catch (error) { }
 }
 
 export async function doesTabGroupExist(tabGroupId: ChromeTabGroupId) {
@@ -122,24 +122,24 @@ export async function doesTabGroupExist(tabGroupId: ChromeTabGroupId) {
 export async function getIfWindowExists(windowId: ChromeWindowId, queryOptions: chrome.windows.QueryOptions = {}) {
   try {
     return (await chrome.windows.get(windowId, queryOptions)) as ChromeWindowWithId;
-  } catch (error) {}
+  } catch (error) { }
 }
 export async function getIfCurrentWindowExists() {
   try {
     return (await chrome.windows.getCurrent()) as ChromeWindowWithId;
-  } catch (error) {}
+  } catch (error) { }
 }
 
 export async function queryTabsIfWindowExists(windowId: ChromeWindowId, otherQueryInfo?: chrome.tabs.QueryInfo) {
   try {
     return (await chrome.tabs.query({ ...otherQueryInfo, windowId })) as ChromeTabWithId[];
-  } catch (error) {}
+  } catch (error) { }
 }
 
 export async function queryTabGroupsIfWindowExists(windowId: ChromeWindowId, otherQueryInfo?: chrome.tabGroups.QueryInfo) {
   try {
     return (await chrome.tabGroups.query({ ...otherQueryInfo, windowId })) as ChromeTabGroupWithId[];
-  } catch (error) {}
+  } catch (error) { }
 }
 
 export async function doesWindowExist(windowId: ChromeWindowId) {

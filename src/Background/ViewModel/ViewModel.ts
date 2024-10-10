@@ -166,9 +166,9 @@ async function activateWindowInternal(windowId: ChromeWindowId, focusModeColors?
 
     let newFocusMode = newFocusModeColors
       ? {
-          colors: newFocusModeColors,
-          savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
-        }
+        colors: newFocusModeColors,
+        savedTabGroupColors: tabGroups.map((tabGroup) => ({ tabGroupId: tabGroup.id, color: tabGroup.color })),
+      }
       : null;
     const newActiveWindow = {
       windowId,
