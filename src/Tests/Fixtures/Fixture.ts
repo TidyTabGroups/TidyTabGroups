@@ -1,6 +1,7 @@
 import { BrowserContext, chromium, test as base, Page } from "@playwright/test";
 import path from "path";
-import ChromeProxy from "../ChromeProxy/ChromeProxy";
+import { ChromeProxy } from "../Types";
+import { createChromeProxy } from "../ChromeProxy/ChromeProxy";
 
 export const test = base.extend<{
   context: BrowserContext;
@@ -70,9 +71,7 @@ export const test = base.extend<{
       });
     });
 
-    const chromeProxy = new ChromeProxy(testRunnerPage);
-    await chromeProxy.loadAPI();
-
+    const chromeProxy = await createChromeProxy(testRunnerPage);
     await use(chromeProxy);
   },
 });
