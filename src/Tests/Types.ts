@@ -5,13 +5,22 @@ import {
   ChromeTabWithId,
 } from "../Shared/Types/Types";
 
-export type ChromeProxyEventListener = "tabs.onUpdated" | "tabs.onMoved" | "tabGroups.onUpdated";
+export type ChromeProxyEventListener =
+  | "tabs.onCreated"
+  | "tabs.onUpdated"
+  | "tabs.onMoved"
+  | "tabGroups.onUpdated"
+  | "tabGroups.onMoved";
 export type ChromeProxyEventListenerArgs<T extends ChromeProxyEventListener> =
-  T extends "tabs.onUpdated"
+  T extends "tabs.onCreated"
+    ? [ChromeTabWithId]
+    : T extends "tabs.onUpdated"
     ? [ChromeTabId, chrome.tabs.TabChangeInfo, chrome.tabs.Tab]
     : T extends "tabs.onMoved"
     ? [ChromeTabId, chrome.tabs.TabMoveInfo]
     : T extends "tabGroups.onUpdated"
+    ? [chrome.tabGroups.TabGroup]
+    : T extends "tabGroups.onMoved"
     ? [chrome.tabGroups.TabGroup]
     : never;
 
