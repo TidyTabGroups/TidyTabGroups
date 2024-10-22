@@ -10,10 +10,14 @@ import Misc from "../../Shared/Misc";
 
 const logger = Logger.createLogger("chromeProxy");
 
-type ChromeProxyEventListener = "tabs.onUpdated" | "tabGroups.onUpdated";
+type ChromeProxyEventListener = "tabs.onUpdated" | "tabs.onMoved" | "tabGroups.onUpdated";
 type ChromeProxyEventListenerArgs<T extends ChromeProxyEventListener> = T extends "tabs.onUpdated"
   ? [ChromeTabId, chrome.tabs.TabChangeInfo, chrome.tabs.Tab]
-  : [chrome.tabGroups.TabGroup];
+  : T extends "tabs.onMoved"
+  ? [ChromeTabId, chrome.tabs.TabMoveInfo]
+  : T extends "tabGroups.onUpdated"
+  ? [chrome.tabGroups.TabGroup]
+  : never;
 
 export const api = {
   tabs: {
@@ -21,6 +25,8 @@ export const api = {
     create: ["tabs", "create"],
     update: ["tabs", "update"],
     group: ["tabs", "group"],
+    query: ["tabs", "query"],
+    move: ["tabs", "move"],
   },
   tabGroups: {
     get: ["tabGroups", "get"],
@@ -45,6 +51,11 @@ export default class ChromeProxy {
       updateProperties: chrome.tabs.UpdateProperties
     ) => Promise<ChromeTabWithId>;
     group: (options: chrome.tabs.GroupOptions) => Promise<ChromeTabGroupId>;
+    query: (queryInfo: chrome.tabs.QueryInfo) => Promise<ChromeTabWithId[]>;
+    move: (
+      tabId: ChromeTabId,
+      moveProperties: chrome.tabs.MoveProperties
+    ) => Promise<ChromeTabWithId>;
   } = {} as any;
 
   public tabGroups: {
@@ -69,6 +80,12 @@ export default class ChromeProxy {
       },
       group: async (options: chrome.tabs.GroupOptions) => {
         return (await this.call(api.tabs.group, options)) as ChromeTabGroupId;
+      },
+      query: async (queryInfo: chrome.tabs.QueryInfo) => {
+        return (await this.call(api.tabs.query, queryInfo)) as ChromeTabWithId[];
+      },
+      move: async (tabId: ChromeTabId, moveProperties: chrome.tabs.MoveProperties) => {
+        return (await this.call(api.tabs.move, tabId, moveProperties)) as ChromeTabWithId;
       },
     };
 
