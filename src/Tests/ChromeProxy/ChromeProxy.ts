@@ -101,7 +101,7 @@ export default class ChromeProxy {
 
   public async waitFor<T extends ChromeProxyEventListener>(
     event: T,
-    callback: (...data: ChromeProxyEventListenerArgs<T>) => boolean
+    callback: (...data: ChromeProxyEventListenerArgs<T>) => Promise<boolean>
   ) {
     const myLogger = logger.createNestedLogger("waitFor");
     if (!this.isLoaded) {
@@ -153,7 +153,7 @@ export default class ChromeProxy {
         });
       }, id)) as ChromeProxyEventListenerArgs<T>;
 
-      if (callback(...eventArgs)) {
+      if (await callback(...eventArgs)) {
         // Cleanup
         await page.evaluate(
           `

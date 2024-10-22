@@ -6,7 +6,7 @@ test.describe("Auto Group", () => {
   test("Created tab gets auto-grouped", async ({ chromeProxy }) => {
     const becomesGroupedPromise = chromeProxy.waitFor(
       "tabs.onUpdated",
-      (tabId, changeInfo, tab) => {
+      async (tabId, changeInfo, tab) => {
         return (
           tabId === createdTab.id &&
           changeInfo.groupId !== undefined &&
@@ -26,7 +26,7 @@ test.describe("Auto Group", () => {
 
     const becomesGroupedPromise = chromeProxy.waitFor(
       "tabs.onUpdated",
-      (tabId, changeInfo, tab) => {
+      async (tabId, changeInfo, tab) => {
         return (
           tabId === createdTab.id &&
           changeInfo.groupId !== undefined &&
@@ -47,7 +47,7 @@ test.describe("Auto Group", () => {
     const activeTab = await test.step("Create active tab group", async () => {
       const becomesGroupedPromise = chromeProxy.waitFor(
         "tabs.onUpdated",
-        (tabId, changeInfo, tab) => {
+        async (tabId, changeInfo, tab) => {
           return (
             tabId === activeTab.id &&
             changeInfo.groupId !== undefined &&
@@ -63,7 +63,7 @@ test.describe("Auto Group", () => {
 
     const becomesGroupedIntoActiveTabGroupPromise = chromeProxy.waitFor(
       "tabs.onUpdated",
-      (tabId, changeInfo, tab) => {
+      async (tabId, changeInfo, tab) => {
         return tabId === createdTab.id && changeInfo.groupId === activeTab.groupId;
       }
     );

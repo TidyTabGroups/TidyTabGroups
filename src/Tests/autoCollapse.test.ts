@@ -8,7 +8,7 @@ test.describe("Auto Collapse", () => {
       // Create active tab
       const becomesGroupedPromise = chromeProxy.waitFor(
         "tabs.onUpdated",
-        (tabId, changeInfo, tab) => {
+        async (tabId, changeInfo, tab) => {
           return (
             tabId === activeTab.id &&
             changeInfo.groupId !== undefined &&
@@ -31,7 +31,7 @@ test.describe("Auto Collapse", () => {
       //  Create non-active tab
       const becomesGroupedPromise = chromeProxy.waitFor(
         "tabs.onUpdated",
-        (tabId, changeInfo, tab) => {
+        async (tabId, changeInfo, tab) => {
           return tabId === nonActiveTab.id && changeInfo.groupId === activeTab.groupId;
         }
       );
@@ -44,9 +44,12 @@ test.describe("Auto Collapse", () => {
       nonActiveTab = await chromeProxy.tabs.get(nonActiveTab.id);
 
       // Create non-active tab group
-      const becomesCollapsedPromise = chromeProxy.waitFor("tabGroups.onUpdated", (tabGroup) => {
-        return tabGroup.id === nonActiveTabGroupId && tabGroup.collapsed === true;
-      });
+      const becomesCollapsedPromise = chromeProxy.waitFor(
+        "tabGroups.onUpdated",
+        async (tabGroup) => {
+          return tabGroup.id === nonActiveTabGroupId && tabGroup.collapsed === true;
+        }
+      );
       const nonActiveTabGroupId = await chromeProxy.tabs.group({
         tabIds: [nonActiveTab.id],
         createProperties: { windowId: nonActiveTab.windowId },
@@ -71,7 +74,7 @@ test.describe("Auto Collapse", () => {
     // Expand non-active tab group and wait for previous active tab group to become collapsed
     const previousActiveTabGroupBecomesCollapsedPromise = chromeProxy.waitFor(
       "tabGroups.onUpdated",
-      (tabGroup) => {
+      async (tabGroup) => {
         return tabGroup.id === activeTab.groupId && tabGroup.collapsed === true;
       }
     );
