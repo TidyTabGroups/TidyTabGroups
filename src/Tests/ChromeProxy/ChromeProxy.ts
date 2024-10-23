@@ -7,6 +7,7 @@ import {
 } from "../../Shared/Types/Types";
 import Logger from "../../Shared/Logger";
 import { ChromeProxy, ChromeProxyEventListener, ChromeProxyEventListenerArgs } from "../Types";
+import { v4 as uuid } from "uuid";
 import Misc from "../../Shared/Misc";
 
 const logger = Logger.createLogger("chromeProxy");
@@ -82,13 +83,14 @@ async function waitFor<T extends ChromeProxyEventListener>(
 ) {
   const myLogger = logger.createNestedLogger("waitFor");
 
-  const id = new Date().getTime();
+  const id = uuid();
+  const idJson = JSON.stringify(id);
   myLogger.log(`Waiting for event: ${event}, id: ${id}`);
 
   // Add the Chrome event listener
   await page.evaluate(
     `
-      const id = ${id};
+      const id = ${idJson};
 
       if (self.pendingEventArgs === undefined) {
         self.pendingEventArgs = {};
@@ -131,7 +133,7 @@ async function waitFor<T extends ChromeProxyEventListener>(
       // Cleanup
       await page.evaluate(
         `
-          const id = ${id};
+          const id = ${idJson};
 
           chrome.${event}.removeListener(self.chromeListeners[id]);
           delete self.chromeListeners[id];
