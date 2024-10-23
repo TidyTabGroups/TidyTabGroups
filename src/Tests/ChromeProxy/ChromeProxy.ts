@@ -111,10 +111,7 @@ async function waitFor<T extends ChromeProxyEventListener>(
     `
   );
 
-  // Wait for the event to be triggered
-  await waitForEventArgs(page);
-
-  async function waitForEventArgs(page: Page) {
+  const waitForValidEventArgs = (async function waitForEventArgs() {
     const eventArgs = (await page.evaluate((id) => {
       return new Promise<any>((resolve) => {
         if ((self as any).pendingEventArgs[id].length > 0) {
@@ -133,17 +130,19 @@ async function waitFor<T extends ChromeProxyEventListener>(
       // Cleanup
       await page.evaluate(
         `
-          const id = ${idJson};
-
-          chrome.${event}.removeListener(self.chromeListeners[id]);
-          delete self.chromeListeners[id];
-          delete self.pendingEventArgs[id];
-        `
+            const id = ${idJson};
+  
+            chrome.${event}.removeListener(self.chromeListeners[id]);
+            delete self.chromeListeners[id];
+            delete self.pendingEventArgs[id];
+          `
       );
     } else {
-      await waitForEventArgs(page);
+      await waitForEventArgs();
     }
-  }
+  })();
+
+  return { waitForValidEventArgs };
 }
 
 async function call(page: Page, api: string[], ...args: any) {

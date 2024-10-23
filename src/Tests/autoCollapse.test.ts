@@ -5,9 +5,10 @@ test("Previous active tab group becomes collapsed", async ({ chromeProxy }) => {
   const activeTabGroupTitle = " * Active * ";
   const activeTab = await test.step("Create active tab group", async () => {
     // Create active tab
-    const becomesGroupedPromise = chromeProxy.waitFor(
+    const becomesGroupedPromise = await chromeProxy.waitFor(
       "tabs.onUpdated",
       async (tabId, changeInfo, tab) => {
+        const activeTab = await activeTabPromise;
         return (
           tabId === activeTab.id &&
           changeInfo.groupId !== undefined &&
@@ -15,8 +16,9 @@ test("Previous active tab group becomes collapsed", async ({ chromeProxy }) => {
         );
       }
     );
-    let activeTab = await chromeProxy.tabs.create({ pinned: false, active: true });
-    await becomesGroupedPromise;
+    const activeTabPromise = chromeProxy.tabs.create({ pinned: false, active: true });
+    let activeTab = await activeTabPromise;
+    await becomesGroupedPromise.waitForValidEventArgs;
     activeTab = await chromeProxy.tabs.get(activeTab.id);
 
     // Update Title for easier debugging
@@ -28,28 +30,35 @@ test("Previous active tab group becomes collapsed", async ({ chromeProxy }) => {
   const nonActiveTabGroupTitle = " * Non-Active * ";
   const nonActiveTab = await test.step("Create non-active tab group", async () => {
     //  Create non-active tab
-    const becomesGroupedPromise = chromeProxy.waitFor(
+    const becomesGroupedPromise = await chromeProxy.waitFor(
       "tabs.onUpdated",
       async (tabId, changeInfo, tab) => {
+        const nonActiveTab = await nonActiveTabPromise;
         return tabId === nonActiveTab.id && changeInfo.groupId === activeTab.groupId;
       }
     );
-    let nonActiveTab = await chromeProxy.tabs.create({
+    const nonActiveTabPromise = chromeProxy.tabs.create({
       pinned: false,
       windowId: activeTab.windowId,
       active: false,
     });
-    await becomesGroupedPromise;
+    let nonActiveTab = await nonActiveTabPromise;
+    await becomesGroupedPromise.waitForValidEventArgs;
     nonActiveTab = await chromeProxy.tabs.get(nonActiveTab.id);
 
     // Create non-active tab group
-    const becomesCollapsedPromise = chromeProxy.waitFor("tabGroups.onUpdated", async (tabGroup) => {
-      return tabGroup.id === nonActiveTabGroupId && tabGroup.collapsed === true;
-    });
-    const nonActiveTabGroupId = await chromeProxy.tabs.group({
+    const becomesCollapsedPromise = await chromeProxy.waitFor(
+      "tabGroups.onUpdated",
+      async (tabGroup) => {
+        const nonActiveTabGroupId = await nonActiveTabGroupIdPromise;
+        return tabGroup.id === nonActiveTabGroupId && tabGroup.collapsed === true;
+      }
+    );
+    const nonActiveTabGroupIdPromise = chromeProxy.tabs.group({
       tabIds: [nonActiveTab.id],
       createProperties: { windowId: nonActiveTab.windowId },
     });
+    const nonActiveTabGroupId = await nonActiveTabGroupIdPromise;
     nonActiveTab = await chromeProxy.tabs.get(nonActiveTab.id);
     let nonActiveTabGroup = await chromeProxy.tabGroups.update(nonActiveTabGroupId, {
       // Update title for easier debugging
@@ -57,7 +66,7 @@ test("Previous active tab group becomes collapsed", async ({ chromeProxy }) => {
     });
 
     if (!nonActiveTabGroup.collapsed) {
-      await becomesCollapsedPromise;
+      await becomesCollapsedPromise.waitForValidEventArgs;
       nonActiveTabGroup = await chromeProxy.tabGroups.get(nonActiveTabGroupId);
       if (!nonActiveTabGroup.collapsed) {
         throw new Error("nonActiveTabGroup is not collapsed");
@@ -68,14 +77,14 @@ test("Previous active tab group becomes collapsed", async ({ chromeProxy }) => {
   });
 
   // Expand non-active tab group and wait for previous active tab group to become collapsed
-  const previousActiveTabGroupBecomesCollapsedPromise = chromeProxy.waitFor(
+  const previousActiveTabGroupBecomesCollapsedPromise = await chromeProxy.waitFor(
     "tabGroups.onUpdated",
     async (tabGroup) => {
       return tabGroup.id === activeTab.groupId && tabGroup.collapsed === true;
     }
   );
   await chromeProxy.tabGroups.update(nonActiveTab.groupId, { collapsed: false });
-  await previousActiveTabGroupBecomesCollapsedPromise;
+  await previousActiveTabGroupBecomesCollapsedPromise.waitForValidEventArgs;
 
   expect(true).toBe(true);
 });

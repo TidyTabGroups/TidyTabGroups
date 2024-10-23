@@ -29,7 +29,7 @@ export interface ChromeProxy {
   waitFor: <T extends ChromeProxyEventListener>(
     event: T,
     callback: (...data: ChromeProxyEventListenerArgs<T>) => Promise<boolean>
-  ) => Promise<void>;
+  ) => Promise<{ waitForValidEventArgs: Promise<void> }>;
   tabs: {
     get: (tabId: ChromeTabId) => Promise<ChromeTabWithId>;
     create: (options: chrome.tabs.CreateProperties) => Promise<ChromeTabWithId>;

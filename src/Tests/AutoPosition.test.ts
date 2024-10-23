@@ -11,7 +11,7 @@ test("Focused tab group and tab get repositioned to end of tab bar", async ({
   const [targetPage, targetPageTab] =
     await test.step("Create target page and tab group", async () => {
       let targetPageTabId: ChromeTabId | undefined;
-      const becomesLoadedPromise = chromeProxy.waitFor(
+      const becomesLoadedPromise = await chromeProxy.waitFor(
         "tabs.onUpdated",
         async (tabId, changeInfo, tab) => {
           if (changeInfo.status === "complete" && tab.url === DEFAULT_TEST_PAGE_URL) {
@@ -21,16 +21,19 @@ test("Focused tab group and tab get repositioned to end of tab bar", async ({
           return false;
         }
       );
-      const becomesGroupedPromise = chromeProxy.waitFor("tabs.onUpdated", async (_, changeInfo) => {
-        return (
-          changeInfo.groupId !== undefined &&
-          changeInfo.groupId !== chromeProxy.tabGroups.TAB_GROUP_ID_NONE
-        );
-      });
+      const becomesGroupedPromise = await chromeProxy.waitFor(
+        "tabs.onUpdated",
+        async (_, changeInfo) => {
+          return (
+            changeInfo.groupId !== undefined &&
+            changeInfo.groupId !== chromeProxy.tabGroups.TAB_GROUP_ID_NONE
+          );
+        }
+      );
       const page = await context.newPage();
       await page.goto(DEFAULT_TEST_PAGE_URL);
-      await becomesGroupedPromise;
-      await becomesLoadedPromise;
+      await becomesGroupedPromise.waitForValidEventArgs;
+      await becomesLoadedPromise.waitForValidEventArgs;
 
       if (targetPageTabId === undefined) {
         throw new Error("targetPageTabId was not set");
@@ -44,7 +47,7 @@ test("Focused tab group and tab get repositioned to end of tab bar", async ({
     });
 
   await test.step("Create an active tab group with a tab positioned after the target tab", async () => {
-    const becomesGroupedPromise = chromeProxy.waitFor(
+    const becomesGroupedPromise = await chromeProxy.waitFor(
       "tabs.onUpdated",
       async (tabId, changeInfo, tab) => {
         return (
@@ -58,7 +61,7 @@ test("Focused tab group and tab get repositioned to end of tab bar", async ({
       index: targetPageTab.index + 1,
       windowId: targetPageTab.windowId,
     });
-    await becomesGroupedPromise;
+    await becomesGroupedPromise.waitForValidEventArgs;
     const tabGroup = await chromeProxy.tabs.group({
       tabIds: [tab.id],
       createProperties: { windowId: tab.windowId },
@@ -68,7 +71,7 @@ test("Focused tab group and tab get repositioned to end of tab bar", async ({
   });
 
   await test.step("Focus target tab group and wait for it and it's tab to be repositioned", async () => {
-    const tabBecomesRepositionedPromise = chromeProxy.waitFor(
+    const tabBecomesRepositionedPromise = await chromeProxy.waitFor(
       "tabs.onMoved",
       async (tabId, moveInfo) => {
         if (tabId === targetPageTab.id) {
@@ -80,7 +83,7 @@ test("Focused tab group and tab get repositioned to end of tab bar", async ({
       }
     );
 
-    const tabGroupBecomesRepositionedPromise = chromeProxy.waitFor(
+    const tabGroupBecomesRepositionedPromise = await chromeProxy.waitFor(
       "tabGroups.onMoved",
       async (tabGroup) => {
         return true;
@@ -94,8 +97,8 @@ test("Focused tab group and tab get repositioned to end of tab bar", async ({
     });
     // WARNING: This does not work if your cursor is in the test page.
     await targetPage.hover("body");
-    await tabBecomesRepositionedPromise;
-    await tabGroupBecomesRepositionedPromise;
+    await tabBecomesRepositionedPromise.waitForValidEventArgs;
+    await tabGroupBecomesRepositionedPromise.waitForValidEventArgs;
   });
 
   expect(true).toBe(true);

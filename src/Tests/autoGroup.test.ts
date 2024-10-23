@@ -3,9 +3,10 @@ import { ChromeTabWithId } from "../Shared/Types/Types";
 import Misc from "../Shared/Misc";
 
 test("Created tab gets auto-grouped", async ({ chromeProxy }) => {
-  const becomesGroupedPromise = chromeProxy.waitFor(
+  const becomesGroupedPromise = await chromeProxy.waitFor(
     "tabs.onUpdated",
     async (tabId, changeInfo, tab) => {
+      const createdTab = await createdTabPromise;
       return (
         tabId === createdTab.id &&
         changeInfo.groupId !== undefined &&
@@ -14,8 +15,9 @@ test("Created tab gets auto-grouped", async ({ chromeProxy }) => {
     }
   );
 
-  const createdTab = await chromeProxy.tabs.create({ pinned: false });
-  await becomesGroupedPromise;
+  const createdTabPromise = chromeProxy.tabs.create({ pinned: false });
+  await createdTabPromise;
+  await becomesGroupedPromise.waitForValidEventArgs;
 
   expect(true).toBe(true);
 });
@@ -23,9 +25,10 @@ test("Created tab gets auto-grouped", async ({ chromeProxy }) => {
 test("Created tab gets auto-grouped into new group", async ({ chromeProxy }) => {
   const activePinnedTab = await chromeProxy.tabs.create({ pinned: true, active: true });
 
-  const becomesGroupedPromise = chromeProxy.waitFor(
+  const becomesGroupedPromise = await chromeProxy.waitFor(
     "tabs.onUpdated",
     async (tabId, changeInfo, tab) => {
+      const createdTab = await createdTabPromise;
       return (
         tabId === createdTab.id &&
         changeInfo.groupId !== undefined &&
@@ -33,20 +36,22 @@ test("Created tab gets auto-grouped into new group", async ({ chromeProxy }) => 
       );
     }
   );
-  const createdTab = await chromeProxy.tabs.create({
+  const createdTabPromise = chromeProxy.tabs.create({
     pinned: false,
     windowId: activePinnedTab.windowId,
   });
-  await becomesGroupedPromise;
+  await createdTabPromise;
+  await becomesGroupedPromise.waitForValidEventArgs;
 
   expect(true).toBe(true);
 });
 
 test("Created tab gets auto-grouped into active tab group", async ({ chromeProxy }) => {
   const activeTab = await test.step("Create active tab group", async () => {
-    const becomesGroupedPromise = chromeProxy.waitFor(
+    const becomesGroupedPromise = await chromeProxy.waitFor(
       "tabs.onUpdated",
       async (tabId, changeInfo, tab) => {
+        const activeTab = await activeTabPromise;
         return (
           tabId === activeTab.id &&
           changeInfo.groupId !== undefined &&
@@ -54,23 +59,26 @@ test("Created tab gets auto-grouped into active tab group", async ({ chromeProxy
         );
       }
     );
-    let activeTab = await chromeProxy.tabs.create({ pinned: false, active: true });
-    await becomesGroupedPromise;
+    let activeTabPromise = chromeProxy.tabs.create({ pinned: false, active: true });
+    let activeTab = await activeTabPromise;
+    await becomesGroupedPromise.waitForValidEventArgs;
     activeTab = await chromeProxy.tabs.get(activeTab.id);
     return activeTab;
   });
 
-  const becomesGroupedIntoActiveTabGroupPromise = chromeProxy.waitFor(
+  const becomesGroupedIntoActiveTabGroupPromise = await chromeProxy.waitFor(
     "tabs.onUpdated",
     async (tabId, changeInfo, tab) => {
+      const createdTab = await createdTabPromise;
       return tabId === createdTab.id && changeInfo.groupId === activeTab.groupId;
     }
   );
-  const createdTab = await chromeProxy.tabs.create({
+  const createdTabPromise = chromeProxy.tabs.create({
     pinned: false,
     windowId: activeTab.windowId,
   });
-  await becomesGroupedIntoActiveTabGroupPromise;
+  await createdTabPromise;
+  await becomesGroupedIntoActiveTabGroupPromise.waitForValidEventArgs;
 
   expect(true).toBe(true);
 });
