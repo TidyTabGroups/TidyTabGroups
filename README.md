@@ -13,13 +13,38 @@
 
 **Whether you're managing multiple projects or just want a cleaner browser, Tidy Tab Groups is the effortless productivity boost for your browser. Try it out today, it's free! 💯**
 
+<div>
+<details>
+<summary><h3>Pictures </summary>
+
+<div>
+    <div>
+      <div>
+        <img src="https://lh3.googleusercontent.com/mpGgPVTRagPdExl6LDqPWBbmX1-lozCc7a9gJG07wbwUAFXpxT1vL76avfQvSFrQN_LMfhKF4GrtuWlN_e-ww9RzAQ=s1280-w1280-h800" alt="" width="100%"  />
+      </div>
+        </br>
+      <div>
+        <img src="https://lh3.googleusercontent.com/rOALgHclMPGd8szI5g_fxHV86b1VShRfC-hebz30ZXcZ2Z0pvgxeLbPBpMS-9kdqzyJcLGVdfDOyKieGxs3GhxwbULk=s1280-w1280-h800" alt="" width="100%"  />
+      </div>
+        </br>
+      <div>
+        <img src="https://lh3.googleusercontent.com/S9K5_Vr6mrK75mOlioFZHq8vfleH7w-3wux_DOrjipgNVsK5hp7hJSLpLVu9ustKI2WSWHuQqhp2OUxPADkqS1FoV1c=s1280-w1280-h800" alt="" width="100%"  />
+      </div>
+        </br>
+      <div>
+        <img src="https://lh3.googleusercontent.com/vf3NYFV1TwOXxvVqHAUP5dd6zySSeCWgHIqlV-DQN3okj3eRKkbX2adtF0p2PWRIPEFGAczsDJNcesKD_zAvvK6AwO4=s1280-w1280-h800" alt="" width="100%"  />
+      </div>
+</div>
+</details>
+</div>
+
 ## How to Install
 
-To install Tidy Tab Groups, you have two routes:
+To install Tidy Tab Groups, you have two options:
 
-You can install it from the [Web Store](https://chromewebstore.google.com/detail/tidy-tab-groups/fohgbkobjdckaapjimleemkolchkmebf) on Chromium-based browsers oryou can follow the steps below to install it manually: 
+**You can install it from the [Web Store](https://chromewebstore.google.com/detail/tidy-tab-groups/fohgbkobjdckaapjimleemkolchkmebf) on Chromium-based browsers** or you can follow the steps below to install it manually: 
 
-1. Go to the [Releases](https://github.com/MoeBazziGIT/Tidy-Tab-Groups/releases) page on this repo and dowload the latest `.crx` file
+1. Go to the **[Releases](https://github.com/MoeBazziGIT/Tidy-Tab-Groups/releases)** page on this repo and dowload the latest `.crx` file
 2. Go to `chrome://extensions`
 3. Enable Developer mode (hint: it's in the upper right hand corner)
 4. Drag the file you downloaded (the `.crx` file) onto the page and it will ask you if you want to download it!
