@@ -564,6 +564,8 @@ export async function initialize(onError: (message: string) => void) {
 export async function onInstalled(details: chrome.runtime.InstalledDetails) {
   logger.log(`onInstalled::Extension was installed because of: ${details.reason}`);
 
+  await Storage.setItems({ state: "loading" });
+
   if (details.reason === "update" && details.previousVersion === "0.0.4") {
     await Storage.updateItems("userPreferences", (prev) => {
       return {
@@ -591,4 +593,6 @@ export async function onInstalled(details: chrome.runtime.InstalledDetails) {
       files: ["js/vendor.js", "js/content_script.js"],
     });
   }
+
+  await Storage.setItems({ state: "ready" });
 }
