@@ -1,0 +1,35 @@
+name: ❓ Question (Other)
+description: Use this for any other issues!
+title: 'Your Descriptive Title'
+labels: ['question']
+body:
+    - type: checkboxes
+      id: duplicates
+      attributes:
+          label: Prerequisites
+          options:
+              - label: I [searched for any existing reports](https://github.com/TidyTabGroups/TidyTabGroups/labels/question) about this question to avoid opening a duplicate.
+                required: true
+              - label: "This issue contains **only one question**. (hint: make multiple issues, it makes it easier on our end!)"
+                required: true
+              - label: The title of this issue **accurately** describes the question.
+                required: true
+
+    - type: textarea
+      attributes:
+          label: What would you like to share/ask?
+          description: Provide a clear and concise explanation of your issue.
+      validations:
+          required: true
+
+    - type: textarea
+      attributes:
+          label: Additional information
+          description: Is there anything else we should know about this issue?
+      validations:
+          required: false
+
+    - type: markdown
+      attributes:
+          value: |
+              ### Thanks for using Tody Tab Groups! 🤝
