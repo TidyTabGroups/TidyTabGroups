@@ -82,7 +82,7 @@ body:
     - type: input
       id: other-source
       attributes:
-          label: *If you select "Other" previously, please specify source*
+          label: '*If you select "Other" previously, please specify source*'
           description: Please fill this only if you choose "Other" for source selection
           placeholder: e.g. "Bleepbloorp"
       validations:
