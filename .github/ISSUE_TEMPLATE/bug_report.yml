@@ -2,6 +2,7 @@ name: 🐞 Bug Report
 description: Create a bug report about Tidy Tab Groups
 title: 'Your Descriptive Title'
 labels: ['bug']
+assignees: elouangrimm,MoeBazziGIT
 body:
     - type: markdown
       attributes:
