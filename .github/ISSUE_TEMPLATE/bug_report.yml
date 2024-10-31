@@ -64,7 +64,7 @@ body:
     - type: textarea
       attributes:
           label: Actual Behavior
-          description: Provide a **clear and concise** description of what actually happened.
+          description: "Provide a **clear and concise** description of what *actually* happened."
       validations:
           required: true
 
