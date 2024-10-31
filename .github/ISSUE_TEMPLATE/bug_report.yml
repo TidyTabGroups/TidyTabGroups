@@ -68,30 +68,9 @@ body:
           required: true
 
     - type: dropdown
-      id: browser
-      attributes:
-          label: Select Your Browser
-          options:
-              - 'Chrome'
-              - 'Firefox'
-              - 'Other'
-      validations:
-          required: true
-
-    - type: input
-      id: other-browser
-      attributes:
-          label: If you select "Other" previously, please specify browser
-          description: Please fill this only if you choose "Other" for browser selection
-          placeholder: e.g. "Floorp"
-      validations:
-          required: false
-
-    - type: dropdown
       id: extension-source
       attributes:
           label: Source of Installation
-          multiple: true
           options:
               - 'Chrome Web Store'
               - 'GitHub Release (`.crx`)'
@@ -103,7 +82,7 @@ body:
     - type: input
       id: other-source
       attributes:
-          label: If you select "Other" previously, please specify source
+          label: *If you select "Other" previously, please specify source*
           description: Please fill this only if you choose "Other" for source selection
           placeholder: e.g. "Bleepbloorp"
       validations:
