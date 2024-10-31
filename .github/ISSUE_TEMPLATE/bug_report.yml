@@ -19,18 +19,18 @@ body:
           # description: Increase the chances of your issue being accepted by making sure it has not been raised before.
           options:
               # - label: I've checked that there is no "open" or "closed" issue about this bug.
-              - label: I [searched for any existing report](https://github.com/itsmartashub/GPThemes/issues?q=is%3Aissue) about this bug to avoid opening a duplicate.
+              - label: I [searched for any existing report](https://github.com/TidyTabGroups/TidyTabGroups/issues?q=is%3Aissue) about this bug to avoid opening a duplicate.
                 required: true
-              - label: This issue contains only one bug.
+              - label: This issue contains **only one bug**. (hint: make multiple issues/reports, makes it easier on our end!)
                 required: true
-              - label: The title of this issue accurately describes the bug.
+              - label: The title of this issue **accurately** describes the bug.
                 required: true
 
     - type: textarea
       id: description
       attributes:
           label: Bug Description
-          description: Please provide a clear and concise description of the problem you encountered.
+          description: Please provide a **clear and concise** description of the problem you encountered.
       validations:
           required: true
 
@@ -57,14 +57,14 @@ body:
     - type: textarea
       attributes:
           label: Expected Behavior
-          description: Provide a clear and concise description of what you expected to happen (or what should have happened).
+          description: Provide a **clear and concise** description of what you expected to happen (or what should have happened).
       validations:
           required: true
 
     - type: textarea
       attributes:
           label: Actual Behavior
-          description: Provide a clear and concise description of what actually happened.
+          description: Provide a **clear and concise** description of what actually happened.
       validations:
           required: true
 
@@ -84,7 +84,7 @@ body:
       id: other-source
       attributes:
           label: '*If you select "Other" previously, please specify source*'
-          description: Please fill this only if you choose "Other" for source selection
+          description: Please fill this **only** if you choose "Other" for source selection
           placeholder: e.g. "Bleepbloorp"
       validations:
           required: false
