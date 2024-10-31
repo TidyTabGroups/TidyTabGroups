@@ -21,7 +21,7 @@ body:
               # - label: I've checked that there is no "open" or "closed" issue about this bug.
               - label: I [searched for any existing report](https://github.com/TidyTabGroups/TidyTabGroups/issues?q=is%3Aissue) about this bug to avoid opening a duplicate.
                 required: true
-              - label: This issue contains **only one bug**. (hint: make multiple issues/reports, makes it easier on our end!)
+              - label: "This issue contains **only one bug**. (hint: make multiple issues/reports, makes it easier on our end!)"
                 required: true
               - label: The title of this issue **accurately** describes the bug.
                 required: true
