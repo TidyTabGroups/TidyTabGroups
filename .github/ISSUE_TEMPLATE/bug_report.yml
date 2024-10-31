@@ -1,0 +1,156 @@
+name: 🐞 Bug Report
+description: Create a bug report about Tidy Tab Groups
+title: 'Your Descriptive Title'
+labels: ['bug']
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Please fill out the sections below to help us identify and fix the bug.
+
+              Thank you for taking the time to report this bug.
+
+    - type: checkboxes
+      id: duplicates
+      attributes:
+          # label: Please complete all tasks before submitting a report
+          label: Prerequisites
+          # description: Increase the chances of your issue being accepted by making sure it has not been raised before.
+          options:
+              # - label: I've checked that there is no "open" or "closed" issue about this bug.
+              - label: I [searched for any existing report](https://github.com/itsmartashub/GPThemes/issues?q=is%3Aissue) about this bug to avoid opening a duplicate.
+                required: true
+              - label: This issue contains only one bug.
+                required: true
+              - label: The title of this issue accurately describes the bug.
+                required: true
+
+    - type: textarea
+      id: description
+      attributes:
+          label: Bug Description
+          description: Please provide a clear and concise description of the problem you encountered.
+      validations:
+          required: true
+
+    - type: textarea
+      id: steps
+      attributes:
+          label: Steps to Reproduce
+          #   description: To help me recreate the bug, provide a numbered list of the exact steps taken to trigger the buggy behavior.
+          description: What did you do for the bug to occur?
+          placeholder: |
+              1. Open the browser extension
+              2. Go to '...'
+              3. Click on '...'
+              4. ...
+
+              If you don't know exact steps, include any relevant details like:
+
+              - What page you were on...
+              - What you were trying to do...
+              - What went wrong...
+      validations:
+          required: true
+
+    - type: textarea
+      attributes:
+          label: Expected Behavior
+          description: Provide a clear and concise description of what you expected to happen (or what should have happened).
+      validations:
+          required: true
+
+    - type: textarea
+      attributes:
+          label: Actual Behavior
+          description: Provide a clear and concise description of what actually happened.
+      validations:
+          required: true
+
+    - type: dropdown
+      id: browser
+      attributes:
+          label: Select Your Browser
+          options:
+              - 'Chrome'
+              - 'Firefox'
+              - 'Other'
+      validations:
+          required: true
+
+    - type: input
+      id: other-browser
+      attributes:
+          label: If you select "Other" previously, please specify browser
+          description: Please fill this only if you choose "Other" for browser selection
+          placeholder: e.g. "Floorp"
+      validations:
+          required: false
+
+    - type: dropdown
+      id: extension-source
+      attributes:
+          label: Source of Installation
+          multiple: true
+          options:
+              - 'Chrome Web Store'
+              - 'GitHub Release (`.crx`)'
+              - 'GitHub Repo Clone (Dev mode)'
+              - "I don't know!"
+      validations:
+          required: true
+
+    - type: input
+      id: other-source
+      attributes:
+          label: If you select "Other" previously, please specify source
+          description: Please fill this only if you choose "Other" for source selection
+          placeholder: e.g. "Bleepbloorp"
+      validations:
+          required: false
+
+    - type: input
+      id: browser-version
+      attributes:
+          label: Web Browser name and version
+          placeholder: e.g. "Chrome 121.0.6167.184"
+      validations:
+          required: true
+
+    - type: input
+      id: extension-version
+      attributes:
+          label: Tidy Tab Groups version
+          placeholder: e.g. "v2.0.2"
+      validations:
+          required: true
+
+    - type: dropdown
+      attributes:
+          label: Does this happen when Tidy Tab Groups is disabled?
+          options:
+              - 'No'
+              - 'Yes'
+      validations:
+          required: true
+
+    - type: textarea
+      id: screenshots
+      attributes:
+          label: Screenshots or Videos
+          description: If applicable, attach any relevant screenshots or videos showing the issue.
+      validations:
+          required: false
+
+    - type: textarea
+      id: additional-information
+      attributes:
+          label: Additional Information
+          description: Provide any additional information about this bug.
+      validations:
+          required: false
+
+    - type: markdown
+      attributes:
+          value: |
+              ### Thank you so much for reporting this issue! 🙏 We will investigate and get back to you as soon as possible.
