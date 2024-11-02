@@ -70,6 +70,8 @@ We'd love to hear your feedback about any issues or potential features you'd lik
 
 **💬 Discord Server - [Over here!](https://discord.gg/aBdAfNfGEv)**
 
+**💬 Discord DM- [@MoeBazzi14](https://discord.com/users/361687372141690880) and [@elouangrimm](https://discord.com/users/939697576419131462)**
+
 **📤 Email - [tidytabgroups@gmail.com](mailto:tidytabgroups@gmail.com) [bazzimoe3@gmail.com](mailto:bazzimoe3@gmail.com) [elouan.grimm@gmail.com](mailto:elouan.grimm@gmail.com)**
 
 **🔗 Twitter - [Here!](https://x.com/TidyTabGroups)**
