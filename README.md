@@ -25,7 +25,7 @@
 
 <div>
 <details>
-<summary><h3>Pictures </summary>
+<summary><h2>Pictures</h2></summary>
 
 <div>
     <div>
@@ -70,6 +70,6 @@ We'd love to hear your feedback about any issues or potential features you'd lik
 
 **💬 Discord Server - [Over here!](https://discord.gg/aBdAfNfGEv)**
 
-**📤 Email - [bazzimoe3@gmail.com](mailto:bazzimoe3@gmail.com) [elouan.grimm@gmail.com](mailto:elouan.grimm@gmail.com)**
+**📤 Email - [tidytabgroups@gmail.com](mailto:tidytabgroups@gmail.com) [bazzimoe3@gmail.com](mailto:bazzimoe3@gmail.com) [elouan.grimm@gmail.com](mailto:elouan.grimm@gmail.com)**
 
 **🔗 Twitter - [Here!](https://x.com/TidyTabGroups)**
