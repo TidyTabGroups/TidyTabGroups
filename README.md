@@ -1,5 +1,5 @@
-# Tidy Tab Groups
-### Tired of tab clutter? Effortlessly group, collapse, and organize your tabs with Tidy Tab Groups.
+<h1 align="center">Tidy Tab Groups</h1>
+<h3 align="center">Tired of tab clutter? Effortlessly group, collapse, and organize your tabs with Tidy Tab Groups.</h3>
 
 <p align="center">
 <a href="https://chromewebstore.google.com/detail/tidy-tab-groups/fohgbkobjdckaapjimleemkolchkmebf">
