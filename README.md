@@ -11,6 +11,8 @@
 
 <img alt="Chrome Web Store Stars" src="https://img.shields.io/chrome-web-store/stars/fohgbkobjdckaapjimleemkolchkmebf?style=flat"> <img alt="Chrome Web Store Users" src="https://img.shields.io/chrome-web-store/users/fohgbkobjdckaapjimleemkolchkmebf?style=flat">
 
+[![Discord Shield](https://discord.com/api/guilds/1284250086003708025/widget.png?style=shield)](https://discord.gg/aBdAfNfGEv)
+
 <br>
 
 **Say goodbye to tab clutter and hello to effortless organization ✨**
