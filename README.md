@@ -11,6 +11,8 @@
 
 <img alt="Chrome Web Store Stars" src="https://img.shields.io/chrome-web-store/stars/fohgbkobjdckaapjimleemkolchkmebf?style=flat"> <img alt="Chrome Web Store Users" src="https://img.shields.io/chrome-web-store/users/fohgbkobjdckaapjimleemkolchkmebf?style=flat">
 
+<img alt="Chrome Web Store Size" src="https://img.shields.io/chrome-web-store/size/fohgbkobjdckaapjimleemkolchkmebf"> <img alt="File Count" src="https://img.shields.io/github/directory-file-count/tidytabgroups/tidytabgroups"> <img alt="Repo Size" src="https://img.shields.io/github/repo-size/tidytabgroups/tidytabgroups">
+
 [![Discord Shield](https://discord.com/api/guilds/1284250086003708025/widget.png?style=shield)](https://discord.gg/aBdAfNfGEv)
 
 <br>
