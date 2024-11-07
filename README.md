@@ -32,22 +32,9 @@
 <summary><h2>Pictures</h2></summary>
 
 <div>
-    <div>
-      <div>
-        <img src="https://lh3.googleusercontent.com/mpGgPVTRagPdExl6LDqPWBbmX1-lozCc7a9gJG07wbwUAFXpxT1vL76avfQvSFrQN_LMfhKF4GrtuWlN_e-ww9RzAQ=s1280-w1280-h800" alt="" width="100%"  />
-      </div>
-        </br>
-      <div>
-        <img src="https://lh3.googleusercontent.com/rOALgHclMPGd8szI5g_fxHV86b1VShRfC-hebz30ZXcZ2Z0pvgxeLbPBpMS-9kdqzyJcLGVdfDOyKieGxs3GhxwbULk=s1280-w1280-h800" alt="" width="100%"  />
-      </div>
-        </br>
-      <div>
-        <img src="https://lh3.googleusercontent.com/S9K5_Vr6mrK75mOlioFZHq8vfleH7w-3wux_DOrjipgNVsK5hp7hJSLpLVu9ustKI2WSWHuQqhp2OUxPADkqS1FoV1c=s1280-w1280-h800" alt="" width="100%"  />
-      </div>
-        </br>
-      <div>
-        <img src="https://lh3.googleusercontent.com/vf3NYFV1TwOXxvVqHAUP5dd6zySSeCWgHIqlV-DQN3okj3eRKkbX2adtF0p2PWRIPEFGAczsDJNcesKD_zAvvK6AwO4=s1280-w1280-h800" alt="" width="100%"  />
-      </div>
+  <img src="https://lh3.googleusercontent.com/mpGgPVTRagPdExl6LDqPWBbmX1-lozCc7a9gJG07wbwUAFXpxT1vL76avfQvSFrQN_LMfhKF4GrtuWlN_e-ww9RzAQ=s1280-w1280-h800" alt="" width="33%"  /><img src="https://lh3.googleusercontent.com/rOALgHclMPGd8szI5g_fxHV86b1VShRfC-hebz30ZXcZ2Z0pvgxeLbPBpMS-9kdqzyJcLGVdfDOyKieGxs3GhxwbULk=s1280-w1280-h800" alt="" width="33%"  />
+  
+  <img src="https://lh3.googleusercontent.com/S9K5_Vr6mrK75mOlioFZHq8vfleH7w-3wux_DOrjipgNVsK5hp7hJSLpLVu9ustKI2WSWHuQqhp2OUxPADkqS1FoV1c=s1280-w1280-h800" alt="" width="33%"  /><img src="https://lh3.googleusercontent.com/vf3NYFV1TwOXxvVqHAUP5dd6zySSeCWgHIqlV-DQN3okj3eRKkbX2adtF0p2PWRIPEFGAczsDJNcesKD_zAvvK6AwO4=s1280-w1280-h800" alt="" width="33%"  />
 </div>
 </details>
 </div>
