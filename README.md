@@ -1,5 +1,5 @@
-<h1 align="center">Tidy Tab Groups</h1>
-<h3 align="center">Tired of tab clutter? Effortlessly group, collapse, and organize your tabs with Tidy Tab Groups.</h3>
+<h1 align="center">Tidy Tabs</h1>
+<h3 align="center">Tired of tab clutter? Effortlessly group, collapse, and organize your tabs with Tidy Tabs</h3>
 
 <p align="center">
 <a href="https://chromewebstore.google.com/detail/tidy-tab-groups/fohgbkobjdckaapjimleemkolchkmebf">
@@ -15,19 +15,18 @@
 
 <br>
 
-**Say goodbye to tab clutter and hello to effortless organization ✨**
+Tidy Tabs for Chrome offers real-time tab management—including comprehensive features for grouping, collapsing, highlighting, and smart positioning—to help you stay productive in your browser, no matter how many tabs you're juggling. The extension's intelligent automation capabilities allow you to:
 
-**With Tidy Tab Groups, you can one-click to create new groups, automatically hide inactive groups, and highlight your active group ⭐**
+⭐️ Maintain crystal-clear focus with automatic highlighting of your current tab group while gracefully collapsing others<br>
+⭐️ Navigate tasks effortlessly with automatic tab positioning that remembers your previous context and places recent tabs within reach<br>
+⭐️ Capture and organize new ideas instantly by creating new tab groups with one-click actions or simple drag-and-drop<br>
+⭐️ Stay oriented with a persistent home tab that keeps you anchored
 
-**Need to quickly switch between tasks? Your last active tab is always remembered and ready for you 🎯**
-
-**Getting lost between your sea of tabs? Tidy Tab Groups intelligently arranges your active tabs for quick access, so you never lose track of your work 📌**
-
-**Whether you're managing multiple projects or just want a cleaner browser, Tidy Tab Groups is the effortless productivity boost for your browser. Try it out today, it's free! 💯**
+Tidy Tabs is more than just a tab organizer. It's a tool that helps you work with confidence, maintain clear context across multiple tasks, and navigate through your browser tabs effortlessly. Whether you're a professional managing multiple projects, or a student juggling research tabs, try it free today and experience a more organized, focused, and productive browsing experience! 💯
 
 <div>
 <details>
-<summary><h2>Pictures</h2></summary>
+<summary><h2>Open to See Images</h2></summary>
 
 <div>
   <img src="https://lh3.googleusercontent.com/mpGgPVTRagPdExl6LDqPWBbmX1-lozCc7a9gJG07wbwUAFXpxT1vL76avfQvSFrQN_LMfhKF4GrtuWlN_e-ww9RzAQ=s1280-w1280-h800" alt="" width="33%"  /><img src="https://lh3.googleusercontent.com/rOALgHclMPGd8szI5g_fxHV86b1VShRfC-hebz30ZXcZ2Z0pvgxeLbPBpMS-9kdqzyJcLGVdfDOyKieGxs3GhxwbULk=s1280-w1280-h800" alt="" width="33%"  />
@@ -39,7 +38,7 @@
 
 ## How to Install
 
-To install Tidy Tab Groups, you have two options:
+To install Tidy Tabs, you have two options:
 
 **You can install it from the [Web Store](https://chromewebstore.google.com/detail/tidy-tab-groups/fohgbkobjdckaapjimleemkolchkmebf) on Chromium-based browsers** or you can follow the steps below to install it manually: 
 
